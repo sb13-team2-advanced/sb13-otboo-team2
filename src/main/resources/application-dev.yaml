@@ -1,0 +1,41 @@
+spring:
+  config:
+    import: optional:file:.env.dev[.properties]
+  datasource:
+    url: jdbc:postgresql://${OOTD_DB_HOST:localhost}:${OOTD_DB_PORT:5432}/${OOTD_DB_NAME:ootd}
+    username: ${OOTD_DB_USERNAME:ootd}
+    password: ${OOTD_DB_PASSWORD:ootd1234}
+    driver-class-name: org.postgresql.Driver
+  jpa:
+    hibernate:
+      ddl-auto: ${OOTD_JPA_DDL_AUTO:validate}
+    properties:
+      hibernate:
+        format_sql: ${OOTD_JPA_FORMAT_SQL:true}
+    show-sql: ${OOTD_JPA_SHOW_SQL:false}
+  flyway:
+    enabled: ${OOTD_FLYWAY_ENABLED:true}
+  docker:
+    compose:
+      enabled: ${OOTD_DOCKER_COMPOSE_ENABLED:true}
+      file: compose.yaml
+      lifecycle-management: start-only
+      arguments:
+        - "--env-file"
+        - ".env.dev"
+
+server:
+  port: ${OOTD_SERVER_PORT:8080}
+
+logging:
+  level:
+    root: info
+    codeit.ootd: debug
+    org.hibernate.SQL: debug
+    org.hibernate.orm.jdbc.batch: trace
+    org.hibernate.orm.jdbc.bind: "off"
+
+ootd:
+  openapi:
+    server-url: http://localhost:${server.port:8080}
+    server-description: 로컬 개발 서버

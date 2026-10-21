@@ -1,0 +1,13 @@
+# Docker 빌드 컨텍스트에 포함하지 않을 파일/폴더.
+# 특히 .env.dev와 .git이 이미지에 절대 들어가면 안 되므로 명시적으로 제외한다.
+.git
+.gradle
+.idea
+build
+.logs
+.env
+.env.dev
+.env.prod
+*.log
+docs
+scripts/performance

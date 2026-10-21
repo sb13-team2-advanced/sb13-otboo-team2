@@ -1,0 +1,20 @@
+services:
+  postgres:
+    image: postgres:16
+    ports:
+      - "127.0.0.1:${OOTD_DB_PORT:-5432}:5432"
+    environment:
+      POSTGRES_DB: ${OOTD_DB_NAME:-ootd}
+      POSTGRES_USER: ${OOTD_DB_USERNAME:-ootd}
+      POSTGRES_PASSWORD: ${OOTD_DB_PASSWORD:?Set OOTD_DB_PASSWORD in .env.dev}
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U \"$$POSTGRES_USER\" -d \"$$POSTGRES_DB\""]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+volumes:
+  postgres-data:
