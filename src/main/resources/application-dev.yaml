@@ -18,6 +18,8 @@ spring:
   docker:
     compose:
       enabled: ${OOTD_DOCKER_COMPOSE_ENABLED:true}
+      file: compose.yaml
+      lifecycle-management: start-only
       arguments:
         - "--env-file"
         - ".env.dev"

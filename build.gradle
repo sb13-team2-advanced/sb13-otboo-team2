@@ -55,6 +55,9 @@ dependencies {
     compileOnly 'org.projectlombok:lombok'
     annotationProcessor 'org.projectlombok:lombok'
 
+    // Docker
+    developmentOnly 'org.springframework.boot:spring-boot-docker-compose'
+
     // Actuator
     implementation 'org.springframework.boot:spring-boot-starter-actuator'
 
