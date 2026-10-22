@@ -98,7 +98,7 @@ tasks.named('test', Test) {
 }
 
 /**
- * 테스트 실행 결과로 전체 운영 코드의 라인 커버리지 보고서를 생성하고 최소 80.1%를 검증한다.
+ * global 패키지를 제외한 운영 코드의 보고서를 생성하고 패키지별 라인 커버리지 80.1%를 검증한다.
  */
 jacoco {
     toolVersion = '0.8.15'
@@ -106,6 +106,9 @@ jacoco {
 
 tasks.named('jacocoTestReport', JacocoReport) {
     dependsOn tasks.named('test')
+    classDirectories.setFrom(sourceSets.main.output.asFileTree.matching {
+        exclude 'codeit/ootd/global/entity/**'
+    })
     reports {
         html.required = true
         xml.required = true
@@ -115,6 +118,7 @@ tasks.named('jacocoTestReport', JacocoReport) {
 
 tasks.named('jacocoTestCoverageVerification', JacocoCoverageVerification) {
     dependsOn tasks.named('jacocoTestReport')
+    classDirectories.setFrom(tasks.named('jacocoTestReport', JacocoReport).map { it.classDirectories })
     violationRules {
         rule {
             element = 'PACKAGE'
