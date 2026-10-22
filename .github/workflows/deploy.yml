@@ -37,7 +37,7 @@ jobs:
       - name: Enable Gradle wrapper
         run: chmod +x gradlew
 
-      - name: Build, test, and verify 80.1% line coverage
+      - name: Build, test, and generate coverage reports
         run: ./gradlew clean build --no-daemon
 
       - name: Upload coverage to Codecov

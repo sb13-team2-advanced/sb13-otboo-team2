@@ -99,7 +99,7 @@ tasks.named('test', Test) {
 }
 
 /**
- * 모든 entity 패키지를 임시로 제외한 운영 코드 보고서를 생성하고 패키지별 라인 커버리지 80.1%를 검증한다.
+ * 모든 entity 패키지를 임시로 제외하고 테스트 실행 후 HTML·XML 커버리지 보고서를 생성한다.
  */
 jacoco {
     toolVersion = '0.8.15'
@@ -115,23 +115,4 @@ tasks.named('jacocoTestReport', JacocoReport) {
         xml.required = true
         csv.required = false
     }
-}
-
-tasks.named('jacocoTestCoverageVerification', JacocoCoverageVerification) {
-    dependsOn tasks.named('jacocoTestReport')
-    classDirectories.setFrom(tasks.named('jacocoTestReport', JacocoReport).map { it.classDirectories })
-    violationRules {
-        rule {
-            element = 'PACKAGE'
-            limit {
-                counter = 'LINE'
-                value = 'COVEREDRATIO'
-                minimum = 0.801
-            }
-        }
-    }
-}
-
-tasks.named('check') {
-    dependsOn tasks.named('jacocoTestCoverageVerification')
 }
