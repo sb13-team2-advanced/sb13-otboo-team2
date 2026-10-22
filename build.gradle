@@ -1,5 +1,6 @@
 plugins {
     id 'java'
+    id 'jacoco'
     id 'org.springframework.boot' version '4.1.1'
     id 'io.spring.dependency-management' version '1.1.7'
 }
@@ -88,9 +89,30 @@ dependencies {
     testImplementation 'org.springframework.boot:spring-boot-starter-websocket-test'
     testCompileOnly 'org.projectlombok:lombok'
     testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+    testRuntimeOnly 'com.h2database:h2'
     testAnnotationProcessor 'org.projectlombok:lombok'
 }
 
 tasks.named('test', Test) {
     useJUnitPlatform()
+    finalizedBy tasks.named('jacocoTestReport')
+}
+
+/**
+ * 모든 entity 패키지를 임시로 제외하고 테스트 실행 후 HTML·XML 커버리지 보고서를 생성한다.
+ */
+jacoco {
+    toolVersion = '0.8.15'
+}
+
+tasks.named('jacocoTestReport', JacocoReport) {
+    dependsOn tasks.named('test')
+    classDirectories.setFrom(sourceSets.main.output.asFileTree.matching {
+        exclude '**/entity/**'
+    })
+    reports {
+        html.required = true
+        xml.required = true
+        csv.required = false
+    }
 }
