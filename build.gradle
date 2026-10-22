@@ -89,6 +89,7 @@ dependencies {
     testImplementation 'org.springframework.boot:spring-boot-starter-websocket-test'
     testCompileOnly 'org.projectlombok:lombok'
     testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+    testRuntimeOnly 'com.h2database:h2'
     testAnnotationProcessor 'org.projectlombok:lombok'
 }
 
@@ -98,7 +99,7 @@ tasks.named('test', Test) {
 }
 
 /**
- * global 패키지를 제외한 운영 코드의 보고서를 생성하고 패키지별 라인 커버리지 80.1%를 검증한다.
+ * 공통 엔티티를 제외한 운영 코드의 보고서를 생성하고 패키지별 라인 커버리지 80.1%를 검증한다.
  */
 jacoco {
     toolVersion = '0.8.15'
