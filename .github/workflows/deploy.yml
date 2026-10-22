@@ -18,26 +18,9 @@ jobs:
     name: Test and build
     runs-on: ubuntu-latest
     timeout-minutes: 20
-    services:
-      postgres:
-        image: postgres:16
-        env:
-          POSTGRES_DB: ootd_test
-          POSTGRES_USER: ootd_test
-          POSTGRES_PASSWORD: ci_test_password
-        ports:
-          - 5432:5432
-        options: >-
-          --health-cmd "pg_isready -U ootd_test -d ootd_test"
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 5
     env:
-      SPRING_PROFILES_ACTIVE: dev
+      SPRING_PROFILES_ACTIVE: test
       SPRING_DOCKER_COMPOSE_ENABLED: 'false'
-      SPRING_DATASOURCE_URL: jdbc:postgresql://localhost:5432/ootd_test
-      SPRING_DATASOURCE_USERNAME: ootd_test
-      SPRING_DATASOURCE_PASSWORD: ci_test_password
     steps:
       - name: Checkout
         uses: actions/checkout@v6
