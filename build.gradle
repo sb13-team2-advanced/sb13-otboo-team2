@@ -1,5 +1,6 @@
 plugins {
     id 'java'
+    id 'jacoco'
     id 'org.springframework.boot' version '4.1.1'
     id 'io.spring.dependency-management' version '1.1.7'
 }
@@ -93,4 +94,39 @@ dependencies {
 
 tasks.named('test', Test) {
     useJUnitPlatform()
+    finalizedBy tasks.named('jacocoTestReport')
+}
+
+/**
+ * 테스트 실행 결과로 전체 운영 코드의 라인 커버리지 보고서를 생성하고 최소 80.1%를 검증한다.
+ */
+jacoco {
+    toolVersion = '0.8.15'
+}
+
+tasks.named('jacocoTestReport', JacocoReport) {
+    dependsOn tasks.named('test')
+    reports {
+        html.required = true
+        xml.required = true
+        csv.required = false
+    }
+}
+
+tasks.named('jacocoTestCoverageVerification', JacocoCoverageVerification) {
+    dependsOn tasks.named('jacocoTestReport')
+    violationRules {
+        rule {
+            element = 'PACKAGE'
+            limit {
+                counter = 'LINE'
+                value = 'COVEREDRATIO'
+                minimum = 0.801
+            }
+        }
+    }
+}
+
+tasks.named('check') {
+    dependsOn tasks.named('jacocoTestCoverageVerification')
 }

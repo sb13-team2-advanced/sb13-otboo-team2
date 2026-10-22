@@ -54,8 +54,17 @@ jobs:
       - name: Enable Gradle wrapper
         run: chmod +x gradlew
 
-      - name: Build, test, and check Javadoc
+      - name: Build, test, and verify 80.1% line coverage
         run: ./gradlew clean build --no-daemon
+
+      - name: Upload coverage to Codecov
+        if: ${{ !cancelled() && hashFiles('build/reports/jacoco/test/jacocoTestReport.xml') != '' }}
+        uses: codecov/codecov-action@v5
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+          files: build/reports/jacoco/test/jacocoTestReport.xml
+          disable_search: true
+          fail_ci_if_error: true
 
       - name: Upload test reports
         if: ${{ !cancelled() }}
@@ -65,6 +74,7 @@ jobs:
           path: |
             build/reports/tests/
             build/test-results/
+            build/reports/jacoco/
             build/reports/checkstyle/
           retention-days: 7
           if-no-files-found: ignore
