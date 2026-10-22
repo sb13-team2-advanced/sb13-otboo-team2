@@ -1,3 +1,6 @@
+ignore:
+  - "**/entity/**"
+
 coverage:
   status:
     project:

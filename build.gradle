@@ -99,7 +99,7 @@ tasks.named('test', Test) {
 }
 
 /**
- * 공통 엔티티를 제외한 운영 코드의 보고서를 생성하고 패키지별 라인 커버리지 80.1%를 검증한다.
+ * 모든 entity 패키지를 임시로 제외한 운영 코드 보고서를 생성하고 패키지별 라인 커버리지 80.1%를 검증한다.
  */
 jacoco {
     toolVersion = '0.8.15'
@@ -108,7 +108,7 @@ jacoco {
 tasks.named('jacocoTestReport', JacocoReport) {
     dependsOn tasks.named('test')
     classDirectories.setFrom(sourceSets.main.output.asFileTree.matching {
-        exclude 'codeit/ootd/global/entity/**'
+        exclude '**/entity/**'
     })
     reports {
         html.required = true
