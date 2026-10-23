@@ -1,4 +1,4 @@
-package codeit.ootd.domain.follow.enums;
+package codeit.ootd.global.enums;
 
 public enum SortDirection {
     ASCENDING,

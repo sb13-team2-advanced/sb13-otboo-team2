@@ -1,6 +1,6 @@
 package codeit.ootd.domain.follow.dto;
 
-import codeit.ootd.domain.follow.enums.SortDirection;
+import codeit.ootd.global.enums.SortDirection;
 import java.util.List;
 import java.util.UUID;
 
