@@ -160,6 +160,33 @@ class LocalFileStorageTest {
     }
 
     @Test
+    void 일부만_저장된_뒤_실패하면_저장된_파일을_정리한다() {
+        // given: 5바이트를 읽은 뒤 읽기 오류가 발생해 일부만 기록되는 파일
+        MockMultipartFile partial = new MockMultipartFile("image", "shirt.png", "image/png", "a".getBytes()) {
+            @Override
+            public InputStream getInputStream() {
+                return new InputStream() {
+                    private int count = 0;
+
+                    @Override
+                    public int read() throws IOException {
+                        if (count++ < 5) {
+                            return 'a';
+                        }
+                        throw new IOException("read failed");
+                    }
+                };
+            }
+        };
+
+        // when/then
+        assertThatThrownBy(() -> storage.upload(partial, "clothes"))
+            .isInstanceOfSatisfying(OtbooException.class,
+                e -> assertThat(e.getErrorCode()).isSameAs(ErrorCode.FILE_UPLOAD_FAILED));
+        assertThat(root.resolve("clothes")).isEmptyDirectory();
+    }
+
+    @Test
     void 저장한_파일을_삭제한다() {
         // given
         String url = storage.upload(image("shirt.png", "image/png", "a"), "clothes");

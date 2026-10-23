@@ -58,6 +58,7 @@ public class LocalFileStorage implements FileStorage {
             Files.copy(inputStream, target);
         } catch (IOException e) {
             log.error("파일 저장 실패: target={}", target, e);
+            deleteQuietly(target);
             throw new OtbooException(ErrorCode.FILE_UPLOAD_FAILED);
         }
 
@@ -82,6 +83,13 @@ public class LocalFileStorage implements FileStorage {
             return;
         }
 
+        deleteQuietly(target);
+    }
+
+    /**
+     * 파일을 삭제하되 실패해도 예외를 던지지 않는다. 저장 도중 실패해 일부만 남은 파일을 정리할 때도 사용한다.
+     */
+    private void deleteQuietly(Path target) {
         try {
             Files.deleteIfExists(target);
         } catch (IOException e) {
