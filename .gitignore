@@ -93,3 +93,6 @@ $RECYCLE.BIN/
 *.lnk
 
 !gradle/wrapper/gradle-wrapper.jar
+
+### Uploaded files (local storage) ###
+uploads/
