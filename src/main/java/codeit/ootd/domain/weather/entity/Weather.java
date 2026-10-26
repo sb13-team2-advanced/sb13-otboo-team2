@@ -3,13 +3,11 @@ package codeit.ootd.domain.weather.entity;
 import codeit.ootd.global.entity.BaseTimeEntity;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
-import jakarta.persistence.FetchType;
-import jakarta.persistence.JoinColumn;
-import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
 import jakarta.persistence.UniqueConstraint;
 import java.time.Instant;
 import java.time.LocalDate;
+import java.util.UUID;
 import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
@@ -26,9 +24,8 @@ import lombok.NoArgsConstructor;
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class Weather extends BaseTimeEntity {
 
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "location_id", nullable = false)
-    private WeatherLocation location;
+    @Column(name = "location_id", nullable = false)
+    private UUID locationId;
 
     @Column(nullable = false)
     private LocalDate weatherDate;
@@ -67,7 +64,7 @@ public class Weather extends BaseTimeEntity {
     private short forecastSlotCount;
 
     public Weather(
-        WeatherLocation location,
+        UUID locationId,
         LocalDate weatherDate,
         Instant calculatedAt,
         double temperatureAvg,
@@ -81,7 +78,7 @@ public class Weather extends BaseTimeEntity {
         double windSpeed,
         short forecastSlotCount
     ) {
-        this.location = location;
+        this.locationId = locationId;
         this.weatherDate = weatherDate;
         this.calculatedAt = calculatedAt;
         this.temperatureAvg = temperatureAvg;

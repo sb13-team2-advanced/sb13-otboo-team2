@@ -5,6 +5,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import java.time.Instant;
 import java.time.OffsetDateTime;
+import java.util.UUID;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
@@ -26,15 +27,10 @@ class WeatherForecastTest {
             OffsetDateTime.parse("2026-10-23T18:00:00+09:00")
                 .toInstant();
 
-        WeatherLocation location = new WeatherLocation(
-            "8828308281fffff",
-            37.5665,
-            126.9780,
-            collectedAt15
-        );
+        UUID locationId = UUID.randomUUID();
 
         WeatherForecast forecast = new WeatherForecast(
-            location,
+            locationId,
             forecastAt18,
             collectedAt12,
             18.0,
@@ -89,15 +85,10 @@ class WeatherForecastTest {
             OffsetDateTime.parse("2026-10-23T18:00:00+09:00")
                 .toInstant();
 
-        WeatherLocation location = new WeatherLocation(
-            "8828308281fffff",
-            37.5665,
-            126.9780,
-            collectedAt15
-        );
+        UUID locationId = UUID.randomUUID();
 
         WeatherForecast forecast = new WeatherForecast(
-            location,
+            locationId,
             forecastAt18,
             collectedAt15,
             15.0,

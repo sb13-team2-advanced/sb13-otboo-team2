@@ -40,7 +40,7 @@ class WeatherForecastRepositoryTest {
         Instant forecastAt = Instant.parse("2026-10-22T06:00:00Z");
 
         WeatherForecast forecast = new WeatherForecast(
-            location,
+            location.getId(),
             forecastAt,
             Instant.parse("2026-10-22T06:00:00Z"),
             18.5,
@@ -55,7 +55,7 @@ class WeatherForecastRepositoryTest {
         forecastRepository.saveAndFlush(forecast);
 
         WeatherForecast found = forecastRepository
-            .findByLocationAndForecastAt(location, forecastAt)
+            .findByLocationIdAndForecastAt(location.getId(), forecastAt)
             .orElseThrow();
 
         assertThat(found.getId()).isEqualTo(forecast.getId());
@@ -80,13 +80,13 @@ class WeatherForecastRepositoryTest {
         Instant collectedAt = Instant.parse("2022-10-22T06:00:00Z");
 
         WeatherForecast first = new WeatherForecast(
-            location, forecastAt, collectedAt,
+            location.getId(), forecastAt, collectedAt,
             18.5, (short) 65, 800, 0.2,
             0.0, 0.0, 2.5
         );
 
         WeatherForecast duplicate = new WeatherForecast(
-            location, forecastAt, collectedAt,
+            location.getId(), forecastAt, collectedAt,
             20.0, (short) 70, 801, 0.5,
             0.0, 0.0, 3.0
         );

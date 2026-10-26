@@ -42,7 +42,7 @@ class WeatherRepositoryTest {
         LocalDate weatherDate = LocalDate.of(2026, 10, 23);
 
         Weather weather = new Weather(
-            location,
+            location.getId(),
             weatherDate,
             Instant.parse("2026-10-22T06:00:00Z"),
             17.0,
@@ -60,7 +60,7 @@ class WeatherRepositoryTest {
         weatherRepository.saveAndFlush(weather);
 
         Weather found = weatherRepository
-            .findByLocationAndWeatherDate(location, weatherDate)
+            .findByLocationIdAndWeatherDate(location.getId(), weatherDate)
             .orElseThrow();
 
         assertThat(found.getId()).isEqualTo(weather.getId());
@@ -86,14 +86,14 @@ class WeatherRepositoryTest {
         Instant calculatedAt = Instant.parse("2026-10-22T06:00:00Z");
 
         Weather first = new Weather(
-            location, weatherDate, calculatedAt,
+            location.getId(), weatherDate, calculatedAt,
             17.0, 12.0, 21.0,
             (short) 65, 800, 0.3,
             0.0, 0.0, 2.5, (short) 8
         );
 
         Weather duplicate = new Weather(
-            location, weatherDate, calculatedAt,
+            location.getId(), weatherDate, calculatedAt,
             19.0, 13.0, 23.0,
             (short) 70, 801, 0.5,
             0.0, 0.0, 3.0, (short) 8
