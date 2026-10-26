@@ -20,8 +20,9 @@ public interface WeatherForecastRepository
     @Query("""
         SELECT f FROM WeatherForecast f
         WHERE f.locationId = :locationId
-          AND f.locationId >= :start
+          AND f.forecastAt >= :start
           AND f.forecastAt < :end
+        ORDER BY f.forecastAt ASC
         """)
     List<WeatherForecast> findForecastsForPeriod(
         @Param("locationId") UUID locationId,
