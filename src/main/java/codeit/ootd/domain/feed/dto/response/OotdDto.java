@@ -1,5 +1,6 @@
 package codeit.ootd.domain.feed.dto.response;
 
+import codeit.ootd.domain.clothes.dto.response.ClothesAttributeWithDefDto;
 import java.util.List;
 import java.util.UUID;
 
