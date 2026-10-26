@@ -15,6 +15,13 @@ springdoc:
     operations-sorter: method
     tags-sorter: alpha
 
+otboo:
+  storage:
+    type: local
+    local:
+      root-path: ./uploads
+      base-url: /files
+
 ootd:
   weather:
     openweathermap:
