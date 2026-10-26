@@ -170,6 +170,51 @@ class UserControllerTest {
                 .andExpect(jsonPath("$.message")
                         .value("이미 사용 중인 이메일입니다."));
     }
+    
+    @Test
+    @DisplayName("이름이 100자를 초과하면 400 Bad Request를 반환한다")
+    void signup_nameTooLong_returnsBadRequest() throws Exception {
+        // given
+        String requestBody = """
+            {
+                "name": "%s",
+                "email": "test@example.com",
+                "password": "password123!"
+            }
+            """.formatted("가".repeat(101));
+
+        // when & then
+        mockMvc.perform(post("/api/users")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(requestBody))
+                .andExpect(status().isBadRequest());
+
+        verifyNoInteractions(userService);
+    }
+
+    @Test
+    @DisplayName("이메일이 100자를 초과하면 400 Bad Request를 반환한다")
+    void signup_emailTooLong_returnsBadRequest() throws Exception {
+        // given
+        String longEmail = "a".repeat(89) + "@example.com";
+        // 89 + 12 = 101자
+
+        String requestBody = """
+            {
+                "name": "테스트사용자",
+                "email": "%s",
+                "password": "password123!"
+            }
+            """.formatted(longEmail);
+
+        // when & then
+        mockMvc.perform(post("/api/users")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(requestBody))
+                .andExpect(status().isBadRequest());
+
+        verifyNoInteractions(userService);
+    }
 
 
     private UserCreateRequest validRequest() {
