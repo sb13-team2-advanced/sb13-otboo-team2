@@ -1,7 +1,9 @@
 package codeit.ootd.domain.user.controller;
 
 import codeit.ootd.domain.user.dto.request.UserCreateRequest;
+import codeit.ootd.domain.user.exception.DuplicateEmailException;
 import codeit.ootd.domain.user.service.UserService;
+import codeit.ootd.global.exception.GlobalExceptionHandler;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -16,9 +18,11 @@ import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.validation.beanvalidation.LocalValidatorFactoryBean;
 import tools.jackson.databind.json.JsonMapper;
 
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 @ExtendWith(MockitoExtension.class)
@@ -41,6 +45,7 @@ class UserControllerTest {
 
         mockMvc = MockMvcBuilders
                 .standaloneSetup(new UserController(userService))
+                .setControllerAdvice(new GlobalExceptionHandler())
                 .setMessageConverters(
                         new JacksonJsonHttpMessageConverter(objectMapper)
                 )
@@ -142,6 +147,28 @@ class UserControllerTest {
                 .andExpect(status().isBadRequest());
 
         verifyNoInteractions(userService);
+    }
+
+
+    @Test
+    @DisplayName("중복된 이메일로 회원가입하면 409를 반환한다")
+    void signup_duplicateEmail_returnsConflict() throws Exception {
+        // given
+        UserCreateRequest request = validRequest();
+
+        doThrow(new DuplicateEmailException())
+                .when(userService)
+                .signup(request);
+
+        // when & then
+        mockMvc.perform(post("/api/users")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.exceptionName")
+                        .value("DuplicateEmailException"))
+                .andExpect(jsonPath("$.message")
+                        .value("이미 사용 중인 이메일입니다."));
     }
 
 

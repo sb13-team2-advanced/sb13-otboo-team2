@@ -1,8 +1,11 @@
 package codeit.ootd.domain.user.exception;
 
-public class DuplicateEmailException extends RuntimeException{
+import codeit.ootd.global.exception.ErrorCode;
+import codeit.ootd.global.exception.OtbooException;
+
+public class DuplicateEmailException extends OtbooException {
 
     public DuplicateEmailException() {
-        super("이미 사용 중인 이메일입니다.");
+        super(ErrorCode.USER_EMAIL_DUPLICATED);
     }
 }
