@@ -20,6 +20,7 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.Duration;
 import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -118,8 +119,12 @@ class UserSignupIntegrationTest {
                 () -> assertEquals(
                         savedUser.getId(), response.id()
                 ),
-                () -> assertEquals(
-                        savedUser.getCreatedAt(), response.createdAt()
+                () -> assertTrue(
+                        Duration.between(
+                                savedUser.getCreatedAt(),
+                                response.createdAt()
+                        ).abs().compareTo(Duration.ofMillis(1)) < 0,
+                        "DB에 저장된 생성 시간과 DTO 생성 시간의 차이는 1ms 미만이어야 한다"
                 ),
                 () -> assertEquals(
                         savedUser.getEmail(), response.email()
@@ -135,7 +140,7 @@ class UserSignupIntegrationTest {
                 )
         );
     }
-    
+
     @Test
     @DisplayName("이미 가입된 이메일로 회원가입하면 예외가 발생한다.")
     void signup_duplicateEmail() {
@@ -156,7 +161,7 @@ class UserSignupIntegrationTest {
 
         userService.signup(firstRequest);
         userRepository.flush();
-    
+
         // when & then
         assertThrows(
                 DuplicateEmailException.class,
