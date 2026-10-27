@@ -8,6 +8,7 @@ import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 public class UserCreateRequestValidationTest {
@@ -104,4 +105,43 @@ public class UserCreateRequestValidationTest {
         // then
         assertTrue(violations.isEmpty());
     }
+
+    @Test
+    @DisplayName("비밀번호가 UTF-8 기준 72바이트 이하면 검증을 통과한다")
+    void password_within72Bytes_isValid() {
+        UserCreateRequest englishRequest = new UserCreateRequest(
+                "테스트사용자",
+                "test@example.com",
+                "a".repeat(72)
+        );
+
+        UserCreateRequest koreanRequest = new UserCreateRequest(
+                "테스트사용자",
+                "test@example.com",
+                "가".repeat(24)
+        );
+
+        assertTrue(validator.validate(englishRequest).isEmpty());
+        assertTrue(validator.validate(koreanRequest).isEmpty());
+    }
+
+    @Test
+    @DisplayName("비밀번호가 UTF-8 기준 72바이트를 초과하면 검증에 실패한다")
+    void password_over72Bytes_isInvalid() {
+        UserCreateRequest englishRequest = new UserCreateRequest(
+                "테스트사용자",
+                "test@example.com",
+                "a".repeat(73)
+        );
+
+        UserCreateRequest koreanRequest = new UserCreateRequest(
+                "테스트사용자",
+                "test@example.com",
+                "가".repeat(25)
+        );
+
+        assertFalse(validator.validate(englishRequest).isEmpty());
+        assertFalse(validator.validate(koreanRequest).isEmpty());
+    }
+
 }
