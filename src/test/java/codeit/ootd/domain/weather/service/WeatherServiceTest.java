@@ -208,6 +208,53 @@ class WeatherServiceTest {
         assertThat(saved.getRainAmount()).isEqualTo(1.0);
     }
 
+    @Test
+    @DisplayName("일별 강수량은 당일 00시를 제외하고 다음 날 00시를 포함한다")
+    void shouldUseCorrectPrecipitationTimeRange() {
+
+        givenForecasts(
+            forecast("2026-10-25T15:00:00Z",
+                10.0, (short) 60, 800,
+                0.1, 50.0, 40.0, 2.0),
+
+            forecast("2026-10-25T18:00:00Z",
+                20.0, (short) 70, 500,
+                0.4, 2.0, 1.0, 3.0),
+
+            forecast("2026-10-26T12:00:00Z",
+                30.0, (short) 80, 600,
+                0.5, 3.0, 2.0, 4.0)
+        );
+
+        WeatherForecast nextDayStart = forecast(
+            "2026-10-26T15:00:00Z",
+            99.0, (short) 90, 600,
+            0.9, 4.0, 3.0, 8.0
+        );
+
+        when(weatherForecastRepository.findByLocationIdAndForecastAt(
+            locationId, END
+        )).thenReturn(Optional.of(nextDayStart));
+
+        when(weatherRepository.findByLocationIdAndWeatherDate(
+            locationId, WEATHER_DATE
+        )).thenReturn(Optional.empty());
+
+        weatherService.calculateAndSaveDailyWeather(
+            location, WEATHER_DATE
+        );
+
+        Weather saved = captureSavedWeather();
+
+        assertThat(saved.getRainAmount()).isEqualTo(9.0);
+
+        assertThat(saved.getSnowAmount()).isEqualTo(6.0);
+
+        assertThat(saved.getTemperatureAvg()).isEqualTo(20.0);
+        assertThat(saved.getTemperatureMax()).isEqualTo(30.0);
+        assertThat(saved.getForecastSlotCount()).isEqualTo((short) 3);
+    }
+
     private void givenForecasts(WeatherForecast... forecasts) {
         when(weatherForecastRepository.findForecastsForPeriod(
             locationId, START, END
