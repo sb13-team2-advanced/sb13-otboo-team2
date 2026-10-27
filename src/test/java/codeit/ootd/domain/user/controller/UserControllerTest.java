@@ -251,5 +251,43 @@ class UserControllerTest {
         );
     }
 
+    @Test
+    @DisplayName("비밀번호가 72바이트를 초과하면 400 Bad Request를 반환한다")
+    void signup_passwordOver72Bytes_returnsBadRequest() throws Exception {
+        // given
+        UserCreateRequest request = new UserCreateRequest(
+                "테스트사용자",
+                "test@example.com",
+                "a".repeat(73)
+        );
+
+        // when & then
+        mockMvc.perform(post("/api/users")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isBadRequest());
+
+        verifyNoInteractions(userService);
+    }
+
+    @Test
+    @DisplayName("한글 비밀번호가 72바이트를 초과하면 400 Bad Request를 반환한다")
+    void signup_koreanPasswordOver72Bytes_returnsBadRequest() throws Exception {
+        // given
+        UserCreateRequest request = new UserCreateRequest(
+                "테스트사용자",
+                "test@example.com",
+                "가".repeat(25)
+        );
+
+        // when & then
+        mockMvc.perform(post("/api/users")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isBadRequest());
+
+        verifyNoInteractions(userService);
+    }
+
 
 }
