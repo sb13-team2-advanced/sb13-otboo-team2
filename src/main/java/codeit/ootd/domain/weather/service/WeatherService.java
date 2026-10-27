@@ -81,13 +81,27 @@ public class WeatherService {
             .max()
             .orElseThrow();
 
+        Optional<WeatherForecast> nextDayStartForecast =
+            weatherForecastRepository.findByLocationIdAndForecastAt(
+                location.getId(),
+                end
+            );
+
         double rainAmount = forecasts.stream()
+            .filter(f -> f.getForecastAt().isAfter(start))
             .mapToDouble(WeatherForecast::getRainAmount)
-            .sum();
+            .sum()
+            + nextDayStartForecast
+            .map(WeatherForecast::getRainAmount)
+            .orElse(0.0);
 
         double snowAmount = forecasts.stream()
+            .filter(f -> f.getForecastAt().isAfter(start))
             .mapToDouble(WeatherForecast::getSnowAmount)
-            .sum();
+            .sum()
+            + nextDayStartForecast
+            .map(WeatherForecast::getSnowAmount)
+            .orElse(0.0);
 
         Map<Integer, Long> codeCounts = forecasts.stream()
             .collect(Collectors.groupingBy(
