@@ -12,3 +12,8 @@ spring:
   docker:
     compose:
       enabled: false
+
+ootd:
+  weather:
+    openweathermap:
+      api-key: test-key

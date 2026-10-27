@@ -21,3 +21,8 @@ otboo:
     local:
       root-path: ./uploads
       base-url: /files
+
+ootd:
+  weather:
+    openweathermap:
+      api-key: ${OWM_API_KEY}
