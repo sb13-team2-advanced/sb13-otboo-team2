@@ -1,6 +1,7 @@
 package codeit.ootd.domain.user.integration;
 
 import codeit.ootd.domain.user.dto.request.UserCreateRequest;
+import codeit.ootd.domain.user.dto.response.UserDto;
 import codeit.ootd.domain.user.entity.User;
 import codeit.ootd.domain.user.entity.UserRole;
 import codeit.ootd.domain.user.entity.UserStatus;
@@ -54,12 +55,9 @@ class UserSignupIntegrationTest {
         );
 
         // when
-        userService.signup(request);
+        UserDto response = userService.signup(request);
 
-        // INSERT SQL을 DB에 반영
         userRepository.flush();
-
-        // 1차 캐시를 초기화해 DB에서 다시 조회
         entityManager.clear();
 
         // then
@@ -111,6 +109,29 @@ class UserSignupIntegrationTest {
                 ),
                 () -> assertNotNull(
                         savedUser.getUpdatedAt()
+                ),
+
+                // UserDto 응답 검증
+                () -> assertNotNull(
+                        response
+                ),
+                () -> assertEquals(
+                        savedUser.getId(), response.id()
+                ),
+                () -> assertEquals(
+                        savedUser.getCreatedAt(), response.createdAt()
+                ),
+                () -> assertEquals(
+                        savedUser.getEmail(), response.email()
+                ),
+                () -> assertEquals(
+                        savedUser.getName(), response.name()
+                ),
+                () -> assertEquals(
+                        savedUser.getRole(), response.role()
+                ),
+                () -> assertEquals(
+                        savedUser.isLocked(), response.locked()
                 )
         );
     }
