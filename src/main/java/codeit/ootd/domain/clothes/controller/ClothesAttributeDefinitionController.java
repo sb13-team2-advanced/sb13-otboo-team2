@@ -3,12 +3,10 @@ package codeit.ootd.domain.clothes.controller;
 import codeit.ootd.domain.clothes.dto.request.ClothesAttributeDefCreateRequest;
 import codeit.ootd.domain.clothes.dto.request.ClothesAttributeDefUpdateRequest;
 import codeit.ootd.domain.clothes.dto.response.ClothesAttributeDefDto;
-import codeit.ootd.domain.clothes.dto.response.ClothesAttributeDefDtoCursorResponse;
 import codeit.ootd.domain.clothes.service.ClothesAttributeDefinitionService;
 import codeit.ootd.global.enums.SortDirection;
 import jakarta.validation.Valid;
-import jakarta.validation.constraints.Max;
-import jakarta.validation.constraints.Min;
+import java.util.List;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
@@ -37,15 +35,11 @@ public class ClothesAttributeDefinitionController {
     }
 
     @GetMapping
-    public ResponseEntity<ClothesAttributeDefDtoCursorResponse> list(
-            @RequestParam(required = false) String cursor,
-            @RequestParam(required = false) UUID idAfter,
-            @RequestParam @Min(1) @Max(100) int limit,
+    public ResponseEntity<List<ClothesAttributeDefDto>> list(
             @RequestParam(required = false) String sortBy,
             @RequestParam(required = false) SortDirection sortDirection,
             @RequestParam(required = false) String keywordLike) {
-        return ResponseEntity.ok(
-                definitionService.list(cursor, idAfter, limit, sortBy, sortDirection, keywordLike));
+        return ResponseEntity.ok(definitionService.list(sortBy, sortDirection, keywordLike));
     }
 
     @PatchMapping("/{definitionId}")

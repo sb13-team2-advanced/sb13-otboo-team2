@@ -3,13 +3,11 @@ package codeit.ootd.domain.clothes.service.impl;
 import codeit.ootd.domain.clothes.dto.request.ClothesAttributeDefCreateRequest;
 import codeit.ootd.domain.clothes.dto.request.ClothesAttributeDefUpdateRequest;
 import codeit.ootd.domain.clothes.dto.response.ClothesAttributeDefDto;
-import codeit.ootd.domain.clothes.dto.response.ClothesAttributeDefDtoCursorResponse;
 import codeit.ootd.domain.clothes.entity.ClothesAttributeDefinition;
 import codeit.ootd.domain.clothes.enums.ClothesAttributeDefSortBy;
 import codeit.ootd.domain.clothes.exception.ClothesAttributeDefinitionNameDuplicatedException;
 import codeit.ootd.domain.clothes.exception.ClothesAttributeDefinitionNotFoundException;
 import codeit.ootd.domain.clothes.exception.ClothesAttributeValuesDuplicatedException;
-import codeit.ootd.domain.clothes.exception.InvalidCursorException;
 import codeit.ootd.domain.clothes.repository.ClothesAttributeDefinitionRepository;
 import codeit.ootd.domain.clothes.repository.ClothesAttributeRepository;
 import codeit.ootd.domain.clothes.service.ClothesAttributeDefinitionService;
@@ -21,6 +19,7 @@ import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -49,40 +48,20 @@ public class ClothesAttributeDefinitionServiceImpl implements ClothesAttributeDe
 
     @Override
     @Transactional(readOnly = true)
-    public ClothesAttributeDefDtoCursorResponse list(
-            String cursor,
-            UUID idAfter,
-            int limit,
-            String sortBy,
-            SortDirection sortDirection,
-            String keywordLike) {
-
+    public List<ClothesAttributeDefDto> list(String sortBy, SortDirection sortDirection, String keywordLike) {
         ClothesAttributeDefSortBy sort = ClothesAttributeDefSortBy.from(sortBy);
-        SortDirection direction = sortDirection == null ? SortDirection.DESCENDING : sortDirection;
+        Sort.Direction direction = sortDirection == SortDirection.ASCENDING
+                ? Sort.Direction.ASC
+                : Sort.Direction.DESC;
+        // 정렬 값이 같아도 순서가 흔들리지 않도록 id를 보조 정렬 기준으로 쓴다.
+        Sort order = Sort.by(direction, sort.getProperty()).and(Sort.by(direction, "id"));
+
         String keyword = normalizeKeyword(keywordLike);
+        List<ClothesAttributeDefinition> definitions = keyword == null
+                ? definitionRepository.findAll(order)
+                : definitionRepository.findAllByNameContainingIgnoreCase(keyword, order);
 
-        boolean hasCursor = cursor != null && !cursor.isBlank();
-        if (hasCursor != (idAfter != null)) {
-            throw new InvalidCursorException();
-        }
-        Object cursorValue = hasCursor ? sort.parseCursor(cursor) : null;
-
-        List<ClothesAttributeDefinition> rows =
-                definitionRepository.findPage(keyword, sort, direction, cursorValue, idAfter, limit + 1);
-
-        boolean hasNext = rows.size() > limit;
-        List<ClothesAttributeDefinition> page = hasNext ? rows.subList(0, limit) : rows;
-        ClothesAttributeDefinition last = page.isEmpty() ? null : page.get(page.size() - 1);
-
-        return new ClothesAttributeDefDtoCursorResponse(
-                page.stream().map(ClothesAttributeDefDto::from).toList(),
-                hasNext ? sort.cursorOf(last) : null,
-                hasNext ? last.getId() : null,
-                hasNext,
-                definitionRepository.countByKeyword(keyword),
-                sort.getProperty(),
-                direction
-        );
+        return definitions.stream().map(ClothesAttributeDefDto::from).toList();
     }
 
     @Override

@@ -3,9 +3,6 @@ package codeit.ootd.domain.clothes.service.impl;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyInt;
-import static org.mockito.ArgumentMatchers.eq;
-import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.never;
@@ -14,13 +11,11 @@ import static org.mockito.Mockito.verify;
 import codeit.ootd.domain.clothes.dto.request.ClothesAttributeDefCreateRequest;
 import codeit.ootd.domain.clothes.dto.request.ClothesAttributeDefUpdateRequest;
 import codeit.ootd.domain.clothes.dto.response.ClothesAttributeDefDto;
-import codeit.ootd.domain.clothes.dto.response.ClothesAttributeDefDtoCursorResponse;
 import codeit.ootd.domain.clothes.entity.ClothesAttributeDefinition;
-import codeit.ootd.domain.clothes.enums.ClothesAttributeDefSortBy;
 import codeit.ootd.domain.clothes.exception.ClothesAttributeDefinitionNameDuplicatedException;
 import codeit.ootd.domain.clothes.exception.ClothesAttributeDefinitionNotFoundException;
 import codeit.ootd.domain.clothes.exception.ClothesAttributeValuesDuplicatedException;
-import codeit.ootd.domain.clothes.exception.InvalidCursorException;
+import codeit.ootd.domain.clothes.exception.InvalidSortFieldException;
 import codeit.ootd.domain.clothes.repository.ClothesAttributeDefinitionRepository;
 import codeit.ootd.domain.clothes.repository.ClothesAttributeRepository;
 import codeit.ootd.global.enums.SortDirection;
@@ -34,6 +29,7 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.data.domain.Sort;
 import org.springframework.test.util.ReflectionTestUtils;
 
 @ExtendWith(MockitoExtension.class)
@@ -177,61 +173,45 @@ class ClothesAttributeDefinitionServiceImplTest {
     }
 
     @Test
-    void 목록은_한_건_더_조회해서_다음_페이지_여부와_커서를_만든다() {
-        ClothesAttributeDefinition a = definition("가방", UUID.randomUUID());
-        ClothesAttributeDefinition b = definition("나이", UUID.randomUUID());
-        ClothesAttributeDefinition c = definition("다리", UUID.randomUUID());
-        given(definitionRepository.findPage(isNull(), eq(ClothesAttributeDefSortBy.NAME),
-                eq(SortDirection.ASCENDING), isNull(), isNull(), eq(3))).willReturn(List.of(a, b, c));
-        given(definitionRepository.countByKeyword(null)).willReturn(7L);
+    void 목록은_정렬_기준과_방향대로_id를_보조_기준으로_조회한다() {
+        Sort sort = Sort.by(Sort.Direction.ASC, "name").and(Sort.by(Sort.Direction.ASC, "id"));
+        given(definitionRepository.findAll(sort)).willReturn(List.of(
+                definition("가방", UUID.randomUUID()), definition("나이", UUID.randomUUID())));
 
-        ClothesAttributeDefDtoCursorResponse result =
-                service.list(null, null, 2, "name", SortDirection.ASCENDING, null);
+        List<ClothesAttributeDefDto> result = service.list("name", SortDirection.ASCENDING, null);
 
-        assertThat(result.data()).extracting(ClothesAttributeDefDto::name).containsExactly("가방", "나이");
-        assertThat(result.hasNext()).isTrue();
-        assertThat(result.nextCursor()).isEqualTo("나이");
-        assertThat(result.nextIdAfter()).isEqualTo(b.getId());
-        assertThat(result.totalCount()).isEqualTo(7L);
-        assertThat(result.sortBy()).isEqualTo("name");
-        assertThat(result.sortDirection()).isEqualTo(SortDirection.ASCENDING);
+        assertThat(result).extracting(ClothesAttributeDefDto::name).containsExactly("가방", "나이");
     }
 
     @Test
-    void 마지막_페이지는_다음_커서가_없다() {
-        ClothesAttributeDefinition a = definition("가방", UUID.randomUUID());
-        given(definitionRepository.findPage(any(), any(), any(), any(), any(), anyInt()))
-                .willReturn(List.of(a));
-        given(definitionRepository.countByKeyword(null)).willReturn(1L);
+    void 검색어가_있으면_공백을_제거하고_이름으로_검색한다() {
+        Sort sort = Sort.by(Sort.Direction.DESC, "name").and(Sort.by(Sort.Direction.DESC, "id"));
+        given(definitionRepository.findAllByNameContainingIgnoreCase("두", sort))
+                .willReturn(List.of(definition("두께", UUID.randomUUID())));
 
-        ClothesAttributeDefDtoCursorResponse result =
-                service.list(null, null, 10, "name", SortDirection.ASCENDING, null);
+        List<ClothesAttributeDefDto> result = service.list("name", SortDirection.DESCENDING, " 두 ");
 
-        assertThat(result.hasNext()).isFalse();
-        assertThat(result.nextCursor()).isNull();
-        assertThat(result.nextIdAfter()).isNull();
+        assertThat(result).extracting(ClothesAttributeDefDto::name).containsExactly("두께");
+        verify(definitionRepository, never()).findAll(any(Sort.class));
     }
 
     @Test
     void 정렬_기준과_방향이_없으면_생성일_내림차순이고_빈_검색어는_무시한다() {
-        given(definitionRepository.findPage(any(), any(), any(), any(), any(), anyInt()))
-                .willReturn(List.of());
-        given(definitionRepository.countByKeyword(null)).willReturn(0L);
+        Sort sort = Sort.by(Sort.Direction.DESC, "createdAt").and(Sort.by(Sort.Direction.DESC, "id"));
+        given(definitionRepository.findAll(sort)).willReturn(List.of());
 
-        ClothesAttributeDefDtoCursorResponse result = service.list(null, null, 10, null, null, "  ");
+        List<ClothesAttributeDefDto> result = service.list(null, null, "  ");
 
-        assertThat(result.sortBy()).isEqualTo("createdAt");
-        assertThat(result.sortDirection()).isEqualTo(SortDirection.DESCENDING);
-        verify(definitionRepository).findPage(isNull(), eq(ClothesAttributeDefSortBy.CREATED_AT),
-                eq(SortDirection.DESCENDING), isNull(), isNull(), eq(11));
+        assertThat(result).isEmpty();
+        verify(definitionRepository, never()).findAllByNameContainingIgnoreCase(any(), any());
     }
 
     @Test
-    void 커서와_보조_커서는_함께_있어야_한다() {
-        assertThatThrownBy(() -> service.list("가방", null, 10, "name", SortDirection.ASCENDING, null))
-                .isInstanceOf(InvalidCursorException.class);
-        assertThatThrownBy(() -> service.list(null, UUID.randomUUID(), 10, "name", SortDirection.ASCENDING, null))
-                .isInstanceOf(InvalidCursorException.class);
+    void 지원하지_않는_정렬_기준이면_조회하지_않고_예외가_발생한다() {
+        assertThatThrownBy(() -> service.list("likeCount", SortDirection.ASCENDING, null))
+                .isInstanceOf(InvalidSortFieldException.class);
+
+        verify(definitionRepository, never()).findAll(any(Sort.class));
     }
 
     private ClothesAttributeDefinition definition(String name, UUID id) {

@@ -1,5 +1,6 @@
 package codeit.ootd.domain.clothes.controller;
 
+import static org.hamcrest.Matchers.hasItem;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.isNull;
@@ -16,9 +17,9 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import codeit.ootd.domain.clothes.dto.request.ClothesAttributeDefCreateRequest;
 import codeit.ootd.domain.clothes.dto.response.ClothesAttributeDefDto;
-import codeit.ootd.domain.clothes.dto.response.ClothesAttributeDefDtoCursorResponse;
 import codeit.ootd.domain.clothes.exception.ClothesAttributeDefinitionNameDuplicatedException;
 import codeit.ootd.domain.clothes.exception.ClothesAttributeDefinitionNotFoundException;
+import codeit.ootd.domain.clothes.exception.InvalidSortFieldException;
 import codeit.ootd.domain.clothes.service.ClothesAttributeDefinitionService;
 import codeit.ootd.global.enums.SortDirection;
 import codeit.ootd.global.exception.GlobalExceptionHandler;
@@ -42,6 +43,7 @@ import tools.jackson.databind.json.JsonMapper;
 class ClothesAttributeDefinitionControllerTest {
 
     private static final String URL = "/api/clothes/attribute-defs";
+    private static final String VALIDATION_MESSAGE = "요청 값이 올바르지 않습니다.";
 
     @Mock
     private ClothesAttributeDefinitionService service;
@@ -88,31 +90,39 @@ class ClothesAttributeDefinitionControllerTest {
     }
 
     @Test
-    void 이름이_비어_있으면_400을_반환한다() throws Exception {
+    void 이름이_비어_있으면_400과_공통_오류_응답을_반환한다() throws Exception {
         mockMvc.perform(post(URL)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"name\":\" \",\"selectableValues\":[\"a\"]}"))
-                .andExpect(status().isBadRequest());
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.exceptionName").value("MethodArgumentNotValidException"))
+                .andExpect(jsonPath("$.message").value(VALIDATION_MESSAGE))
+                .andExpect(jsonPath("$.details.name").value("속성 정의 이름은 필수입니다."));
 
         verifyNoInteractions(service);
     }
 
     @Test
-    void 선택_가능한_값이_없으면_400을_반환한다() throws Exception {
+    void 선택_가능한_값이_없으면_400과_실패_사유를_반환한다() throws Exception {
         mockMvc.perform(post(URL)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"name\":\"두께\",\"selectableValues\":[]}"))
-                .andExpect(status().isBadRequest());
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.exceptionName").value("MethodArgumentNotValidException"))
+                .andExpect(jsonPath("$.message").value(VALIDATION_MESSAGE))
+                .andExpect(jsonPath("$.details.selectableValues").value("선택 가능한 값은 1개 이상이어야 합니다."));
 
         verifyNoInteractions(service);
     }
 
     @Test
-    void 선택_가능한_값에_빈_문자열이_있으면_400을_반환한다() throws Exception {
+    void 선택_가능한_값에_빈_문자열이_있으면_400과_실패_사유를_반환한다() throws Exception {
         mockMvc.perform(post(URL)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"name\":\"두께\",\"selectableValues\":[\"a\",\" \"]}"))
-                .andExpect(status().isBadRequest());
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message").value(VALIDATION_MESSAGE))
+                .andExpect(jsonPath("$.details.*", hasItem("선택 가능한 값은 비어 있을 수 없습니다.")));
 
         verifyNoInteractions(service);
     }
@@ -126,36 +136,50 @@ class ClothesAttributeDefinitionControllerTest {
                         .content("{\"name\":\"두께\",\"selectableValues\":[\"a\"]}"))
                 .andExpect(status().isConflict())
                 .andExpect(jsonPath("$.exceptionName").value("ClothesAttributeDefinitionNameDuplicatedException"))
-                .andExpect(jsonPath("$.message").exists());
+                .andExpect(jsonPath("$.message").value("이미 존재하는 속성 정의 이름입니다."));
     }
 
     @Test
-    void 목록_조회_파라미터를_서비스로_전달하고_커서_응답을_반환한다() throws Exception {
-        UUID nextId = UUID.randomUUID();
-        given(service.list(isNull(), isNull(), eq(10), eq("name"), eq(SortDirection.ASCENDING), eq("두")))
-                .willReturn(new ClothesAttributeDefDtoCursorResponse(
-                        List.of(), "두께", nextId, true, 3L, "name", SortDirection.ASCENDING));
+    void 목록은_배열로_반환하고_정렬과_검색_파라미터를_서비스로_전달한다() throws Exception {
+        UUID id = UUID.randomUUID();
+        given(service.list(eq("name"), eq(SortDirection.ASCENDING), eq("두")))
+                .willReturn(List.of(new ClothesAttributeDefDto(
+                        id, Instant.parse("2026-10-27T01:00:00Z"), "두께", List.of("얇음"))));
 
         mockMvc.perform(get(URL)
-                        .param("limit", "10")
                         .param("sortBy", "name")
                         .param("sortDirection", "ASCENDING")
                         .param("keywordLike", "두"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.hasNext").value(true))
-                .andExpect(jsonPath("$.nextCursor").value("두께"))
-                .andExpect(jsonPath("$.nextIdAfter").value(nextId.toString()))
-                .andExpect(jsonPath("$.totalCount").value(3))
-                .andExpect(jsonPath("$.sortBy").value("name"))
-                .andExpect(jsonPath("$.sortDirection").value("ASCENDING"));
+                .andExpect(jsonPath("$").isArray())
+                .andExpect(jsonPath("$[0].id").value(id.toString()))
+                .andExpect(jsonPath("$[0].name").value("두께"))
+                .andExpect(jsonPath("$[0].selectableValues[0]").value("얇음"))
+                .andExpect(jsonPath("$[0].createdAt").exists());
     }
 
     @Test
-    void 목록_조회에_limit이_없으면_400을_반환한다() throws Exception {
-        mockMvc.perform(get(URL))
-                .andExpect(status().isBadRequest());
+    void 목록_조회는_limit_없이도_호출할_수_있고_보내도_무시한다() throws Exception {
+        given(service.list(isNull(), isNull(), isNull())).willReturn(List.of());
 
-        verifyNoInteractions(service);
+        mockMvc.perform(get(URL))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$").isArray())
+                .andExpect(jsonPath("$").isEmpty());
+
+        mockMvc.perform(get(URL).param("limit", "10"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$").isEmpty());
+    }
+
+    @Test
+    void 지원하지_않는_정렬_기준이면_400을_반환한다() throws Exception {
+        given(service.list(eq("likeCount"), isNull(), isNull())).willThrow(new InvalidSortFieldException());
+
+        mockMvc.perform(get(URL).param("sortBy", "likeCount"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.exceptionName").value("InvalidSortFieldException"))
+                .andExpect(jsonPath("$.message").value("지원하지 않는 정렬 기준입니다."));
     }
 
     @Test
@@ -179,15 +203,19 @@ class ClothesAttributeDefinitionControllerTest {
         mockMvc.perform(patch(URL + "/" + id)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"name\":\"소재\"}"))
-                .andExpect(status().isNotFound());
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.exceptionName").value("ClothesAttributeDefinitionNotFoundException"));
     }
 
     @Test
-    void 수정_요청의_이름이_공백이면_400을_반환한다() throws Exception {
+    void 수정_요청의_이름이_공백이면_400과_실패_사유를_반환한다() throws Exception {
         mockMvc.perform(patch(URL + "/" + UUID.randomUUID())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"name\":\"  \"}"))
-                .andExpect(status().isBadRequest());
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.exceptionName").value("MethodArgumentNotValidException"))
+                .andExpect(jsonPath("$.message").value(VALIDATION_MESSAGE))
+                .andExpect(jsonPath("$.details.name").value("속성 정의 이름은 비어 있을 수 없습니다."));
 
         verifyNoInteractions(service);
     }

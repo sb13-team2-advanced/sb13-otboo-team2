@@ -16,8 +16,8 @@ public enum ErrorCode {
     CLOTHES_ATTRIBUTE_DEFINITION_NAME_DUPLICATED(HttpStatus.CONFLICT, "이미 존재하는 속성 정의 이름입니다."),
     CLOTHES_ATTRIBUTE_VALUES_DUPLICATED(HttpStatus.BAD_REQUEST, "선택 가능한 값에 중복이 있습니다."),
 
-    // 목록 조회
-    INVALID_CURSOR(HttpStatus.BAD_REQUEST, "유효하지 않은 커서입니다."),
+    // 공통
+    INVALID_REQUEST(HttpStatus.BAD_REQUEST, "요청 값이 올바르지 않습니다."),
     INVALID_SORT_FIELD(HttpStatus.BAD_REQUEST, "지원하지 않는 정렬 기준입니다."),
 
     //팔로우

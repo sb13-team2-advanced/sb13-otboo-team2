@@ -9,7 +9,11 @@ import codeit.ootd.domain.clothes.entity.ClothesAttribute;
 import codeit.ootd.domain.clothes.repository.ClothesAttributeDefinitionRepository;
 import codeit.ootd.domain.clothes.repository.ClothesAttributeRepository;
 import codeit.ootd.domain.clothes.service.ClothesAttributeDefinitionService;
+import codeit.ootd.global.enums.SortDirection;
 import jakarta.persistence.EntityManager;
+import java.time.Instant;
+import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
@@ -92,6 +96,67 @@ class ClothesAttributeDefinitionServiceIntegrationTest {
                 .contains(other.id());
         assertThat(definitionRepository.findById(other.id())).isPresent();
         assertThat(countSelectableValues(other.id())).isEqualTo(2L);
+    }
+
+    @Test
+    void 이름_오름차순과_내림차순으로_조회한다() {
+        createFive();
+
+        assertThat(service.list("name", SortDirection.ASCENDING, null)).extracting(ClothesAttributeDefDto::name)
+                .containsExactly("color", "material", "pattern", "season", "thickness");
+        assertThat(service.list("name", SortDirection.DESCENDING, null)).extracting(ClothesAttributeDefDto::name)
+                .containsExactly("thickness", "season", "pattern", "material", "color");
+    }
+
+    @Test
+    void 조회한_속성_정의의_선택_가능한_값이_순서대로_채워진다() {
+        createFive();
+
+        assertThat(service.list("name", SortDirection.ASCENDING, null)).allSatisfy(definition ->
+                assertThat(definition.selectableValues()).containsExactly("a", "b"));
+    }
+
+    @Test
+    void 검색어는_대소문자를_구분하지_않고_이름에_포함된_항목만_찾는다() {
+        createFive();
+
+        assertThat(service.list("name", SortDirection.ASCENDING, "OL")).extracting(ClothesAttributeDefDto::name)
+                .containsExactly("color");
+    }
+
+    @Test
+    void 검색어의_와일드카드_문자는_문자_그대로_취급한다() {
+        createFive();
+
+        assertThat(service.list("name", SortDirection.ASCENDING, "%")).isEmpty();
+        assertThat(service.list("name", SortDirection.ASCENDING, "_")).isEmpty();
+    }
+
+    @Test
+    void 생성일이_모두_같아도_id를_보조_기준으로_순서가_고정되고_오름차순과_내림차순이_정확히_뒤집힌다() {
+        createFive();
+        entityManager.createNativeQuery("update clothes_attribute_definition set created_at = ?1")
+                .setParameter(1, Instant.parse("2026-10-27T01:00:00Z"))
+                .executeUpdate();
+        entityManager.clear();
+
+        List<UUID> ascending = service.list("createdAt", SortDirection.ASCENDING, null).stream()
+                .map(ClothesAttributeDefDto::id).toList();
+        List<UUID> descending = service.list("createdAt", SortDirection.DESCENDING, null).stream()
+                .map(ClothesAttributeDefDto::id).toList();
+
+        assertThat(ascending).hasSize(5).doesNotHaveDuplicates();
+        List<UUID> reversed = new ArrayList<>(ascending);
+        Collections.reverse(reversed);
+        assertThat(descending).containsExactlyElementsOf(reversed);
+    }
+
+    private void createFive() {
+        for (String name : List.of("thickness", "color", "season", "material", "pattern")) {
+            service.create(new ClothesAttributeDefCreateRequest(name, List.of("a", "b")));
+        }
+        entityManager.flush();
+        entityManager.clear();
     }
 
     private long countSelectableValues(UUID definitionId) {
