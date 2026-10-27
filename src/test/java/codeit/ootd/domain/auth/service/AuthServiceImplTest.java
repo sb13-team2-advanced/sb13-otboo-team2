@@ -1,8 +1,10 @@
 package codeit.ootd.domain.auth.service;
 
+import codeit.ootd.domain.auth.entity.AuthSession;
 import codeit.ootd.domain.auth.exception.AccountInactiveException;
 import codeit.ootd.domain.auth.exception.AccountLockedException;
 import codeit.ootd.domain.auth.exception.InvalidCredentialsException;
+import codeit.ootd.domain.auth.jwt.JwtProvider;
 import codeit.ootd.domain.auth.service.impl.AuthServiceImpl;
 import codeit.ootd.domain.user.entity.User;
 import codeit.ootd.domain.user.entity.UserStatus;
@@ -14,6 +16,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.EnumSource;
+import org.mockito.InOrder;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -21,12 +24,16 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.security.crypto.password.PasswordEncoder;
 
 import java.util.Optional;
+import java.util.UUID;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.inOrder;
 
 @ExtendWith(MockitoExtension.class)
 class AuthServiceImplTest {
@@ -36,6 +43,12 @@ class AuthServiceImplTest {
 
     @Mock
     private PasswordEncoder passwordEncoder;
+
+    @Mock
+    private AuthSessionService authSessionService;
+
+    @Mock
+    private JwtProvider jwtProvider;
 
     @InjectMocks
     private AuthServiceImpl authService;
@@ -182,4 +195,74 @@ class AuthServiceImplTest {
                 () -> authService.authenticate(email, password)
         );
     }
+
+    @Test
+    @DisplayName("로그인 성공 시 세션을 생성하고 Access Token을 발급한다")
+    void signIn_success() {
+        // given
+        String email = "test@example.com";
+        String password = "password123!";
+        UUID userId = UUID.randomUUID();
+        UUID sessionId = UUID.randomUUID();
+
+        User user = mock(User.class);
+        AuthSession session = mock(AuthSession.class);
+
+        when(user.getId()).thenReturn(userId);
+        when(user.getPassword()).thenReturn("encoded-password");
+        when(user.isLocked()).thenReturn(false);
+        when(user.getStatus()).thenReturn(UserStatus.ACTIVE);
+
+        when(userRepository.findByEmail(email))
+                .thenReturn(Optional.of(user));
+
+        when(passwordEncoder.matches(password, "encoded-password"))
+                .thenReturn(true);
+
+        when(authSessionService.createSession(userId))
+                .thenReturn(session);
+
+        when(session.getId()).thenReturn(sessionId);
+
+        when(jwtProvider.generateAccessToken(userId, sessionId))
+                .thenReturn("test-access-token");
+
+        // when
+        String accessToken = authService.signIn(email, password);
+
+        // then
+        assertEquals("test-access-token", accessToken);
+
+        InOrder inOrder = inOrder(authSessionService, jwtProvider);
+
+        inOrder.verify(authSessionService).createSession(userId);
+        inOrder.verify(jwtProvider).generateAccessToken(userId, sessionId);
+    }
+
+    @Test
+    @DisplayName("비밀번호가 틀리면 세션과 Access Token을 생성하지 않는다")
+    void signIn_wrongPassword_doesNotCreateSessionOrToken() {
+        // given
+        String email = "test@example.com";
+        String password = "wrong-password";
+
+        User user = createUser(email);
+
+        when(userRepository.findByEmail(email))
+                .thenReturn(Optional.of(user));
+
+        when(passwordEncoder.matches(password, user.getPassword()))
+                .thenReturn(false);
+
+        // when & then
+        assertThrows(
+                InvalidCredentialsException.class,
+                () -> authService.signIn(email, password)
+        );
+
+        verifyNoInteractions(authSessionService, jwtProvider);
+    }
+
+
+
 }

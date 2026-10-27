@@ -6,4 +6,6 @@ public interface AuthService {
 
     User authenticate(String email, String password);
 
+    String signIn(String email, String password);
+
 }
