@@ -124,7 +124,7 @@ public class WeatherCollectionTasklet implements Tasklet {
                 );
 
                 try {
-                    Thread.sleep(1_000L + attempt);
+                    Thread.sleep(1_000L * attempt);
                 } catch (InterruptedException interruptedException) {
                     Thread.currentThread().interrupt();
                     throw new IllegalStateException(
