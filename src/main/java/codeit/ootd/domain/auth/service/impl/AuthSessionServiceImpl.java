@@ -58,4 +58,21 @@ public class AuthSessionServiceImpl implements AuthSessionService {
         return savedSession;
     }
 
+    @Override
+    @Transactional(readOnly = true)
+    public AuthSession getActiveSession(UUID sessionId) {
+        Instant now = clock.instant();
+
+        AuthSession session = authSessionRepository.findById(sessionId)
+                .orElseThrow(() ->
+                        new IllegalArgumentException("인증 세션이 존재하지 않습니다.")
+                );
+
+        if (!session.isActive(now)) {
+            throw new IllegalArgumentException("유효하지 않은 인증 세션입니다.");
+        }
+
+        return session;
+    }
+
 }

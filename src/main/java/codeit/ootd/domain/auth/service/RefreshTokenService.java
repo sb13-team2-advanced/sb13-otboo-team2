@@ -8,4 +8,5 @@ public interface RefreshTokenService {
 
     String rotate(UUID sessionId, String oldRawToken);
 
+    UUID findSessionIdByToken(String rawToken);
 }

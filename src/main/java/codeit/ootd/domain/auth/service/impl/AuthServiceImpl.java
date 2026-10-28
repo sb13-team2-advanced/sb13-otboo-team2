@@ -1,6 +1,7 @@
 package codeit.ootd.domain.auth.service.impl;
 
 import codeit.ootd.domain.auth.dto.response.SignInResult;
+import codeit.ootd.domain.auth.dto.response.TokenRefreshResult;
 import codeit.ootd.domain.auth.entity.AuthSession;
 import codeit.ootd.domain.auth.exception.AccountInactiveException;
 import codeit.ootd.domain.auth.exception.AccountLockedException;
@@ -17,6 +18,8 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+
+import java.util.UUID;
 
 @RequiredArgsConstructor
 @Service
@@ -69,6 +72,43 @@ public class AuthServiceImpl implements AuthService {
                 refreshToken
         );
 
+    }
+
+    @Override
+    @Transactional
+    public TokenRefreshResult refresh(String refreshToken) {
+
+        UUID sessionId = refreshTokenService.findSessionIdByToken(refreshToken);
+
+        AuthSession session = authSessionService.getActiveSession(sessionId);
+
+        User user = userRepository.findById(session.getUserId())
+                .orElseThrow(() ->
+                        new IllegalArgumentException("사용자가 존재하지 않습니다.")
+                );
+
+        if (user.isLocked()) {
+            throw new AccountLockedException();
+        }
+
+        if (user.getStatus() != UserStatus.ACTIVE) {
+            throw new AccountInactiveException();
+        }
+
+        String newRefreshToken = refreshTokenService.rotate(
+                sessionId,
+                refreshToken
+        );
+
+        String newAccessToken = jwtProvider.generateAccessToken(
+                user.getId(),
+                sessionId
+        );
+
+        return new TokenRefreshResult(
+                newAccessToken,
+                newRefreshToken
+        );
     }
 
 }

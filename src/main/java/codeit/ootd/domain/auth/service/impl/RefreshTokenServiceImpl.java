@@ -128,6 +128,25 @@ public class RefreshTokenServiceImpl implements RefreshTokenService {
         return newRawToken;
     }
 
+    @Override
+    @Transactional(readOnly = true)
+    public UUID findSessionIdByToken(String rawToken) {
+
+        if (rawToken == null || rawToken.isBlank()) {
+            throw new IllegalArgumentException("Refresh Token이 유효하지 않습니다.");
+        }
+
+        String tokenHash = hash(rawToken);
+
+        RefreshToken refreshToken = refreshTokenRepository
+                .findByTokenHash(tokenHash)
+                .orElseThrow(() ->
+                        new IllegalArgumentException("Refresh Token이 존재하지 않습니다.")
+                );
+
+        return refreshToken.getSessionId();
+    }
+
     private String hash(String rawToken) {
         try {
             MessageDigest digest = MessageDigest.getInstance("SHA-256");

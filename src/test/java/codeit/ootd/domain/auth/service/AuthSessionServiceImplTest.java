@@ -6,6 +6,8 @@ import codeit.ootd.domain.auth.service.impl.AuthSessionServiceImpl;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.EnumSource;
 import org.mockito.ArgumentCaptor;
 
 import java.time.Clock;
@@ -13,6 +15,7 @@ import java.time.Duration;
 import java.time.Instant;
 import java.time.ZoneOffset;
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -146,5 +149,87 @@ class AuthSessionServiceImplTest {
                 .save(any(AuthSession.class));
     }
 
+    @Test
+    @DisplayName("유효한 인증 세션을 조회한다")
+    void getActiveSession_success() {
+        // given
+        UUID sessionId = UUID.randomUUID();
+        UUID userId = UUID.randomUUID();
+
+        AuthSession session = mock(AuthSession.class);
+
+        when(authSessionRepository.findById(sessionId))
+                .thenReturn(Optional.of(session));
+
+        when(session.isActive(now)).thenReturn(true);
+
+        // when
+        AuthSession result = authSessionService.getActiveSession(sessionId);
+
+        // then
+        assertSame(session, result);
+
+        verify(authSessionRepository).findById(sessionId);
+        verify(session).isActive(now);
+    }
+
+    @Test
+    @DisplayName("존재하지 않는 인증 세션 조회 시 예외가 발생한다")
+    void getActiveSession_notFound() {
+        // given
+        UUID sessionId = UUID.randomUUID();
+
+        when(authSessionRepository.findById(sessionId))
+                .thenReturn(Optional.empty());
+
+        // when & then
+        IllegalArgumentException exception = assertThrows(
+                IllegalArgumentException.class,
+                () -> authSessionService.getActiveSession(sessionId)
+        );
+
+        assertEquals(
+                "인증 세션이 존재하지 않습니다.",
+                exception.getMessage()
+        );
+
+        verify(authSessionRepository).findById(sessionId);
+    }
+
+    @ParameterizedTest
+    @EnumSource(value = SessionState.class, names = {"EXPIRED", "REVOKED"})
+    @DisplayName("만료되거나 폐기된 인증 세션은 조회를 거부한다")
+    void getActiveSession_inactiveSession(SessionState state) {
+        // given
+        UUID sessionId = UUID.randomUUID();
+        UUID userId = UUID.randomUUID();
+
+        Instant expiresAt = state == SessionState.EXPIRED
+                ? now.minusSeconds(1)
+                : now.plus(Duration.ofDays(1));
+
+        AuthSession session = AuthSession.create(userId, expiresAt);
+
+        if (state == SessionState.REVOKED) {
+            session.revoke(now.minusSeconds(10));
+        }
+
+        when(authSessionRepository.findById(sessionId))
+                .thenReturn(Optional.of(session));
+
+        // when & then
+        IllegalArgumentException exception = assertThrows(
+                IllegalArgumentException.class,
+                () -> authSessionService.getActiveSession(sessionId)
+        );
+
+        assertEquals("유효하지 않은 인증 세션입니다.", exception.getMessage());
+        verify(authSessionRepository).findById(sessionId);
+    }
+
+    private enum SessionState {
+        EXPIRED,
+        REVOKED
+    }
 
 }

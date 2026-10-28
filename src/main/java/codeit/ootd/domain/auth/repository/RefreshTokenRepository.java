@@ -14,6 +14,8 @@ public interface RefreshTokenRepository extends JpaRepository<RefreshToken, UUID
 
     Optional<RefreshToken> findBySessionId(UUID sessionId);
 
+    Optional<RefreshToken> findByTokenHash(String tokenHash);
+
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("SELECT r FROM RefreshToken r WHERE r.sessionId = :sessionId")
     Optional<RefreshToken> findBySessionIdForUpdate(

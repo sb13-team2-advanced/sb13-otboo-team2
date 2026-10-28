@@ -8,6 +8,9 @@ import codeit.ootd.domain.auth.service.impl.RefreshTokenServiceImpl;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.NullAndEmptySource;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
@@ -479,6 +482,60 @@ class RefreshTokenServiceImplTest {
         } catch (NoSuchAlgorithmException e) {
             throw new IllegalStateException(e);
         }
+    }
+
+    @Test
+    @DisplayName("유효한 Refresh Token으로 세션 ID를 조회한다")
+    void findSessionIdByToken_success() throws NoSuchAlgorithmException {
+        // given
+        UUID sessionId = UUID.randomUUID();
+        String rawToken = "test-refresh-token";
+
+        String tokenHash = HexFormat.of().formatHex(
+                MessageDigest.getInstance("SHA-256")
+                        .digest(rawToken.getBytes(StandardCharsets.UTF_8))
+        );
+
+        RefreshToken refreshToken = mock(RefreshToken.class);
+
+        when(refreshToken.getSessionId()).thenReturn(sessionId);
+        when(refreshTokenRepository.findByTokenHash(tokenHash))
+                .thenReturn(Optional.of(refreshToken));
+
+        // when
+        UUID result = refreshTokenService.findSessionIdByToken(rawToken);
+
+        // then
+        assertEquals(sessionId, result);
+        verify(refreshTokenRepository).findByTokenHash(tokenHash);
+    }
+
+    @Test
+    @DisplayName("존재하지 않는 Refresh Token으로 세션 조회 시 예외가 발생한다")
+    void findSessionIdByToken_notFound() {
+        // given
+        String rawToken = "invalid-refresh-token";
+
+        // when & then
+        assertThrows(
+                IllegalArgumentException.class,
+                () -> refreshTokenService.findSessionIdByToken(rawToken)
+        );
+    }
+
+    @ParameterizedTest
+    @NullAndEmptySource
+    @ValueSource(strings = {" ", "   "})
+    @DisplayName("Refresh Token이 비어 있으면 세션 조회를 거부한다")
+    void findSessionIdByToken_blankToken(String rawToken) {
+        // when & then
+        assertThrows(
+                IllegalArgumentException.class,
+                () -> refreshTokenService.findSessionIdByToken(rawToken)
+        );
+
+        verify(refreshTokenRepository, never())
+                .findByTokenHash(anyString());
     }
 
 }
