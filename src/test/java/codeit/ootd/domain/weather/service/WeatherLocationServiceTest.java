@@ -6,9 +6,12 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import codeit.ootd.domain.weather.dto.response.WeatherAPILocation;
 import codeit.ootd.domain.weather.entity.WeatherLocation;
 import codeit.ootd.domain.weather.repository.WeatherLocationRepository;
+import codeit.ootd.infra.kakao.KakaoLocalClient;
 import codeit.ootd.infra.weather.H3Service;
+import codeit.ootd.infra.weather.dto.KakaoRegionResponse;
 import com.uber.h3core.util.LatLng;
 import java.time.Instant;
 import java.util.Optional;
@@ -27,6 +30,9 @@ class WeatherLocationServiceTest {
 
     @Mock
     private H3Service h3Service;
+
+    @Mock
+    private KakaoLocalClient kakaoLocalClient;
 
     @InjectMocks
     private WeatherLocationService weatherLocationService;
@@ -95,5 +101,39 @@ class WeatherLocationServiceTest {
 
         verify(weatherLocationRepository, never())
             .save(any(WeatherLocation.class));
+    }
+
+    @Test
+    @DisplayName("사용자 GPS와 카카오 행정동을 위치 응답 DTO로 변환한다")
+    void getLocationReturnsWeatherAPILocation() {
+
+        double latitude = 37.5665;
+        double longitude = 126.9780;
+
+        KakaoRegionResponse.Region region =
+            new KakaoRegionResponse.Region(
+                "H",
+                "서울특별시 중구 명동",
+                "서울특별시",
+                "중구",
+                "명동"
+            );
+
+        when(kakaoLocalClient.getAdministrativeRegion(latitude, longitude))
+            .thenReturn(region);
+
+        WeatherAPILocation result =
+            weatherLocationService.getLocation(latitude, longitude);
+
+        assertThat(result.latitude()).isEqualTo(latitude);
+        assertThat(result.longitude()).isEqualTo(longitude);
+        assertThat(result.x()).isEqualTo(latitude);
+        assertThat(result.y()).isEqualTo(longitude);
+
+        assertThat(result.locationNames())
+            .containsExactly("서울특별시", "중구", "명동");
+
+        verify(kakaoLocalClient)
+            .getAdministrativeRegion(latitude, longitude);
     }
 }

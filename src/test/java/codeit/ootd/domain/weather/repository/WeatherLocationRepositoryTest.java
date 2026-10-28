@@ -5,6 +5,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import codeit.ootd.domain.weather.entity.WeatherLocation;
 import java.time.Instant;
+import java.util.List;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -65,5 +66,81 @@ class WeatherLocationRepositoryTest {
 
         assertThatThrownBy(() -> repository.saveAndFlush(duplicate))
             .isInstanceOf(DataIntegrityViolationException.class);
+    }
+
+    @Test
+    @DisplayName("수집 예정 시각이 지난 위치를 오래된 순서로 조회한다")
+    void findLocationsDueForCollection() {
+
+        Instant now = Instant.parse("2026-10-27T05:00:00Z");
+
+        WeatherLocation past = new WeatherLocation(
+            "cell-past",
+            37.5665,
+            126.9780,
+            now.minusSeconds(3600)
+        );
+
+        WeatherLocation current = new WeatherLocation(
+            "cell-current",
+            37.5700,
+            126.9800,
+            now
+        );
+
+        WeatherLocation future = new WeatherLocation(
+            "cell-future",
+            37.5800,
+            126.9900,
+            now.plusSeconds(3600)
+        );
+
+        repository.saveAllAndFlush(List.of(past, current, future));
+
+        List<WeatherLocation> result =
+            repository.findByNextRefreshAtLessThanEqualOrderByNextRefreshAtAsc(now);
+
+        assertThat(result)
+            .extracting(WeatherLocation::getCellId)
+            .containsExactly("cell-past", "cell-current");
+    }
+
+    @Test
+    @DisplayName("수집 실패 시 10분 뒤로 재시도를 예약하고 그 전에는 조회하지 않는다")
+    void scheduleRetryAfterCollectionFailure() {
+
+        Instant collectedAt = Instant.parse("2026-10-28T06:00:00Z");
+        Instant failedAt = Instant.parse("2026-10-28T09:00:00Z");
+        Instant retryAt = failedAt.plusSeconds(600);
+
+        WeatherLocation location = new WeatherLocation(
+            "cell-retry",
+            37.5665,
+            126.9780,
+            collectedAt
+        );
+
+        location.completeCollection(
+            collectedAt,
+            collectedAt.plusSeconds(7200)
+        );
+
+        location.scheduleRetry(failedAt, retryAt);
+        repository.saveAndFlush(location);
+
+        assertThat(location.getLastCollectedAt()).isEqualTo(collectedAt);
+        assertThat(location.getNextRefreshAt()).isEqualTo(retryAt);
+
+        assertThat(repository
+            .findTop20ByNextRefreshAtLessThanEqualOrderByNextRefreshAtAsc(
+                failedAt.plusSeconds(300)
+            ))
+            .extracting(WeatherLocation::getCellId)
+            .doesNotContain("cell-retry");
+
+        assertThat(repository
+            .findTop20ByNextRefreshAtLessThanEqualOrderByNextRefreshAtAsc(retryAt))
+            .extracting(WeatherLocation::getCellId)
+            .contains("cell-retry");
     }
 }

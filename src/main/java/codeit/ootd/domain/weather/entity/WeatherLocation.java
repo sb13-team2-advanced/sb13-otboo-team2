@@ -55,4 +55,12 @@ public class WeatherLocation extends BaseTimeEntity {
         this.lastCollectedAt = collectedAt;
         this.nextRefreshAt = nextRefreshAt;
     }
+
+    public void scheduleRetry(Instant failedAt, Instant retryAt) {
+        if (!retryAt.isAfter(failedAt)) {
+            throw new IllegalArgumentException("재시도 예정 시간은 실패 시간보다 이후여야 합니다.");
+        }
+
+        this.nextRefreshAt = retryAt;
+    }
 }
