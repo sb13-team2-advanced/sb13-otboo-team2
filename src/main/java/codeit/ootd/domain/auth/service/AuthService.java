@@ -1,11 +1,12 @@
 package codeit.ootd.domain.auth.service;
 
+import codeit.ootd.domain.auth.dto.response.SignInResult;
 import codeit.ootd.domain.user.entity.User;
 
 public interface AuthService {
 
     User authenticate(String email, String password);
 
-    String signIn(String email, String password);
+    SignInResult signIn(String email, String password);
 
 }

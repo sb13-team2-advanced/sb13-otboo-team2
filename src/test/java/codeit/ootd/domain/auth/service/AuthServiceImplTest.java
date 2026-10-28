@@ -1,5 +1,6 @@
 package codeit.ootd.domain.auth.service;
 
+import codeit.ootd.domain.auth.dto.response.SignInResult;
 import codeit.ootd.domain.auth.entity.AuthSession;
 import codeit.ootd.domain.auth.exception.AccountInactiveException;
 import codeit.ootd.domain.auth.exception.AccountLockedException;
@@ -26,6 +27,7 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import java.util.Optional;
 import java.util.UUID;
 
+import static org.junit.jupiter.api.Assertions.assertAll;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -46,6 +48,9 @@ class AuthServiceImplTest {
 
     @Mock
     private AuthSessionService authSessionService;
+
+    @Mock
+    private RefreshTokenService refreshTokenService;
 
     @Mock
     private JwtProvider jwtProvider;
@@ -197,7 +202,7 @@ class AuthServiceImplTest {
     }
 
     @Test
-    @DisplayName("로그인 성공 시 세션을 생성하고 Access Token을 발급한다")
+    @DisplayName("로그인 성공 시 세션을 생성하고 Access/Refresh Token을 발급한다")
     void signIn_success() {
         // given
         String email = "test@example.com";
@@ -227,16 +232,28 @@ class AuthServiceImplTest {
         when(jwtProvider.generateAccessToken(userId, sessionId))
                 .thenReturn("test-access-token");
 
+        // 추가: Refresh Token 발급 Mock
+        when(refreshTokenService.issue(sessionId))
+                .thenReturn("test-refresh-token");
+
         // when
-        String accessToken = authService.signIn(email, password);
+        SignInResult result = authService.signIn(email, password);
 
         // then
-        assertEquals("test-access-token", accessToken);
+        assertAll(
+                () -> assertEquals("test-access-token", result.accessToken()),
+                () -> assertEquals("test-refresh-token", result.refreshToken())
+        );
 
-        InOrder inOrder = inOrder(authSessionService, jwtProvider);
+        InOrder inOrder = inOrder(
+                authSessionService,
+                jwtProvider,
+                refreshTokenService
+        );
 
         inOrder.verify(authSessionService).createSession(userId);
         inOrder.verify(jwtProvider).generateAccessToken(userId, sessionId);
+        inOrder.verify(refreshTokenService).issue(sessionId);
     }
 
     @Test
@@ -260,7 +277,7 @@ class AuthServiceImplTest {
                 () -> authService.signIn(email, password)
         );
 
-        verifyNoInteractions(authSessionService, jwtProvider);
+        verifyNoInteractions(authSessionService, jwtProvider, refreshTokenService);
     }
 
 
