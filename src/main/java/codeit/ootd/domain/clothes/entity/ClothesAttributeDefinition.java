@@ -15,6 +15,7 @@ import java.util.Objects;
 import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
+import org.hibernate.annotations.BatchSize;
 
 @Getter
 @Entity
@@ -31,6 +32,7 @@ public class ClothesAttributeDefinition extends BaseEntity {
      * 선택 가능한 값 목록. selectable_attribute 테이블의 sort 컬럼이 순서를 나타낸다.
      * value는 H2 등에서 예약어라 따옴표로 감싼다.
      */
+    @BatchSize(size = 100)
     @ElementCollection
     @CollectionTable(
         name = "selectable_attribute",
