@@ -25,3 +25,8 @@ otboo:
 jwt:
   secret: ${JWT_SECRET}
   access-token-expiration: 30m
+
+ootd:
+  weather:
+    openweathermap:
+      api-key: ${OWM_API_KEY}

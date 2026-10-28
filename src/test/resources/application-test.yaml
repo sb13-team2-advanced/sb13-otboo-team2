@@ -12,3 +12,12 @@ spring:
   docker:
     compose:
       enabled: false
+
+ootd:
+  weather:
+    openweathermap:
+      api-key: test-key
+
+jwt:
+  secret: 'AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA='
+  access-token-expiration: 30m

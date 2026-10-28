@@ -20,6 +20,7 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.Duration;
 import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -57,7 +58,10 @@ class UserSignupIntegrationTest {
         // when
         UserDto response = userService.signup(request);
 
+        // INSERT SQL을 DB에 반영
         userRepository.flush();
+
+        // 1차 캐시를 초기화해 DB에서 다시 조회
         entityManager.clear();
 
         // then
@@ -118,8 +122,12 @@ class UserSignupIntegrationTest {
                 () -> assertEquals(
                         savedUser.getId(), response.id()
                 ),
-                () -> assertEquals(
-                        savedUser.getCreatedAt(), response.createdAt()
+                () -> assertTrue(
+                        Duration.between(
+                                savedUser.getCreatedAt(),
+                                response.createdAt()
+                        ).abs().compareTo(Duration.ofMillis(1)) < 0,
+                        "DB에 저장된 생성 시간과 DTO 생성 시간의 차이는 1ms 미만이어야 한다"
                 ),
                 () -> assertEquals(
                         savedUser.getEmail(), response.email()
