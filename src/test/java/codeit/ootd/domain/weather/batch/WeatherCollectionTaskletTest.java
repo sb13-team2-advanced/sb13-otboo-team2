@@ -81,7 +81,7 @@ class WeatherCollectionTaskletTest {
     }
 
     @Test
-    @DisplayName("일부 셀의 수집이 실패해도 나머지 셀은 계속 처리한다")
+    @DisplayName("일부 셀의 수집이 3회 실패해도 재시도를 예약하고 나머지 셀을 처리한다")
     void executeContinuesWhenCollectionFails() {
 
         WeatherLocation secondLocation = mock(WeatherLocation.class);
@@ -103,6 +103,21 @@ class WeatherCollectionTaskletTest {
             .isInstanceOf(IllegalStateException.class)
             .hasMessageContaining("1");
 
+        verify(weatherForecastCollector, times(3))
+            .collectForecasts(location);
+
+        verify(location).scheduleRetry(
+            any(Instant.class),
+            any(Instant.class)
+        );
+
+        verify(location, never()).completeCollection(
+            any(Instant.class),
+            any(Instant.class)
+        );
+
+        verify(weatherLocationRepository).save(location);
+
         verify(weatherForecastCollector)
             .collectForecasts(secondLocation);
 
@@ -112,12 +127,51 @@ class WeatherCollectionTaskletTest {
                 any(LocalDate.class)
             );
 
-        verify(location, never()).completeCollection(
+        verify(weatherLocationRepository).save(secondLocation);
+    }
+
+    @Test
+    @DisplayName("예보 수집이 두 번 실패해도 세 번째 시도에 성공하면 정상 완료한다")
+    void executeSucceedsAfterRetries() {
+
+        when(weatherLocationRepository
+            .findTop20ByNextRefreshAtLessThanEqualOrderByNextRefreshAtAsc(
+                any(Instant.class)
+            ))
+            .thenReturn(List.of(location));
+
+        doThrow(new RuntimeException("일시적 API 오류"))
+            .doThrow(new RuntimeException("일시적 API 오류"))
+            .doNothing()
+            .when(weatherForecastCollector)
+            .collectForecasts(location);
+
+        RepeatStatus result = tasklet.execute(
+            mock(StepContribution.class),
+            mock(ChunkContext.class)
+        );
+
+        verify(weatherForecastCollector, times(3))
+            .collectForecasts(location);
+
+        verify(weatherService, times(5))
+            .calculateAndSaveDailyWeather(
+                eq(location),
+                any(LocalDate.class)
+            );
+
+        verify(location).completeCollection(
             any(Instant.class),
             any(Instant.class)
         );
 
-        verify(weatherLocationRepository, never()).save(location);
-        verify(weatherLocationRepository).save(secondLocation);
+        verify(location, never()).scheduleRetry(
+            any(Instant.class),
+            any(Instant.class)
+        );
+
+        verify(weatherLocationRepository).save(location);
+
+        assertThat(result).isEqualTo(RepeatStatus.FINISHED);
     }
 }

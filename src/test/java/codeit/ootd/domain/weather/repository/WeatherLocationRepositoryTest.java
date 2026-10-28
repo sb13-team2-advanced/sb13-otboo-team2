@@ -104,4 +104,43 @@ class WeatherLocationRepositoryTest {
             .extracting(WeatherLocation::getCellId)
             .containsExactly("cell-past", "cell-current");
     }
+
+    @Test
+    @DisplayName("수집 실패 시 10분 뒤로 재시도를 예약하고 그 전에는 조회하지 않는다")
+    void scheduleRetryAfterCollectionFailure() {
+
+        Instant collectedAt = Instant.parse("2026-10-28T06:00:00Z");
+        Instant failedAt = Instant.parse("2026-10-28T09:00:00Z");
+        Instant retryAt = failedAt.plusSeconds(600);
+
+        WeatherLocation location = new WeatherLocation(
+            "cell-retry",
+            37.5665,
+            126.9780,
+            collectedAt
+        );
+
+        location.completeCollection(
+            collectedAt,
+            collectedAt.plusSeconds(7200)
+        );
+
+        location.scheduleRetry(failedAt, retryAt);
+        repository.saveAndFlush(location);
+
+        assertThat(location.getLastCollectedAt()).isEqualTo(collectedAt);
+        assertThat(location.getNextRefreshAt()).isEqualTo(retryAt);
+
+        assertThat(repository
+            .findTop20ByNextRefreshAtLessThanEqualOrderByNextRefreshAtAsc(
+                failedAt.plusSeconds(300)
+            ))
+            .extracting(WeatherLocation::getCellId)
+            .doesNotContain("cell-retry");
+
+        assertThat(repository
+            .findTop20ByNextRefreshAtLessThanEqualOrderByNextRefreshAtAsc(retryAt))
+            .extracting(WeatherLocation::getCellId)
+            .contains("cell-retry");
+    }
 }

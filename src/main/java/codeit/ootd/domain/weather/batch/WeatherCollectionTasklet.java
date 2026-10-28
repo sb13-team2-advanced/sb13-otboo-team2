@@ -27,6 +27,9 @@ public class WeatherCollectionTasklet implements Tasklet {
 
     private static final Duration REFRESH_INTERVAL = Duration.ofHours(2);
 
+    private static final int MAX_ATTEMPTS = 3;
+    private static final Duration RETRY_INTERVAL = Duration.ofMinutes(10);
+
     private final WeatherLocationRepository weatherLocationRepository;
     private final WeatherForecastCollector weatherForecastCollector;
     private final WeatherService weatherService;
@@ -47,7 +50,7 @@ public class WeatherCollectionTasklet implements Tasklet {
 
         for (WeatherLocation location : locations) {
             try {
-                weatherForecastCollector.collectForecasts(location);
+                collectWithRetry(location);
 
                 LocalDate today = LocalDate.now(KOREA_ZONE);
 
@@ -72,6 +75,21 @@ public class WeatherCollectionTasklet implements Tasklet {
                 failureCount++;
 
                 log.error("날씨 수집 실패: cellId={}", location.getCellId(), e);
+
+                Instant failedAt = Instant.now();
+
+                try {
+                    location.scheduleRetry(failedAt, failedAt.plus(RETRY_INTERVAL));
+
+                    weatherLocationRepository.save(location);
+
+                } catch (Exception retryException) {
+                    log.error(
+                        "날씨 수집 재시도 예약 실패: cellId={}",
+                        location.getCellId(),
+                        retryException
+                    );
+                }
             }
         }
 
@@ -84,5 +102,37 @@ public class WeatherCollectionTasklet implements Tasklet {
         }
 
         return RepeatStatus.FINISHED;
+    }
+
+    private void collectWithRetry(WeatherLocation location) {
+
+        for (int attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
+            try {
+                weatherForecastCollector.collectForecasts(location);
+                return;
+
+            } catch (Exception e) {
+                if (attempt == MAX_ATTEMPTS) {
+                    throw new IllegalStateException("날씨 예보 수집 재시도 횟수 초과", e);
+                }
+
+                log.warn(
+                    "날씨 예보 수집 재시도: cellId={}, 다음 시도={}/{}",
+                    location.getCellId(),
+                    attempt + 1,
+                    MAX_ATTEMPTS
+                );
+
+                try {
+                    Thread.sleep(1_000L + attempt);
+                } catch (InterruptedException interruptedException) {
+                    Thread.currentThread().interrupt();
+                    throw new IllegalStateException(
+                        "날씨 예보 재시도가 중단되었습니다.",
+                        interruptedException
+                    );
+                }
+            }
+        }
     }
 }
