@@ -8,4 +8,6 @@ import org.springframework.data.jpa.repository.JpaRepository;
 public interface ClothesAttributeRepository extends JpaRepository<ClothesAttribute, UUID> {
 
     List<ClothesAttribute> findAllByClothesId(UUID clothesId);
+
+    void deleteAllByDefinitionId(UUID definitionId);
 }

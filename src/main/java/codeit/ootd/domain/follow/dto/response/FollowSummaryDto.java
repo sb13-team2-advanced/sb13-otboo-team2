@@ -1,4 +1,4 @@
-package codeit.ootd.domain.follow.dto;
+package codeit.ootd.domain.follow.dto.response;
 
 import java.util.UUID;
 
