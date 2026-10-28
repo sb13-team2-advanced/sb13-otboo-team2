@@ -3,7 +3,6 @@ package codeit.ootd.domain.weather.service;
 import codeit.ootd.domain.weather.entity.WeatherForecast;
 import codeit.ootd.domain.weather.entity.WeatherLocation;
 import codeit.ootd.domain.weather.repository.WeatherForecastRepository;
-import codeit.ootd.infra.weather.OpenWeatherMapClient;
 import codeit.ootd.infra.weather.dto.OwmForecastResponse;
 import java.time.Instant;
 import java.util.Optional;
@@ -15,16 +14,13 @@ import org.springframework.transaction.annotation.Transactional;
 @RequiredArgsConstructor
 public class WeatherForecastService {
 
-    private final OpenWeatherMapClient openWeatherMapClient;
     private final WeatherForecastRepository weatherForecastRepository;
 
     @Transactional
-    public void collectForecasts(WeatherLocation location) {
-
-        OwmForecastResponse response = openWeatherMapClient.getForecast(
-            location.getLatitude(),
-            location.getLongitude()
-        );
+    public void saveForecasts(
+        WeatherLocation location,
+        OwmForecastResponse response
+    ) {
 
         Instant collectedAt = Instant.now();
 

@@ -253,6 +253,7 @@ class WeatherServiceTest {
         assertThat(saved.getTemperatureAvg()).isEqualTo(20.0);
         assertThat(saved.getTemperatureMax()).isEqualTo(30.0);
         assertThat(saved.getForecastSlotCount()).isEqualTo((short) 3);
+        assertThat(saved.getPrecipitationProbability()).isEqualTo(0.9);
     }
 
     private void givenForecasts(WeatherForecast... forecasts) {

@@ -5,6 +5,11 @@ spring:
     default: dev
   jpa:
     open-in-view: false
+  batch:
+    job:
+      enabled: false
+    jdbc:
+      initialize-schema: never
 
 springdoc:
   api-docs:
@@ -30,3 +35,6 @@ ootd:
   weather:
     openweathermap:
       api-key: ${OWM_API_KEY}
+  kakao:
+    local:
+      api-key: ${KAKAO_API_KEY}

@@ -5,6 +5,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import codeit.ootd.domain.weather.entity.WeatherLocation;
 import java.time.Instant;
+import java.util.List;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -65,5 +66,42 @@ class WeatherLocationRepositoryTest {
 
         assertThatThrownBy(() -> repository.saveAndFlush(duplicate))
             .isInstanceOf(DataIntegrityViolationException.class);
+    }
+
+    @Test
+    @DisplayName("수집 예정 시각이 지난 위치를 오래된 순서로 조회한다")
+    void findLocationsDueForCollection() {
+
+        Instant now = Instant.parse("2026-10-27T05:00:00Z");
+
+        WeatherLocation past = new WeatherLocation(
+            "cell-past",
+            37.5665,
+            126.9780,
+            now.minusSeconds(3600)
+        );
+
+        WeatherLocation current = new WeatherLocation(
+            "cell-current",
+            37.5700,
+            126.9800,
+            now
+        );
+
+        WeatherLocation future = new WeatherLocation(
+            "cell-future",
+            37.5800,
+            126.9900,
+            now.plusSeconds(3600)
+        );
+
+        repository.saveAllAndFlush(List.of(past, current, future));
+
+        List<WeatherLocation> result =
+            repository.findByNextRefreshAtLessThanEqualOrderByNextRefreshAtAsc(now);
+
+        assertThat(result)
+            .extracting(WeatherLocation::getCellId)
+            .containsExactly("cell-past", "cell-current");
     }
 }

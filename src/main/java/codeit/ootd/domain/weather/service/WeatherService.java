@@ -8,6 +8,7 @@ import codeit.ootd.domain.weather.repository.WeatherRepository;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.ZoneId;
+import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
@@ -76,32 +77,33 @@ public class WeatherService {
             .max()
             .orElseThrow();
 
-        double precipitationProbability = forecasts.stream()
-            .mapToDouble(WeatherForecast::getPrecipitationProbability)
-            .max()
-            .orElseThrow();
-
         Optional<WeatherForecast> nextDayStartForecast =
             weatherForecastRepository.findByLocationIdAndForecastAt(
                 location.getId(),
                 end
             );
 
-        double rainAmount = forecasts.stream()
-            .filter(f -> f.getForecastAt().isAfter(start))
-            .mapToDouble(WeatherForecast::getRainAmount)
-            .sum()
-            + nextDayStartForecast
-            .map(WeatherForecast::getRainAmount)
+        List<WeatherForecast> precipitationForecasts =
+            new ArrayList<>(
+                forecasts.stream()
+                    .filter(f -> f.getForecastAt().isAfter(start))
+                    .toList()
+            );
+
+        nextDayStartForecast.ifPresent(precipitationForecasts::add);
+
+        double precipitationProbability = precipitationForecasts.stream()
+            .mapToDouble(WeatherForecast::getPrecipitationProbability)
+            .max()
             .orElse(0.0);
 
-        double snowAmount = forecasts.stream()
-            .filter(f -> f.getForecastAt().isAfter(start))
+        double rainAmount = precipitationForecasts.stream()
+            .mapToDouble(WeatherForecast::getRainAmount)
+            .sum();
+
+        double snowAmount = precipitationForecasts.stream()
             .mapToDouble(WeatherForecast::getSnowAmount)
-            .sum()
-            + nextDayStartForecast
-            .map(WeatherForecast::getSnowAmount)
-            .orElse(0.0);
+            .sum();
 
         Map<Integer, Long> codeCounts = forecasts.stream()
             .collect(Collectors.groupingBy(
