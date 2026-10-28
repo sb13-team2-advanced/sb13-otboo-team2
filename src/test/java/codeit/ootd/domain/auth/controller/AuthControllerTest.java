@@ -1,6 +1,8 @@
 package codeit.ootd.domain.auth.controller;
 
 import codeit.ootd.domain.auth.dto.response.SignInResult;
+import codeit.ootd.domain.auth.dto.response.TokenRefreshResult;
+import codeit.ootd.domain.auth.exception.InvalidRefreshTokenException;
 import codeit.ootd.domain.auth.service.AuthService;
 import codeit.ootd.domain.user.dto.response.UserDto;
 import codeit.ootd.domain.user.entity.UserRole;
@@ -21,6 +23,8 @@ import java.time.Instant;
 import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
@@ -179,6 +183,165 @@ class AuthControllerTest {
                 .andExpect(status().isForbidden());
 
         verifyNoInteractions(authService);
+    }
+
+    @Test
+    @DisplayName("유효한 Refresh Token 쿠키로 토큰 재발급에 성공한다")
+    void refresh_success() throws Exception {
+        // given
+        String oldRefreshToken = "old-refresh-token";
+
+        TokenRefreshResult result = new TokenRefreshResult(
+                "new-access-token",
+                "new-refresh-token"
+        );
+
+        when(authService.refresh(oldRefreshToken))
+                .thenReturn(result);
+
+        MvcResult csrfResult = mockMvc.perform(get("/api/auth/csrf"))
+                .andExpect(status().isOk())
+                .andExpect(cookie().exists("XSRF-TOKEN"))
+                .andReturn();
+
+        Cookie csrfCookie = csrfResult.getResponse()
+                .getCookie("XSRF-TOKEN");
+
+        assertNotNull(csrfCookie);
+
+        Cookie refreshCookie = new Cookie(
+                "refreshToken",
+                oldRefreshToken
+        );
+
+        // when & then
+        mockMvc.perform(post("/api/auth/refresh")
+                        .cookie(csrfCookie, refreshCookie)
+                        .header("X-XSRF-TOKEN", csrfCookie.getValue()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.accessToken")
+                        .value("new-access-token"))
+                .andExpect(jsonPath("$.refreshToken").doesNotExist())
+                .andExpect(cookie().value(
+                        "refreshToken",
+                        "new-refresh-token"
+                ))
+                .andExpect(cookie().httpOnly("refreshToken", true))
+                .andExpect(cookie().secure("refreshToken", true))
+                .andExpect(cookie().path("refreshToken", "/api/auth"));
+
+        verify(authService).refresh(oldRefreshToken);
+    }
+
+    @Test
+    @DisplayName("Refresh Token 쿠키가 없으면 재발급 요청을 거부한다")
+    void refresh_missingCookie() throws Exception {
+        // given
+        MvcResult csrfResult = mockMvc.perform(get("/api/auth/csrf"))
+                .andExpect(status().isOk())
+                .andExpect(cookie().exists("XSRF-TOKEN"))
+                .andReturn();
+
+        Cookie csrfCookie = csrfResult.getResponse()
+                .getCookie("XSRF-TOKEN");
+
+        assertNotNull(csrfCookie);
+
+        // when & then
+        mockMvc.perform(post("/api/auth/refresh")
+                        .cookie(csrfCookie)
+                        .header("X-XSRF-TOKEN", csrfCookie.getValue()))
+                .andExpect(status().isBadRequest());
+
+        verify(authService, never()).refresh(anyString());
+    }
+
+    @Test
+    @DisplayName("CSRF 헤더가 없으면 Refresh Token 재발급을 거부한다")
+    void refresh_withoutCsrfHeader_forbidden() throws Exception {
+        // given
+        MvcResult csrfResult = mockMvc.perform(get("/api/auth/csrf"))
+                .andExpect(status().isOk())
+                .andExpect(cookie().exists("XSRF-TOKEN"))
+                .andReturn();
+
+        Cookie csrfCookie = csrfResult.getResponse()
+                .getCookie("XSRF-TOKEN");
+
+        assertNotNull(csrfCookie);
+
+        Cookie refreshCookie = new Cookie(
+                "refreshToken",
+                "old-refresh-token"
+        );
+
+        // when & then
+        mockMvc.perform(post("/api/auth/refresh")
+                        .cookie(csrfCookie, refreshCookie))
+                .andExpect(status().isForbidden());
+
+        // CSRF 검증에 실패하면 서비스는 호출되지 않아야 함
+        verifyNoInteractions(authService);
+    }
+
+    @Test
+    @DisplayName("잘못된 CSRF 토큰으로 Refresh Token 재발급 요청 시 403을 반환한다")
+    void refresh_invalidCsrfToken_forbidden() throws Exception {
+        // given
+        MvcResult csrfResult = mockMvc.perform(get("/api/auth/csrf"))
+                .andExpect(status().isOk())
+                .andExpect(cookie().exists("XSRF-TOKEN"))
+                .andReturn();
+
+        Cookie csrfCookie = csrfResult.getResponse()
+                .getCookie("XSRF-TOKEN");
+
+        assertNotNull(csrfCookie);
+
+        Cookie refreshCookie = new Cookie(
+                "refreshToken",
+                "old-refresh-token"
+        );
+
+        // when & then
+        mockMvc.perform(post("/api/auth/refresh")
+                        .cookie(csrfCookie, refreshCookie)
+                        .header("X-XSRF-TOKEN", "invalid-csrf-token"))
+                .andExpect(status().isForbidden());
+
+        // CSRF 검증에 실패하면 재발급 서비스가 호출되지 않아야 함
+        verifyNoInteractions(authService);
+    }
+
+    @Test
+    @DisplayName("유효하지 않은 Refresh Token으로 재발급 요청 시 401을 반환한다")
+    void refresh_invalidToken_unauthorized() throws Exception {
+        // given
+        String invalidRefreshToken = "invalid-refresh-token";
+
+        MvcResult csrfResult = mockMvc.perform(get("/api/auth/csrf"))
+                .andExpect(status().isOk())
+                .andExpect(cookie().exists("XSRF-TOKEN"))
+                .andReturn();
+
+        Cookie csrfCookie = csrfResult.getResponse()
+                .getCookie("XSRF-TOKEN");
+
+        assertNotNull(csrfCookie);
+
+        when(authService.refresh(invalidRefreshToken))
+                .thenThrow(new InvalidRefreshTokenException());
+
+        // when & then
+        mockMvc.perform(post("/api/auth/refresh")
+                        .cookie(
+                                csrfCookie,
+                                new Cookie("refreshToken", invalidRefreshToken)
+                        )
+                        .header("X-XSRF-TOKEN", csrfCookie.getValue()))
+                .andExpect(status().isUnauthorized());
+
+        verify(authService).refresh(invalidRefreshToken);
     }
 
 }

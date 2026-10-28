@@ -1,6 +1,7 @@
 package codeit.ootd.domain.auth.service.impl;
 
 import codeit.ootd.domain.auth.entity.AuthSession;
+import codeit.ootd.domain.auth.exception.InvalidAuthSessionException;
 import codeit.ootd.domain.auth.repository.AuthSessionRepository;
 import codeit.ootd.domain.auth.service.AuthSessionService;
 import lombok.RequiredArgsConstructor;
@@ -64,12 +65,10 @@ public class AuthSessionServiceImpl implements AuthSessionService {
         Instant now = clock.instant();
 
         AuthSession session = authSessionRepository.findById(sessionId)
-                .orElseThrow(() ->
-                        new IllegalArgumentException("인증 세션이 존재하지 않습니다.")
-                );
+                .orElseThrow(InvalidAuthSessionException::new);
 
         if (!session.isActive(now)) {
-            throw new IllegalArgumentException("유효하지 않은 인증 세션입니다.");
+            throw new InvalidAuthSessionException();
         }
 
         return session;

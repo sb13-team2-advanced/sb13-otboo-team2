@@ -2,6 +2,7 @@ package codeit.ootd.domain.auth.service;
 
 import codeit.ootd.domain.auth.entity.AuthSession;
 import codeit.ootd.domain.auth.entity.RefreshToken;
+import codeit.ootd.domain.auth.exception.InvalidRefreshTokenException;
 import codeit.ootd.domain.auth.repository.AuthSessionRepository;
 import codeit.ootd.domain.auth.repository.RefreshTokenRepository;
 import codeit.ootd.domain.auth.service.impl.RefreshTokenServiceImpl;
@@ -182,7 +183,7 @@ class RefreshTokenServiceImplTest {
         // when & then
         assertAll(
                 () -> assertThrows(
-                        IllegalArgumentException.class,
+                        InvalidRefreshTokenException.class,
                         () -> refreshTokenService.rotate(
                                 sessionId,
                                 "invalid-refresh-token"
@@ -206,12 +207,12 @@ class RefreshTokenServiceImplTest {
     void rotate_expiredToken_throwsException() {
         // given
         UUID sessionId = UUID.randomUUID();
-        String oldRawToken = "expired-refresh-token";
+        String oldToken = "expired-refresh-token";
 
         Instant now = Instant.parse("2026-10-28T00:00:00Z");
         Instant expiredAt = now.minus(Duration.ofSeconds(1));
 
-        String oldHash = sha256(oldRawToken);
+        String oldHash = sha256(oldToken);
 
         RefreshToken existingToken = RefreshToken.create(
                 sessionId,
@@ -227,8 +228,8 @@ class RefreshTokenServiceImplTest {
         // when & then
         assertAll(
                 () -> assertThrows(
-                        IllegalArgumentException.class,
-                        () -> refreshTokenService.rotate(sessionId, oldRawToken)
+                        InvalidRefreshTokenException.class,
+                        () -> refreshTokenService.rotate(sessionId, oldToken)
                 ),
                 () -> assertEquals(oldHash, existingToken.getTokenHash()),
                 () -> assertEquals(expiredAt, existingToken.getExpiresAt())
@@ -242,15 +243,15 @@ class RefreshTokenServiceImplTest {
     void rotate_tokenNotFound_throwsException() {
         // given
         UUID sessionId = UUID.randomUUID();
-        String oldRawToken = "old-refresh-token";
+        String oldToken = "old-refresh-token";
 
         when(refreshTokenRepository.findBySessionIdForUpdate(sessionId))
                 .thenReturn(Optional.empty());
 
         // when & then
         assertThrows(
-                IllegalArgumentException.class,
-                () -> refreshTokenService.rotate(sessionId, oldRawToken)
+                InvalidRefreshTokenException.class,
+                () -> refreshTokenService.rotate(sessionId, oldToken)
         );
 
         verify(refreshTokenRepository)
@@ -267,8 +268,8 @@ class RefreshTokenServiceImplTest {
         UUID sessionId = UUID.randomUUID();
 
         Instant now = Instant.parse("2026-10-28T00:00:00Z");
-        String oldRawToken = "valid-refresh-token";
-        String oldHash = sha256(oldRawToken);
+        String oldToken = "valid-refresh-token";
+        String oldHash = sha256(oldToken);
 
         AuthSession session = AuthSession.create(
                 userId,
@@ -292,8 +293,8 @@ class RefreshTokenServiceImplTest {
 
         // when & then
         assertThrows(
-                IllegalArgumentException.class,
-                () -> refreshTokenService.rotate(sessionId, oldRawToken)
+                InvalidRefreshTokenException.class,
+                () -> refreshTokenService.rotate(sessionId, oldToken)
         );
 
         assertEquals(oldHash, existingToken.getTokenHash());
@@ -309,8 +310,8 @@ class RefreshTokenServiceImplTest {
         UUID sessionId = UUID.randomUUID();
 
         Instant now = Instant.parse("2026-10-28T00:00:00Z");
-        String oldRawToken = "valid-refresh-token";
-        String oldHash = sha256(oldRawToken);
+        String oldToken = "valid-refresh-token";
+        String oldHash = sha256(oldToken);
 
         // Refresh Token 자체는 유효함
         RefreshToken existingToken = RefreshToken.create(
@@ -335,8 +336,8 @@ class RefreshTokenServiceImplTest {
 
         // when & then
         assertThrows(
-                IllegalArgumentException.class,
-                () -> refreshTokenService.rotate(sessionId, oldRawToken)
+                InvalidRefreshTokenException.class,
+                () -> refreshTokenService.rotate(sessionId, oldToken)
         );
 
         assertEquals(oldHash, existingToken.getTokenHash());
@@ -355,8 +356,8 @@ class RefreshTokenServiceImplTest {
         UUID sessionId = UUID.randomUUID();
 
         Instant now = Instant.parse("2026-10-28T00:00:00Z");
-        String oldRawToken = "valid-refresh-token";
-        String oldHash = sha256(oldRawToken);
+        String oldToken = "valid-refresh-token";
+        String oldHash = sha256(oldToken);
         Instant expiresAt = now.plus(Duration.ofDays(7));
 
         RefreshToken existingToken = RefreshToken.create(
@@ -375,8 +376,8 @@ class RefreshTokenServiceImplTest {
 
         // when & then
         assertThrows(
-                IllegalArgumentException.class,
-                () -> refreshTokenService.rotate(sessionId, oldRawToken)
+                InvalidRefreshTokenException.class,
+                () -> refreshTokenService.rotate(sessionId, oldToken)
         );
 
         assertEquals(oldHash, existingToken.getTokenHash());
@@ -491,10 +492,7 @@ class RefreshTokenServiceImplTest {
         UUID sessionId = UUID.randomUUID();
         String rawToken = "test-refresh-token";
 
-        String tokenHash = HexFormat.of().formatHex(
-                MessageDigest.getInstance("SHA-256")
-                        .digest(rawToken.getBytes(StandardCharsets.UTF_8))
-        );
+        String tokenHash = sha256(rawToken);
 
         RefreshToken refreshToken = mock(RefreshToken.class);
 
@@ -518,7 +516,7 @@ class RefreshTokenServiceImplTest {
 
         // when & then
         assertThrows(
-                IllegalArgumentException.class,
+                InvalidRefreshTokenException.class,
                 () -> refreshTokenService.findSessionIdByToken(rawToken)
         );
     }
@@ -530,7 +528,7 @@ class RefreshTokenServiceImplTest {
     void findSessionIdByToken_blankToken(String rawToken) {
         // when & then
         assertThrows(
-                IllegalArgumentException.class,
+                InvalidRefreshTokenException.class,
                 () -> refreshTokenService.findSessionIdByToken(rawToken)
         );
 

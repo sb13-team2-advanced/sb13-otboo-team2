@@ -5,13 +5,16 @@ import codeit.ootd.domain.auth.dto.response.TokenRefreshResult;
 import codeit.ootd.domain.auth.entity.AuthSession;
 import codeit.ootd.domain.auth.exception.AccountInactiveException;
 import codeit.ootd.domain.auth.exception.AccountLockedException;
+import codeit.ootd.domain.auth.exception.InvalidAuthSessionException;
 import codeit.ootd.domain.auth.exception.InvalidCredentialsException;
+import codeit.ootd.domain.auth.exception.InvalidRefreshTokenException;
 import codeit.ootd.domain.auth.jwt.JwtProvider;
 import codeit.ootd.domain.auth.service.impl.AuthServiceImpl;
 import codeit.ootd.domain.user.entity.User;
 import codeit.ootd.domain.user.entity.UserStatus;
 import codeit.ootd.domain.user.repository.UserRepository;
 
+import codeit.ootd.global.exception.ErrorCode;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -425,13 +428,11 @@ class AuthServiceImplTest {
         when(user.getStatus()).thenReturn(UserStatus.ACTIVE);
 
         when(refreshTokenService.rotate(sessionId, oldRefreshToken))
-                .thenThrow(new IllegalArgumentException(
-                        "Refresh Token이 일치하지 않습니다."
-                ));
+                .thenThrow(new InvalidRefreshTokenException());
 
         // when & then
         assertThrows(
-                IllegalArgumentException.class,
+                InvalidRefreshTokenException.class,
                 () -> authService.refresh(oldRefreshToken)
         );
 
@@ -484,6 +485,37 @@ class AuthServiceImplTest {
                 oldRefreshToken,
                 user
         );
+    }
+
+    @Test
+    @DisplayName("유효하지 않은 인증 세션은 Refresh Token 재발급을 거부한다")
+    void refresh_invalidSession() {
+        // given
+        String oldRefreshToken = "old-refresh-token";
+        UUID sessionId = UUID.randomUUID();
+
+        when(refreshTokenService.findSessionIdByToken(oldRefreshToken))
+                .thenReturn(sessionId);
+
+        when(authSessionService.getActiveSession(sessionId))
+                .thenThrow(new InvalidAuthSessionException());
+
+        // when & then
+        InvalidRefreshTokenException exception = assertThrows(
+                InvalidRefreshTokenException.class,
+                () -> authService.refresh(oldRefreshToken)
+        );
+
+        assertEquals(
+                ErrorCode.INVALID_REFRESH_TOKEN,
+                exception.getErrorCode()
+        );
+
+        verify(refreshTokenService, never())
+                .rotate(any(), anyString());
+
+        verify(jwtProvider, never())
+                .generateAccessToken(any(), any());
     }
 
 

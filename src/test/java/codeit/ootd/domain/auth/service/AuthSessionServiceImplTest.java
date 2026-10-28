@@ -1,8 +1,10 @@
 package codeit.ootd.domain.auth.service;
 
 import codeit.ootd.domain.auth.entity.AuthSession;
+import codeit.ootd.domain.auth.exception.InvalidAuthSessionException;
 import codeit.ootd.domain.auth.repository.AuthSessionRepository;
 import codeit.ootd.domain.auth.service.impl.AuthSessionServiceImpl;
+import codeit.ootd.global.exception.ErrorCode;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -183,18 +185,19 @@ class AuthSessionServiceImplTest {
                 .thenReturn(Optional.empty());
 
         // when & then
-        IllegalArgumentException exception = assertThrows(
-                IllegalArgumentException.class,
+        InvalidAuthSessionException exception = assertThrows(
+                InvalidAuthSessionException.class,
                 () -> authSessionService.getActiveSession(sessionId)
         );
 
         assertEquals(
-                "인증 세션이 존재하지 않습니다.",
+                ErrorCode.INVALID_AUTH_SESSION.getMessage(),
                 exception.getMessage()
         );
 
         verify(authSessionRepository).findById(sessionId);
     }
+
 
     @ParameterizedTest
     @EnumSource(value = SessionState.class, names = {"EXPIRED", "REVOKED"})
@@ -218,12 +221,16 @@ class AuthSessionServiceImplTest {
                 .thenReturn(Optional.of(session));
 
         // when & then
-        IllegalArgumentException exception = assertThrows(
-                IllegalArgumentException.class,
+        InvalidAuthSessionException exception = assertThrows(
+                InvalidAuthSessionException.class,
                 () -> authSessionService.getActiveSession(sessionId)
         );
 
-        assertEquals("유효하지 않은 인증 세션입니다.", exception.getMessage());
+        assertEquals(
+                ErrorCode.INVALID_AUTH_SESSION.getMessage(),
+                exception.getMessage()
+        );
+
         verify(authSessionRepository).findById(sessionId);
     }
 

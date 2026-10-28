@@ -5,7 +5,9 @@ import codeit.ootd.domain.auth.dto.response.TokenRefreshResult;
 import codeit.ootd.domain.auth.entity.AuthSession;
 import codeit.ootd.domain.auth.exception.AccountInactiveException;
 import codeit.ootd.domain.auth.exception.AccountLockedException;
+import codeit.ootd.domain.auth.exception.InvalidAuthSessionException;
 import codeit.ootd.domain.auth.exception.InvalidCredentialsException;
+import codeit.ootd.domain.auth.exception.InvalidRefreshTokenException;
 import codeit.ootd.domain.auth.jwt.JwtProvider;
 import codeit.ootd.domain.auth.service.AuthService;
 import codeit.ootd.domain.auth.service.AuthSessionService;
@@ -80,7 +82,13 @@ public class AuthServiceImpl implements AuthService {
 
         UUID sessionId = refreshTokenService.findSessionIdByToken(refreshToken);
 
-        AuthSession session = authSessionService.getActiveSession(sessionId);
+        AuthSession session;
+
+        try {
+            session = authSessionService.getActiveSession(sessionId);
+        } catch (InvalidAuthSessionException e) {
+            throw new InvalidRefreshTokenException();
+        }
 
         User user = userRepository.findById(session.getUserId())
                 .orElseThrow(() ->

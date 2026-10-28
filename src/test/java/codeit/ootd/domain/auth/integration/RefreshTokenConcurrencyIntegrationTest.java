@@ -2,6 +2,7 @@ package codeit.ootd.domain.auth.integration;
 
 import codeit.ootd.domain.auth.entity.AuthSession;
 import codeit.ootd.domain.auth.entity.RefreshToken;
+import codeit.ootd.domain.auth.exception.InvalidRefreshTokenException;
 import codeit.ootd.domain.auth.repository.AuthSessionRepository;
 import codeit.ootd.domain.auth.repository.RefreshTokenRepository;
 import codeit.ootd.domain.auth.service.RefreshTokenService;
@@ -27,6 +28,7 @@ import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.Callable;
 import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
@@ -144,8 +146,9 @@ class RefreshTokenConcurrencyIntegrationTest {
                 try {
                     successfulToken = future.get(10, TimeUnit.SECONDS);
                     successCount++;
-                } catch (java.util.concurrent.ExecutionException e) {
-                    if (e.getCause() instanceof IllegalArgumentException) {
+                }
+                catch (ExecutionException e) {
+                    if (e.getCause() instanceof InvalidRefreshTokenException) {
                         failureCount++;
                     } else {
                         throw e;

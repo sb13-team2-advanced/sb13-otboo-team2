@@ -2,6 +2,7 @@ package codeit.ootd.domain.auth.service.impl;
 
 import codeit.ootd.domain.auth.entity.AuthSession;
 import codeit.ootd.domain.auth.entity.RefreshToken;
+import codeit.ootd.domain.auth.exception.InvalidRefreshTokenException;
 import codeit.ootd.domain.auth.repository.AuthSessionRepository;
 import codeit.ootd.domain.auth.repository.RefreshTokenRepository;
 import codeit.ootd.domain.auth.service.RefreshTokenService;
@@ -80,11 +81,11 @@ public class RefreshTokenServiceImpl implements RefreshTokenService {
         RefreshToken existingToken = refreshTokenRepository
                 .findBySessionIdForUpdate(sessionId)
                 .orElseThrow(() ->
-                        new IllegalArgumentException("Refresh Token이 존재하지 않습니다.")
+                        new InvalidRefreshTokenException()
                 );
 
         if (oldRawToken == null || oldRawToken.isBlank()) {
-            throw new IllegalArgumentException("Refresh Token이 유효하지 않습니다.");
+            throw new InvalidRefreshTokenException();
         }
 
         String oldTokenHash = hash(oldRawToken);
@@ -93,22 +94,20 @@ public class RefreshTokenServiceImpl implements RefreshTokenService {
                 oldTokenHash.getBytes(StandardCharsets.UTF_8),
                 existingToken.getTokenHash().getBytes(StandardCharsets.UTF_8)
         )) {
-            throw new IllegalArgumentException("Refresh Token이 일치하지 않습니다.");
+            throw new InvalidRefreshTokenException();
         }
 
         Instant now = clock.instant();
 
         if (!existingToken.getExpiresAt().isAfter(now)) {
-            throw new IllegalArgumentException("Refresh Token이 만료되었습니다.");
+            throw new InvalidRefreshTokenException();
         }
 
         AuthSession session = authSessionRepository.findById(sessionId)
-                .orElseThrow(() ->
-                        new IllegalArgumentException("인증 세션이 존재하지 않습니다.")
-                );
+                .orElseThrow(InvalidRefreshTokenException::new);
 
         if (!session.isActive(now)) {
-            throw new IllegalArgumentException("유효하지 않은 인증 세션입니다.");
+            throw new InvalidRefreshTokenException();
         }
 
         byte[] randomBytes = new byte[32];
@@ -133,7 +132,7 @@ public class RefreshTokenServiceImpl implements RefreshTokenService {
     public UUID findSessionIdByToken(String rawToken) {
 
         if (rawToken == null || rawToken.isBlank()) {
-            throw new IllegalArgumentException("Refresh Token이 유효하지 않습니다.");
+            throw new InvalidRefreshTokenException();
         }
 
         String tokenHash = hash(rawToken);
@@ -141,7 +140,7 @@ public class RefreshTokenServiceImpl implements RefreshTokenService {
         RefreshToken refreshToken = refreshTokenRepository
                 .findByTokenHash(tokenHash)
                 .orElseThrow(() ->
-                        new IllegalArgumentException("Refresh Token이 존재하지 않습니다.")
+                        new InvalidRefreshTokenException()
                 );
 
         return refreshToken.getSessionId();

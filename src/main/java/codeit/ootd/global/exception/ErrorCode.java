@@ -13,6 +13,8 @@ public enum ErrorCode {
 
     // 인증
     INVALID_CREDENTIALS(HttpStatus.UNAUTHORIZED, "이메일 또는 비밀번호가 올바르지 않습니다."),
+    INVALID_REFRESH_TOKEN(HttpStatus.UNAUTHORIZED, "유효하지 않거나 만료된 Refresh Token입니다."),
+    INVALID_AUTH_SESSION(HttpStatus.UNAUTHORIZED, "유효하지 않거나 만료된 인증 세션입니다."),
     ACCOUNT_LOCKED(HttpStatus.FORBIDDEN, "잠긴 계정입니다."),
     ACCOUNT_INACTIVE(HttpStatus.FORBIDDEN, "활성화되지 않은 계정입니다."),
     // 의상
