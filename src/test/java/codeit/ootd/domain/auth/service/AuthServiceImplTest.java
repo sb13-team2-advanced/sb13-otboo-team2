@@ -29,6 +29,7 @@ import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.assertAll;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.Mockito.mock;
@@ -232,7 +233,6 @@ class AuthServiceImplTest {
         when(jwtProvider.generateAccessToken(userId, sessionId))
                 .thenReturn("test-access-token");
 
-        // 추가: Refresh Token 발급 Mock
         when(refreshTokenService.issue(sessionId))
                 .thenReturn("test-refresh-token");
 
@@ -241,6 +241,7 @@ class AuthServiceImplTest {
 
         // then
         assertAll(
+                () -> assertNotNull(result.userDto()),
                 () -> assertEquals("test-access-token", result.accessToken()),
                 () -> assertEquals("test-refresh-token", result.refreshToken())
         );

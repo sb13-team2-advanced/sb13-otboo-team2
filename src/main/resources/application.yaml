@@ -30,3 +30,7 @@ ootd:
   weather:
     openweathermap:
       api-key: ${OWM_API_KEY}
+
+auth:
+  cookie:
+    secure: true

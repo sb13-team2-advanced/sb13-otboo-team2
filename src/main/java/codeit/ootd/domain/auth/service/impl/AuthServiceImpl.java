@@ -9,6 +9,7 @@ import codeit.ootd.domain.auth.jwt.JwtProvider;
 import codeit.ootd.domain.auth.service.AuthService;
 import codeit.ootd.domain.auth.service.AuthSessionService;
 import codeit.ootd.domain.auth.service.RefreshTokenService;
+import codeit.ootd.domain.user.dto.response.UserDto;
 import codeit.ootd.domain.user.entity.User;
 import codeit.ootd.domain.user.entity.UserStatus;
 import codeit.ootd.domain.user.repository.UserRepository;
@@ -62,7 +63,12 @@ public class AuthServiceImpl implements AuthService {
 
         String refreshToken = refreshTokenService.issue(session.getId());
 
-        return new SignInResult(accessToken, refreshToken);
+        return new SignInResult(
+                UserDto.from(user),
+                accessToken,
+                refreshToken
+        );
+
     }
 
 }
