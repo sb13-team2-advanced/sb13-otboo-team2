@@ -19,6 +19,8 @@ import java.util.UUID;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -95,6 +97,15 @@ class FollowServiceTest {
     }
 
     @Test
+    @DisplayName("자기 자신을 팔로우하면 예외가 발생하고 저장하지 않는다")
+    void create_rejectsSelfFollow() {
+        assertEquals(FOLLOW_SELF_NOT_ALLOWED,
+            assertThrows(OtbooException.class,
+                () -> service.create(new FollowCreateRequest(me, me), me)).getErrorCode());
+        verifyNoInteractions(follows, queries, users, profiles);
+    }
+
+    @Test
     @DisplayName("이미 팔로우한 사용자를 다시 팔로우하면 중복 예외가 발생한다")
     void create_rejectsDuplicate() {
         when(users.findById(me)).thenReturn(Optional.of(user(me)));
@@ -135,12 +146,13 @@ class FollowServiceTest {
     @DisplayName("다음 페이지가 있으면 다음 커서와 검색 조건에 맞는 전체 개수를 반환한다")
     void getList_returnsNextCursorAndFilteredTotal() {
         when(users.findById(me)).thenReturn(Optional.of(user(me)));
-        when(users.findById(target)).thenReturn(Optional.of(user(target)));
+        when(users.findAllById(List.of(target, me))).thenReturn(List.of(user(me), user(target)));
         Follow anchor = follow();
+        Follow lookahead = new Follow(me, UUID.randomUUID());
         var first = new FollowDto(anchor.getId(), new UserSummary(target, "name", null),
             new UserSummary(me, "name", null));
         when(queries.findList(me, true, null, null, 2, "name"))
-            .thenReturn(List.of(anchor, follow()));
+            .thenReturn(List.of(anchor, lookahead));
         when(queries.countList(me, true, "name")).thenReturn(5L);
         var dto = service.getList(me, true, null, null, 1, "name");
         assertEquals(List.of(first), dto.data());
@@ -148,6 +160,8 @@ class FollowServiceTest {
         assertEquals(anchor.getId(), dto.nextIdAfter());
         assertEquals(anchor.getCreatedAt().toString(), dto.nextCursor());
         assertEquals(5L, dto.totalCount());
+        verify(users).findAllById(List.of(target, me));
+        verify(profiles).findByUserIdIn(List.of(target, me));
     }
 
     @Test
@@ -160,6 +174,9 @@ class FollowServiceTest {
         assertFalse(dto.hasNext());
         assertNull(dto.nextCursor());
         assertNull(dto.nextIdAfter());
+        verify(users).findById(target);
+        verifyNoMoreInteractions(users);
+        verifyNoInteractions(profiles);
     }
 
     @Test
@@ -180,7 +197,7 @@ class FollowServiceTest {
     @DisplayName("팔로워 조회는 idAfter의 생성 시간을 커서로 사용한다")
     void getList_followersResolvesIdOnlyCursor() {
         when(users.findById(target)).thenReturn(Optional.of(user(target)));
-        when(users.findById(me)).thenReturn(Optional.of(user(me)));
+        when(users.findAllById(List.of(target, me))).thenReturn(List.of(user(me), user(target)));
         Follow anchor = follow();
         when(follows.findById(anchor.getId())).thenReturn(Optional.of(anchor));
         when(queries.findList(target, false, anchor.getCreatedAt(), anchor.getId(), 11, null))
@@ -193,12 +210,70 @@ class FollowServiceTest {
         verify(queries).countList(target, false, null);
     }
 
+    @ParameterizedTest
+    @ValueSource(booleans = {true, false})
+    @DisplayName("팔로잉과 팔로워 목록의 사용자 및 프로필을 각각 한 번만 일괄 조회한다")
+    void getList_batchesUserSummaries(boolean followings) {
+        UUID other = UUID.randomUUID();
+        Follow first = followings ? new Follow(me, target) : new Follow(target, me);
+        Follow second = followings ? new Follow(me, other) : new Follow(other, me);
+        List<UUID> ids = followings ? List.of(target, me, other) : List.of(me, target, other);
+        User targetUser = User.create("target", "target@example.com", "encoded");
+        ReflectionTestUtils.setField(targetUser, "id", target);
+        Profile profile = new Profile(target);
+        ReflectionTestUtils.setField(profile, "profileImageUrl", "https://example.com/profile.png");
+        when(users.findById(me)).thenReturn(Optional.of(user(me)));
+        when(queries.findList(me, followings, null, null, 11, null)).thenReturn(List.of(first, second));
+        when(users.findAllById(ids)).thenReturn(List.of(user(other), user(me), targetUser));
+        when(profiles.findByUserIdIn(ids)).thenReturn(List.of(profile));
+
+        var dto = service.getList(me, followings, null, null, 10, null);
+
+        UserSummary targetSummary = new UserSummary(target, "target", "https://example.com/profile.png");
+        UserSummary meSummary = new UserSummary(me, "name", null);
+        UserSummary otherSummary = new UserSummary(other, "name", null);
+        assertEquals(List.of(
+            new FollowDto(first.getId(), followings ? targetSummary : meSummary,
+                followings ? meSummary : targetSummary),
+            new FollowDto(second.getId(), followings ? otherSummary : meSummary,
+                followings ? meSummary : otherSummary)), dto.data());
+        verify(users).findById(me);
+        verify(users).findAllById(ids);
+        verify(profiles).findByUserIdIn(ids);
+        verifyNoMoreInteractions(users, profiles);
+    }
+
+    @Test
+    @DisplayName("일괄 조회에서 사용자가 누락되면 기존 사용자 없음 예외를 유지한다")
+    void getList_rejectsMissingUserInBatch() {
+        when(users.findById(me)).thenReturn(Optional.of(user(me)));
+        when(queries.findList(me, true, null, null, 11, null)).thenReturn(List.of(follow()));
+        when(users.findAllById(List.of(target, me))).thenReturn(List.of(user(me)));
+
+        assertEquals(FOLLOW_USER_NOT_FOUND,
+            assertThrows(OtbooException.class,
+                () -> service.getList(me, true, null, null, 10, null)).getErrorCode());
+        verifyNoInteractions(profiles);
+    }
+
     @Test
     @DisplayName("커서의 형식이 잘못되면 유효하지 않은 커서 예외가 발생한다")
     void getList_rejectsInvalidCursor() {
         when(users.findById(me)).thenReturn(Optional.of(user(me)));
         assertEquals(FOLLOW_INVALID_CURSOR,
             assertThrows(OtbooException.class, () -> service.getList(me, true, "bad", null, 10, null)).getErrorCode());
+        verifyNoInteractions(follows, queries);
+    }
+
+    @Test
+    @DisplayName("시간 커서만 전달하면 동일 생성 시간의 데이터 누락을 막기 위해 거부한다")
+    void getList_rejectsCursorWithoutIdAfter() {
+        when(users.findById(me)).thenReturn(Optional.of(user(me)));
+        for (boolean followings : List.of(true, false)) {
+            assertEquals(FOLLOW_INVALID_CURSOR,
+                assertThrows(OtbooException.class, () -> service.getList(me, followings,
+                    "2026-10-27T00:00:00Z", null, 10, null)).getErrorCode());
+        }
         verifyNoInteractions(follows, queries);
     }
 

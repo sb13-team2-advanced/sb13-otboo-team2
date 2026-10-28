@@ -43,6 +43,7 @@ public class FollowService {
     @Transactional
     public FollowDto create(FollowCreateRequest request, UUID currentUserId) {
         if (!currentUserId.equals(request.followerId())) throw new OtbooException(ACCESS_DENIED);
+        if (request.followerId().equals(request.followeeId())) throw new OtbooException(FOLLOW_SELF_NOT_ALLOWED);
         User follower = user(request.followerId());
         User followee = user(request.followeeId());
         if (followRepository.existsByFollowerIdAndFolloweeId(follower.getId(), followee.getId())) {
@@ -85,6 +86,7 @@ public class FollowService {
         } catch (DateTimeParseException exception) {
             throw new OtbooException(FOLLOW_INVALID_CURSOR);
         }
+        if (after != null && idAfter == null) throw new OtbooException(FOLLOW_INVALID_CURSOR);
         if (after == null && idAfter != null) {
             Follow anchor = followRepository.findById(idAfter)
                 .orElseThrow(() -> new OtbooException(FOLLOW_INVALID_CURSOR));

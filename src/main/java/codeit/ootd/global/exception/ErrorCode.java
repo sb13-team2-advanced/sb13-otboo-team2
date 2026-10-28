@@ -28,6 +28,7 @@ public enum ErrorCode {
     CLOTHES_ATTRIBUTE_VALUES_DUPLICATED(HttpStatus.BAD_REQUEST, "선택 가능한 값에 중복이 있습니다."),
 
     // 팔로우
+    FOLLOW_SELF_NOT_ALLOWED(HttpStatus.BAD_REQUEST, "자기 자신을 팔로우할 수 없습니다."),
     FOLLOW_ALREADY_EXISTS(HttpStatus.BAD_REQUEST, "이미 팔로우한 사용자입니다."),
     FOLLOW_USER_NOT_FOUND(HttpStatus.BAD_REQUEST, "팔로우 사용자를 찾을 수 없습니다."),
     FOLLOW_NOT_FOUND(HttpStatus.BAD_REQUEST, "팔로우 관계를 찾을 수 없습니다."),
