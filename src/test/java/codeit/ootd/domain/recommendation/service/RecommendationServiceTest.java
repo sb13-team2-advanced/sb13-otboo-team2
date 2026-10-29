@@ -46,6 +46,32 @@ class RecommendationServiceTest {
     @Mock private OutfitRecommender recommender;
     @InjectMocks private RecommendationServiceImpl service;
 
+    /**
+     * 의상 속성이 참조하는 정의가 누락되면 추천을 중단하는지 검증한다.
+     */
+    @Test
+    void 의상_속성_정의가_없으면_예외를_발생시킨다() {
+        // given
+        UUID userId = UUID.randomUUID();
+        UUID weatherId = UUID.randomUUID();
+        UUID clothesId = UUID.randomUUID();
+        UUID definitionId = UUID.randomUUID();
+        Clothes clothes = mock(Clothes.class);
+        given(weatherRepository.findById(weatherId)).willReturn(Optional.of(mock(Weather.class)));
+        given(clothesRepository.findAllByUserId(userId)).willReturn(List.of(clothes));
+        given(clothes.getId()).willReturn(clothesId);
+        given(attributeRepository.findAllByClothesIdIn(List.of(clothesId)))
+                .willReturn(List.of(new ClothesAttribute(clothesId, definitionId, "보통")));
+        given(definitionRepository.findAllById(List.of(definitionId))).willReturn(List.of());
+
+        // when then
+        assertThatThrownBy(() -> service.recommend(userId, weatherId))
+                .isInstanceOfSatisfying(OtbooException.class, exception ->
+                        assertThat(exception.getErrorCode())
+                                .isEqualTo(ErrorCode.CLOTHES_ATTRIBUTE_DEFINITION_NOT_FOUND));
+        verifyNoInteractions(recommender);
+    }
+
     @Test
     void 의상과_속성을_조합해_알고리즘에_전달한다() {
 

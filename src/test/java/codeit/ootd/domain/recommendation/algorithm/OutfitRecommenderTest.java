@@ -17,6 +17,42 @@ import org.junit.jupiter.api.Test;
 class OutfitRecommenderTest {
     private final OutfitRecommender recommender = new OutfitRecommender();
 
+    /**
+     * 다른 속성과 미등록 두께 값을 기본 두께로 처리하고 신발까지 조합하는지 검증한다.
+     */
+    @Test
+    void 미등록_두께는_보통으로_처리하고_다른_속성은_무시한다() {
+        // given
+        RecommendationClothesResponse top = new RecommendationClothesResponse(
+                UUID.randomUUID(), "상의", null, ClothesType.TOP,
+                List.of(new ClothesAttributeWithDefDto(UUID.randomUUID(), "색상", List.of("검정"), "검정"),
+                        new ClothesAttributeWithDefDto(UUID.randomUUID(), "두께", List.of("미등록"), "미등록")));
+        RecommendationClothesResponse bottom = item(ClothesType.BOTTOM, "보통");
+        RecommendationClothesResponse shoes = item(ClothesType.SHOES, "보통");
+
+        // when
+        List<RecommendationClothesResponse> result = recommender.recommend(20,
+                List.of(top, item(ClothesType.TOP, "두꺼움"), bottom, shoes));
+
+        // then
+        assertThat(result).containsExactly(top, bottom, shoes);
+    }
+
+    /**
+     * 상의 없이 하의만 있는 경우에도 완전한 코디가 없으면 추천하지 않는지 검증한다.
+     */
+    @Test
+    void 하의만_있으면_빈_목록을_반환한다() {
+        // given
+        RecommendationClothesResponse bottom = item(ClothesType.BOTTOM, "보통");
+
+        // when
+        List<RecommendationClothesResponse> result = recommender.recommend(15, List.of(bottom));
+
+        // then
+        assertThat(result).isEmpty();
+    }
+
     private static RecommendationClothesResponse item(ClothesType type, String thickness) {
         return new RecommendationClothesResponse(UUID.randomUUID(), "의상", null, type,
                 List.of(new ClothesAttributeWithDefDto(UUID.randomUUID(), "두께",
