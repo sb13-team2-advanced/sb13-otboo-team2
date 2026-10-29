@@ -24,6 +24,9 @@ public class RecommendationController {
 
     private final RecommendationService recommendationService;
 
+    /**
+     * 동일 날씨로 재요청해도 적합한 후보 중 랜덤으로 추천한다.
+     */
     @GetMapping
     public RecommendationResponse recommend(@RequestParam UUID weatherId, Principal principal) {
 

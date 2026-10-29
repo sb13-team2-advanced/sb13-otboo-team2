@@ -1,6 +1,9 @@
 package codeit.ootd.domain.recommendation.algorithm;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.mockStatic;
+import static org.mockito.Mockito.when;
 
 import codeit.ootd.domain.clothes.dto.response.ClothesAttributeWithDefDto;
 import codeit.ootd.domain.clothes.enums.ClothesType;
@@ -8,8 +11,11 @@ import codeit.ootd.domain.recommendation.dto.response.RecommendationClothesRespo
 
 import java.util.List;
 import java.util.UUID;
+import java.util.concurrent.ThreadLocalRandom;
 
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.EnumSource;
 
 /**
  * 기온 경계, 속성 누락, 코디 구성과 동점 처리 정책을 검증한다.
@@ -48,6 +54,72 @@ class OutfitRecommenderTest {
 
         // when
         List<RecommendationClothesResponse> result = recommender.recommend(15, List.of(bottom));
+
+        // then
+        assertThat(result).isEmpty();
+    }
+
+    /**
+     * 기본 코디와 함께 모든 부가 종류에서 최적 두께의 의상을 한 벌씩 추가한다.
+     */
+    @ParameterizedTest
+    @EnumSource(value = ClothesType.class, names = {"UNDERWEAR", "ACCESSORY", "SHOES",
+            "SOCKS", "HAT", "BAG", "SCARF", "ETC"})
+    void 부가_종류도_한_벌씩_추천한다(ClothesType type) {
+        // given
+        RecommendationClothesResponse dress = item(ClothesType.DRESS, "보통");
+        RecommendationClothesResponse suitable = item(type, "보통");
+        RecommendationClothesResponse unsuitable = item(type, "두꺼움");
+
+        // when
+        List<RecommendationClothesResponse> result = recommender.recommend(20,
+                List.of(dress, suitable, unsuitable));
+
+        // then
+        assertThat(result).containsExactly(dress, suitable);
+    }
+
+    /**
+     * 상하의와 원피스를 모두 보유하면 둘 중 하나만 선택하고 부가 의상은 유지한다.
+     */
+    @Test
+    void 상하의와_원피스_구성을_랜덤으로_선택한다() {
+        // given
+        RecommendationClothesResponse top = item(ClothesType.TOP, "보통");
+        RecommendationClothesResponse bottom = item(ClothesType.BOTTOM, "보통");
+        RecommendationClothesResponse dress = item(ClothesType.DRESS, "보통");
+        RecommendationClothesResponse outer = item(ClothesType.OUTER, "보통");
+        RecommendationClothesResponse underwear = item(ClothesType.UNDERWEAR, "보통");
+        RecommendationClothesResponse accessory = item(ClothesType.ACCESSORY, "보통");
+        RecommendationClothesResponse shoes = item(ClothesType.SHOES, "보통");
+        List<RecommendationClothesResponse> clothes = List.of(top, bottom, dress, outer,
+                underwear, accessory, shoes);
+        ThreadLocalRandom random = mock(ThreadLocalRandom.class);
+        try (var mocked = mockStatic(ThreadLocalRandom.class)) {
+            mocked.when(ThreadLocalRandom::current).thenReturn(random);
+            when(random.nextBoolean()).thenReturn(false, true);
+
+            // when
+            List<RecommendationClothesResponse> separates = recommender.recommend(15, clothes);
+            List<RecommendationClothesResponse> onePiece = recommender.recommend(15, clothes);
+
+            // then
+            assertThat(separates).containsExactly(top, bottom, outer, underwear, accessory, shoes);
+            assertThat(onePiece).containsExactly(dress, outer, underwear, accessory, shoes);
+        }
+    }
+
+    /**
+     * 속옷과 액세서리만으로는 기본 코디를 구성하지 않는다.
+     */
+    @Test
+    void 부가_의상만_있으면_빈_목록을_반환한다() {
+        // given
+        List<RecommendationClothesResponse> clothes = List.of(item(ClothesType.UNDERWEAR, "보통"),
+                item(ClothesType.ACCESSORY, "보통"), item(ClothesType.SHOES, "보통"));
+
+        // when
+        List<RecommendationClothesResponse> result = recommender.recommend(15, clothes);
 
         // then
         assertThat(result).isEmpty();
@@ -106,16 +178,43 @@ class OutfitRecommenderTest {
         assertThat(recommender.recommend(15, List.of())).isEmpty();
     }
 
+    /**
+     * 난수 선택 위치를 제어하여 같은 적합도의 상하의 네 조합이 모두 선택 가능한지 검증한다.
+     */
     @Test
-    void 두께가_없으면_보통으로_평가하고_동점은_조회순서에_영향받지_않는다() {
+    void 동점_후보에서_상하의를_각각_랜덤으로_선택한다() {
         // given
-        RecommendationClothesResponse first = new RecommendationClothesResponse(new UUID(0, 1), "상의", null, ClothesType.TOP, List.of());
-        RecommendationClothesResponse second = new RecommendationClothesResponse(new UUID(0, 2), "상의", null, ClothesType.TOP, List.of());
-        RecommendationClothesResponse bottom = item(ClothesType.BOTTOM, "보통");
-        // when
-        List<RecommendationClothesResponse> result = recommender.recommend(10, List.of(second, bottom, first));
-        // then
+        RecommendationClothesResponse top1 = item(ClothesType.TOP, "보통");
+        RecommendationClothesResponse top2 = item(ClothesType.TOP, "보통");
+        RecommendationClothesResponse bottom1 = item(ClothesType.BOTTOM, "보통");
+        RecommendationClothesResponse bottom2 = item(ClothesType.BOTTOM, "보통");
+        List<RecommendationClothesResponse> clothes = List.of(top1, top2, bottom1, bottom2,
+                item(ClothesType.TOP, "두꺼움"));
+        ThreadLocalRandom random = mock(ThreadLocalRandom.class);
+        try (var mocked = mockStatic(ThreadLocalRandom.class)) {
+            mocked.when(ThreadLocalRandom::current).thenReturn(random);
+            when(random.nextInt(2)).thenReturn(0, 0, 0, 1, 1, 0, 1, 1);
 
-        assertThat(result).containsExactly(first, bottom);
+            // when then
+            assertThat(recommender.recommend(20, clothes)).containsExactly(top1, bottom1);
+            assertThat(recommender.recommend(20, clothes)).containsExactly(top1, bottom2);
+            assertThat(recommender.recommend(20, clothes)).containsExactly(top2, bottom1);
+            assertThat(recommender.recommend(20, clothes)).containsExactly(top2, bottom2);
+        }
+    }
+
+    @Test
+    void 두께가_없으면_보통으로_평가한다() {
+        // given
+        RecommendationClothesResponse top = new RecommendationClothesResponse(UUID.randomUUID(),
+                "상의", null, ClothesType.TOP, List.of());
+        RecommendationClothesResponse bottom = item(ClothesType.BOTTOM, "보통");
+
+        // when
+        List<RecommendationClothesResponse> result = recommender.recommend(10,
+                List.of(top, bottom, item(ClothesType.TOP, "얇음")));
+
+        // then
+        assertThat(result).containsExactly(top, bottom);
     }
 }

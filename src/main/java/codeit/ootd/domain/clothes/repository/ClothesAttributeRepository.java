@@ -4,7 +4,6 @@ import codeit.ootd.domain.clothes.entity.ClothesAttribute;
 import java.util.Collection;
 import java.util.List;
 import java.util.UUID;
-import java.util.List;
 import org.springframework.data.jpa.repository.JpaRepository;
 
 public interface ClothesAttributeRepository extends JpaRepository<ClothesAttribute, UUID> {
@@ -16,6 +15,4 @@ public interface ClothesAttributeRepository extends JpaRepository<ClothesAttribu
     void deleteAllByClothesId(UUID clothesId);
 
     void deleteAllByDefinitionId(UUID definitionId);
-
-    List<ClothesAttribute> findAllByClothesIdIn(List<UUID> clothesIds);
 }
