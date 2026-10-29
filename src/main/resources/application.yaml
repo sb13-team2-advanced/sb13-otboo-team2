@@ -42,3 +42,7 @@ ootd:
   kakao:
     local:
       api-key: ${KAKAO_API_KEY}
+
+auth:
+  cookie:
+    secure: true

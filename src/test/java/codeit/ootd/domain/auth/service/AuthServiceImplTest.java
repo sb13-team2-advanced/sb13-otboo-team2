@@ -1,15 +1,20 @@
 package codeit.ootd.domain.auth.service;
 
+import codeit.ootd.domain.auth.dto.response.SignInResult;
+import codeit.ootd.domain.auth.dto.response.TokenRefreshResult;
 import codeit.ootd.domain.auth.entity.AuthSession;
 import codeit.ootd.domain.auth.exception.AccountInactiveException;
 import codeit.ootd.domain.auth.exception.AccountLockedException;
+import codeit.ootd.domain.auth.exception.InvalidAuthSessionException;
 import codeit.ootd.domain.auth.exception.InvalidCredentialsException;
+import codeit.ootd.domain.auth.exception.InvalidRefreshTokenException;
 import codeit.ootd.domain.auth.jwt.JwtProvider;
 import codeit.ootd.domain.auth.service.impl.AuthServiceImpl;
 import codeit.ootd.domain.user.entity.User;
 import codeit.ootd.domain.user.entity.UserStatus;
 import codeit.ootd.domain.user.repository.UserRepository;
 
+import codeit.ootd.global.exception.ErrorCode;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -26,10 +31,15 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import java.util.Optional;
 import java.util.UUID;
 
+import static org.junit.jupiter.api.Assertions.assertAll;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
@@ -46,6 +56,9 @@ class AuthServiceImplTest {
 
     @Mock
     private AuthSessionService authSessionService;
+
+    @Mock
+    private RefreshTokenService refreshTokenService;
 
     @Mock
     private JwtProvider jwtProvider;
@@ -156,14 +169,6 @@ class AuthServiceImplTest {
         );
     }
 
-    private User createUser(String email) {
-        return User.create(
-                "테스트사용자",
-                email,
-                "encoded-password"
-        );
-    }
-
     @ParameterizedTest
     @EnumSource(
             value = UserStatus.class,
@@ -197,7 +202,7 @@ class AuthServiceImplTest {
     }
 
     @Test
-    @DisplayName("로그인 성공 시 세션을 생성하고 Access Token을 발급한다")
+    @DisplayName("로그인 성공 시 세션을 생성하고 Access/Refresh Token을 발급한다")
     void signIn_success() {
         // given
         String email = "test@example.com";
@@ -227,16 +232,28 @@ class AuthServiceImplTest {
         when(jwtProvider.generateAccessToken(userId, sessionId))
                 .thenReturn("test-access-token");
 
+        when(refreshTokenService.issue(sessionId))
+                .thenReturn("test-refresh-token");
+
         // when
-        String accessToken = authService.signIn(email, password);
+        SignInResult result = authService.signIn(email, password);
 
         // then
-        assertEquals("test-access-token", accessToken);
+        assertAll(
+                () -> assertNotNull(result.userDto()),
+                () -> assertEquals("test-access-token", result.accessToken()),
+                () -> assertEquals("test-refresh-token", result.refreshToken())
+        );
 
-        InOrder inOrder = inOrder(authSessionService, jwtProvider);
+        InOrder inOrder = inOrder(
+                authSessionService,
+                jwtProvider,
+                refreshTokenService
+        );
 
         inOrder.verify(authSessionService).createSession(userId);
         inOrder.verify(jwtProvider).generateAccessToken(userId, sessionId);
+        inOrder.verify(refreshTokenService).issue(sessionId);
     }
 
     @Test
@@ -260,7 +277,245 @@ class AuthServiceImplTest {
                 () -> authService.signIn(email, password)
         );
 
-        verifyNoInteractions(authSessionService, jwtProvider);
+        verifyNoInteractions(authSessionService, jwtProvider, refreshTokenService);
+    }
+
+
+    @Test
+    @DisplayName("유효한 Refresh Token으로 토큰 재발급에 성공한다")
+    void refresh_success() {
+        // given
+        RefreshFixture f = createRefreshFixture();
+
+        when(userRepository.findById(f.userId()))
+                .thenReturn(Optional.of(f.user()));
+
+        when(f.user().getId()).thenReturn(f.userId());
+        when(f.user().getStatus()).thenReturn(UserStatus.ACTIVE);
+
+        when(refreshTokenService.rotate(
+                f.sessionId(), f.oldRefreshToken()
+        )).thenReturn("new-refresh-token");
+
+        when(jwtProvider.generateAccessToken(
+                f.userId(), f.sessionId()
+        )).thenReturn("new-access-token");
+
+        // when
+        TokenRefreshResult result = authService.refresh(f.oldRefreshToken());
+
+        // then
+        assertEquals("new-access-token", result.accessToken());
+        assertEquals("new-refresh-token", result.refreshToken());
+
+        verify(refreshTokenService)
+                .rotate(f.sessionId(), f.oldRefreshToken());
+
+        verify(authSessionService, never()).createSession(any());
+    }
+
+    @Test
+    @DisplayName("잠긴 계정은 Refresh Token 재발급을 거부한다")
+    void refresh_lockedAccount() {
+        // given
+        RefreshFixture f = createRefreshFixture();
+
+        when(userRepository.findById(f.userId()))
+                .thenReturn(Optional.of(f.user()));
+
+        when(f.user().isLocked()).thenReturn(true);
+
+        // when & then
+        assertThrows(
+                AccountLockedException.class,
+                () -> authService.refresh(f.oldRefreshToken())
+        );
+
+        verify(refreshTokenService, never())
+                .rotate(any(), anyString());
+
+        verify(jwtProvider, never())
+                .generateAccessToken(any(), any());
+    }
+
+
+    @Test
+    @DisplayName("비활성 계정은 Refresh Token 재발급을 거부한다")
+    void refresh_inactiveAccount() {
+        // given
+        UUID userId = UUID.randomUUID();
+        UUID sessionId = UUID.randomUUID();
+
+        String oldRefreshToken = "old-refresh-token";
+
+        User user = mock(User.class);
+        AuthSession session = mock(AuthSession.class);
+
+        when(refreshTokenService.findSessionIdByToken(oldRefreshToken))
+                .thenReturn(sessionId);
+
+        when(authSessionService.getActiveSession(sessionId))
+                .thenReturn(session);
+
+        when(session.getUserId()).thenReturn(userId);
+
+        when(userRepository.findById(userId))
+                .thenReturn(Optional.of(user));
+
+        when(user.isLocked()).thenReturn(false);
+        when(user.getStatus()).thenReturn(UserStatus.DEACTIVATED);
+
+        // when & then
+        assertThrows(
+                AccountInactiveException.class,
+                () -> authService.refresh(oldRefreshToken)
+        );
+
+        // 비활성 계정은 토큰을 교체하거나 발급하면 안 됨
+        verify(refreshTokenService, never())
+                .rotate(any(), anyString());
+
+        verify(jwtProvider, never())
+                .generateAccessToken(any(), any());
+    }
+
+    @Test
+    @DisplayName("사용자가 존재하지 않으면 토큰 재발급을 거부한다")
+    void refresh_userNotFound() {
+        // given
+        RefreshFixture f = createRefreshFixture();
+
+        when(userRepository.findById(f.userId()))
+                .thenReturn(Optional.empty());
+
+        // when & then
+        assertThrows(
+                IllegalArgumentException.class,
+                () -> authService.refresh(f.oldRefreshToken())
+        );
+
+        verify(refreshTokenService, never())
+                .rotate(any(), anyString());
+
+        verify(jwtProvider, never())
+                .generateAccessToken(any(), any());
+    }
+
+
+    @Test
+    @DisplayName("Refresh Token 회전에 실패하면 Access Token을 발급하지 않는다")
+    void refresh_rotateFailed() {
+        // given
+        UUID userId = UUID.randomUUID();
+        UUID sessionId = UUID.randomUUID();
+        String oldRefreshToken = "old-refresh-token";
+
+        User user = mock(User.class);
+        AuthSession session = mock(AuthSession.class);
+
+        when(refreshTokenService.findSessionIdByToken(oldRefreshToken))
+                .thenReturn(sessionId);
+
+        when(authSessionService.getActiveSession(sessionId))
+                .thenReturn(session);
+
+        when(session.getUserId()).thenReturn(userId);
+
+        when(userRepository.findById(userId))
+                .thenReturn(Optional.of(user));
+
+        when(user.isLocked()).thenReturn(false);
+        when(user.getStatus()).thenReturn(UserStatus.ACTIVE);
+
+        when(refreshTokenService.rotate(sessionId, oldRefreshToken))
+                .thenThrow(new InvalidRefreshTokenException());
+
+        // when & then
+        assertThrows(
+                InvalidRefreshTokenException.class,
+                () -> authService.refresh(oldRefreshToken)
+        );
+
+        verify(refreshTokenService)
+                .rotate(sessionId, oldRefreshToken);
+
+        verify(jwtProvider, never())
+                .generateAccessToken(any(), any());
+
+        verify(authSessionService, never())
+                .createSession(any());
+    }
+
+    private User createUser(String email) {
+        return User.create(
+                "테스트사용자",
+                email,
+                "encoded-password"
+        );
+    }
+
+
+    private record RefreshFixture(
+            UUID userId,
+            UUID sessionId,
+            String oldRefreshToken,
+            User user
+    ) {
+    }
+
+    private RefreshFixture createRefreshFixture() {
+        UUID userId = UUID.randomUUID();
+        UUID sessionId = UUID.randomUUID();
+        String oldRefreshToken = "old-refresh-token";
+
+        User user = mock(User.class);
+        AuthSession session = mock(AuthSession.class);
+
+        when(refreshTokenService.findSessionIdByToken(oldRefreshToken))
+                .thenReturn(sessionId);
+
+        when(authSessionService.getActiveSession(sessionId))
+                .thenReturn(session);
+
+        when(session.getUserId()).thenReturn(userId);
+
+        return new RefreshFixture(
+                userId,
+                sessionId,
+                oldRefreshToken,
+                user
+        );
+    }
+
+    @Test
+    @DisplayName("유효하지 않은 인증 세션은 Refresh Token 재발급을 거부한다")
+    void refresh_invalidSession() {
+        // given
+        String oldRefreshToken = "old-refresh-token";
+        UUID sessionId = UUID.randomUUID();
+
+        when(refreshTokenService.findSessionIdByToken(oldRefreshToken))
+                .thenReturn(sessionId);
+
+        when(authSessionService.getActiveSession(sessionId))
+                .thenThrow(new InvalidAuthSessionException());
+
+        // when & then
+        InvalidRefreshTokenException exception = assertThrows(
+                InvalidRefreshTokenException.class,
+                () -> authService.refresh(oldRefreshToken)
+        );
+
+        assertEquals(
+                ErrorCode.INVALID_REFRESH_TOKEN,
+                exception.getErrorCode()
+        );
+
+        verify(refreshTokenService, never())
+                .rotate(any(), anyString());
+
+        verify(jwtProvider, never())
+                .generateAccessToken(any(), any());
     }
 
 
