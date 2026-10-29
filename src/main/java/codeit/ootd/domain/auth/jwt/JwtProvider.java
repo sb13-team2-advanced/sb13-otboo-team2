@@ -31,7 +31,6 @@ public class JwtProvider {
         this.accessTokenExpiration = accessTokenExpiration;
     }
 
-
     public String generateAccessToken(UUID userId, UUID sessionId) {
         Instant now = Instant.now();
 

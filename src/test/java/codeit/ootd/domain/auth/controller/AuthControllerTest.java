@@ -12,12 +12,14 @@ import org.junit.jupiter.api.Test;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.http.HttpHeaders;
+import org.springframework.http.ResponseCookie;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
 
+import java.time.Duration;
 import java.time.Instant;
 import java.util.UUID;
 
@@ -326,6 +328,49 @@ class AuthControllerTest {
         verify(authService).refresh(invalidRefreshToken);
     }
 
+    @Test
+    @DisplayName("로그아웃 성공 시 204를 반환하고 Refresh Token 쿠키를 삭제한다")
+    void signOut_success() throws Exception {
+        // given
+        String refreshToken = "valid-refresh-token";
+
+        Cookie csrfCookie = issueCsrfCookie();
+
+        Cookie refreshCookie = new Cookie("refreshToken", refreshToken);
+
+        // when & then
+        mockMvc.perform(post("/api/auth/sign-out")
+                        .cookie(csrfCookie, refreshCookie)
+                        .header("X-XSRF-TOKEN", csrfCookie.getValue()))
+                .andExpect(status().isNoContent())
+                .andExpect(cookie().exists("refreshToken"))
+                .andExpect(cookie().maxAge("refreshToken", 0))
+                .andExpect(cookie().httpOnly("refreshToken", true))
+                .andExpect(cookie().path("refreshToken", "/api/auth"));
+
+        verify(authService).signOut(refreshToken);
+    }
+
+    @Test
+    @DisplayName("Refresh Token 쿠키가 없어도 로그아웃에 성공한다")
+    void signOut_withoutRefreshToken() throws Exception {
+        // given
+        // 기존 CSRF 쿠키 발급 코드 대신
+        Cookie csrfCookie = issueCsrfCookie();
+
+        // when & then
+        mockMvc.perform(post("/api/auth/sign-out")
+                        .cookie(csrfCookie)
+                        .header("X-XSRF-TOKEN", csrfCookie.getValue()))
+                .andExpect(status().isNoContent())
+                .andExpect(cookie().exists("refreshToken"))
+                .andExpect(cookie().maxAge("refreshToken", 0))
+                .andExpect(cookie().path("refreshToken", "/api/auth"));
+
+        verify(authService, never()).signOut(anyString());
+    }
+
+
     private Cookie issueCsrfCookie() throws Exception {
         MvcResult result = mockMvc.perform(get("/api/auth/csrf-token"))
                 .andExpect(status().isOk())
@@ -338,5 +383,6 @@ class AuthControllerTest {
 
         return csrfCookie;
     }
+
 
 }

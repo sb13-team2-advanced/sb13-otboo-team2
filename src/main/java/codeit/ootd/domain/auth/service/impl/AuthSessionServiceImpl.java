@@ -74,4 +74,17 @@ public class AuthSessionServiceImpl implements AuthSessionService {
         return session;
     }
 
+    @Override
+    @Transactional
+    public void revokeSession(UUID sessionId) {
+        Instant now = clock.instant();
+
+        AuthSession session = authSessionRepository.findById(sessionId)
+                .orElseThrow(InvalidAuthSessionException::new);
+
+        session.revoke(now);
+
+        log.debug("인증 세션 폐기 완료: sessionId={}", sessionId);
+    }
+
 }

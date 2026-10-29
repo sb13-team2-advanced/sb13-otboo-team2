@@ -17,6 +17,7 @@ import codeit.ootd.domain.user.entity.User;
 import codeit.ootd.domain.user.entity.UserStatus;
 import codeit.ootd.domain.user.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -25,6 +26,7 @@ import java.util.UUID;
 
 @RequiredArgsConstructor
 @Service
+@Slf4j
 public class AuthServiceImpl implements AuthService {
 
     private final UserRepository userRepository;
@@ -119,4 +121,16 @@ public class AuthServiceImpl implements AuthService {
         );
     }
 
+    @Override
+    @Transactional
+    public void signOut(String refreshToken) {
+        try {
+            UUID sessionId = refreshTokenService.findSessionIdByToken(refreshToken);
+
+            authSessionService.revokeSession(sessionId);
+
+        } catch (InvalidRefreshTokenException | InvalidAuthSessionException e) {
+            log.debug("로그아웃 요청: 이미 유효하지 않은 토큰 또는 인증 세션");
+        }
+    }
 }
