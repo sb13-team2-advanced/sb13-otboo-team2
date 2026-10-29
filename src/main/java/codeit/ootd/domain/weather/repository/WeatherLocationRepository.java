@@ -24,14 +24,57 @@ public interface WeatherLocationRepository
     @Transactional
     @Query("""
         UPDATE WeatherLocation w
-        SET w.nextRefreshAt = :reservedUntil
+        SET w.nextRefreshAt = :reservedUntil,
+            w.initialCollectionInProgress = true,
+            w.initialCollectionToken = :token
         WHERE w.id = :locationId
-          AND w.lastCollectedAt IS NULL 
+          AND w.lastCollectedAt IS NULL
           AND w.nextRefreshAt <= :now
         """)
     int reserveInitialCollection(
         @Param("locationId") UUID locationId,
         @Param("now") Instant now,
-        @Param("reservedUntil") Instant reservedUntil
+        @Param("reservedUntil") Instant reservedUntil,
+        @Param("token") UUID token
+    );
+
+    @Modifying
+    @Transactional
+    @Query("""
+        UPDATE WeatherLocation w
+        SET w.lastCollectedAt = :completedAt,
+            w.nextRefreshAt = :nextRefreshAt,
+            w.initialCollectionInProgress = false,
+            w.initialCollectionToken = null
+        WHERE w.id = :locationId
+          AND w.initialCollectionToken = :token
+          AND w.initialCollectionInProgress = true
+        """)
+    int completeInitialCollection(
+        @Param("locationId") UUID locationId,
+        @Param("token") UUID token,
+        @Param("completedAt") Instant completedAt,
+        @Param("nextRefreshAt") Instant nextRefreshAt
+    );
+
+    @Modifying
+    @Transactional
+    @Query("""
+        UPDATE WeatherLocation w
+        SET w.nextRefreshAt = :retryAt,
+            w.initialCollectionInProgress = false,
+            w.initialCollectionToken = null
+        WHERE w.id = :locationId
+          AND w.initialCollectionToken = :token
+          AND w.initialCollectionInProgress = true
+        """)
+    int scheduleInitialCollectionRetry(
+        @Param("locationId") UUID locationId,
+        @Param("token") UUID token,
+        @Param("retryAt") Instant retryAt
+    );
+
+    List<WeatherLocation> findTop20ByLastCollectedAtIsNotNullAndNextRefreshAtLessThanEqualOrderByNextRefreshAtAsc(
+        Instant now
     );
 }

@@ -42,7 +42,7 @@ public class WeatherCollectionTasklet implements Tasklet {
 
         List<WeatherLocation> locations =
             weatherLocationRepository
-                .findTop20ByNextRefreshAtLessThanEqualOrderByNextRefreshAtAsc(
+                .findTop20ByLastCollectedAtIsNotNullAndNextRefreshAtLessThanEqualOrderByNextRefreshAtAsc(
                     Instant.now()
                 );
 

@@ -9,6 +9,7 @@ import java.time.Instant;
 import java.time.LocalDate;
 import java.time.ZoneId;
 import java.util.List;
+import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
@@ -21,6 +22,7 @@ public class WeatherQueryService {
     private static final Duration REFRESH_INTERVAL = Duration.ofHours(2);
     private static final Duration RETRY_INTERVAL = Duration.ofMinutes(10);
     private static final Duration RESERVATION_DURATION = Duration.ofMinutes(5);
+    private static final long[] WAIT_INTERVALS_MS = {500, 500, 1000, 1000};
 
     private final WeatherLocationService weatherLocationService;
     private final WeatherForecastCollector weatherForecastCollector;
@@ -40,12 +42,14 @@ public class WeatherQueryService {
 
             if (!location.getNextRefreshAt().isAfter(now)) {
                 Instant reservedUntil = now.plus(RESERVATION_DURATION);
+                UUID token = UUID.randomUUID();
 
                 int updatedCount =
                     weatherLocationRepository.reserveInitialCollection(
                         location.getId(),
                         now,
-                        reservedUntil
+                        reservedUntil,
+                        token
                     );
 
                 if (updatedCount == 1) {
@@ -55,29 +59,58 @@ public class WeatherQueryService {
 
 
                     try {
-                        collectInitialWeather(location, today);
+                        collectInitialWeather(location, today, token);
                     } catch (RuntimeException e) {
                         Instant failedAt = clock.instant();
 
-                        location.scheduleRetry(
-                            failedAt,
+                        weatherLocationRepository.scheduleInitialCollectionRetry(
+                            location.getId(),
+                            token,
                             failedAt.plus(RETRY_INTERVAL)
                         );
 
-                        weatherLocationRepository.save(location);
-
                         throw e;
                     }
+                } else {
+                    waitForInitialCollection(location.getId());
                 }
+            } else if (location.isInitialCollectionInProgress()) {
+                waitForInitialCollection(location.getId());
             }
         }
 
         return weatherService.getWeathers(latitude, longitude);
     }
 
+    private void waitForInitialCollection(UUID locationId) {
+        for (long waitMillis : WAIT_INTERVALS_MS) {
+            try {
+                Thread.sleep(waitMillis);
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                throw new IllegalStateException(
+                    "날씨 최초 수집 대기 중 중단되었습니다.", e
+                );
+            }
+
+            WeatherLocation latest = weatherLocationRepository
+                .findById(locationId)
+                .orElse(null);
+
+            if (latest == null || latest.getLastCollectedAt() != null) {
+                return;
+            }
+
+            if (!latest.isInitialCollectionInProgress()) {
+                return;
+            }
+        }
+    }
+
     private void collectInitialWeather(
         WeatherLocation location,
-        LocalDate today
+        LocalDate today,
+        UUID token
     ) {
 
         weatherForecastCollector.collectForecasts(location);
@@ -91,11 +124,11 @@ public class WeatherQueryService {
 
         Instant completedAt = clock.instant();
 
-        location.completeCollection(
+        weatherLocationRepository.completeInitialCollection(
+            location.getId(),
+            token,
             completedAt,
             completedAt.plus(REFRESH_INTERVAL)
         );
-
-        weatherLocationRepository.save(location);
     }
 }
