@@ -10,8 +10,8 @@ import com.uber.h3core.util.LatLng;
 import java.time.Instant;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
 
 @Service
 @RequiredArgsConstructor
@@ -21,7 +21,6 @@ public class WeatherLocationService {
     private final WeatherLocationRepository weatherLocationRepository;
     private final KakaoLocalClient kakaoLocalClient;
 
-    @Transactional
     public WeatherLocation findOrCreate(double latitude, double longitude) {
 
         String cellId = h3Service.toCellId(latitude, longitude);
@@ -37,7 +36,12 @@ public class WeatherLocationService {
                     Instant.now()
                 );
 
-                return weatherLocationRepository.save(location);
+                try {
+                    return weatherLocationRepository.saveAndFlush(location);
+                } catch (DataIntegrityViolationException e) {
+                    return weatherLocationRepository.findByCellId(cellId)
+                        .orElseThrow(() -> e);
+                }
             });
     }
 
