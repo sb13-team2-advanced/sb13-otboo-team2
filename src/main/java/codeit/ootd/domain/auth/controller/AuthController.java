@@ -11,11 +11,13 @@ import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseCookie;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.web.csrf.CsrfToken;
 import org.springframework.web.bind.annotation.CookieValue;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.ModelAttribute;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -34,11 +36,14 @@ public class AuthController {
     @Value("${auth.cookie.secure:true}")
     private boolean cookieSecure;
 
-    @PostMapping("/sign-in")
-    public ResponseEntity<SignInResponse> signIn(@Valid @RequestBody SignInRequest request) {
+    @PostMapping(
+            value = "/sign-in",
+            consumes = MediaType.MULTIPART_FORM_DATA_VALUE
+    )
+    public ResponseEntity<SignInResponse> signIn(@Valid @ModelAttribute SignInRequest request) {
 
         SignInResult result = authService.signIn(
-                request.email(),
+                request.username(),
                 request.password()
         );
 
@@ -49,7 +54,7 @@ public class AuthController {
                 .body(SignInResponse.from(result));
     }
 
-    @GetMapping("/csrf")
+    @GetMapping({"/csrf-token", "/csrf"})
     public Map<String, String> csrf(CsrfToken csrfToken) {
         return Map.of("token", csrfToken.getToken());
     }

@@ -14,7 +14,6 @@ import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.http.HttpHeaders;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.http.MediaType;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
@@ -22,6 +21,7 @@ import org.springframework.test.web.servlet.MvcResult;
 import java.time.Instant;
 import java.util.UUID;
 
+import static org.hamcrest.Matchers.containsString;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.never;
@@ -29,6 +29,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.cookie;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
@@ -81,27 +82,13 @@ class AuthControllerTest {
         when(authService.signIn("test@example.com", "password123!"))
                 .thenReturn(result);
 
-        MvcResult csrfResult = mockMvc.perform(get("/api/auth/csrf"))
-                .andExpect(status().isOk())
-                .andExpect(cookie().exists("XSRF-TOKEN"))
-                .andExpect(cookie().httpOnly("XSRF-TOKEN", false))
-                .andReturn();
+        Cookie csrfCookie = issueCsrfCookie();
 
-        Cookie csrfCookie = csrfResult.getResponse()
-                .getCookie("XSRF-TOKEN");
-
-        assertNotNull(csrfCookie);
-
-        mockMvc.perform(post("/api/auth/sign-in")
+        mockMvc.perform(multipart("/api/auth/sign-in")
                         .cookie(csrfCookie)
                         .header("X-XSRF-TOKEN", csrfCookie.getValue())
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content("""
-                            {
-                              "email": "test@example.com",
-                              "password": "password123!"
-                            }
-                            """))
+                        .param("username", "test@example.com")
+                        .param("password", "password123!"))
                 .andExpect(status().isOk())
 
                 .andExpect(jsonPath("$.userDto.id").value(userId.toString()))
@@ -119,7 +106,7 @@ class AuthControllerTest {
                 .andExpect(cookie().maxAge("refreshToken", 604800))
                 .andExpect(header().string(
                         HttpHeaders.SET_COOKIE,
-                        org.hamcrest.Matchers.containsString("SameSite=Lax")
+                        containsString("SameSite=Lax")
                 ));
 
         verify(authService).signIn(
@@ -129,28 +116,26 @@ class AuthControllerTest {
     }
 
     @Test
+    @DisplayName("프론트 CSRF 경로로 토큰을 발급한다")
+    void csrf_frontendPath_success() throws Exception {
+        mockMvc.perform(get("/api/auth/csrf-token"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.token").isNotEmpty())
+                .andExpect(cookie().exists("XSRF-TOKEN"))
+                .andExpect(cookie().httpOnly("XSRF-TOKEN", false));
+    }
+
+    @Test
     @DisplayName("CSRF 헤더가 없으면 로그인 요청을 거부한다")
     void signIn_withoutCsrfHeader_forbidden() throws Exception {
         // given
-        MvcResult csrfResult = mockMvc.perform(get("/api/auth/csrf"))
-                .andExpect(status().isOk())
-                .andReturn();
-
-        Cookie csrfCookie = csrfResult.getResponse()
-                .getCookie("XSRF-TOKEN");
-
-        assertNotNull(csrfCookie);
+        Cookie csrfCookie = issueCsrfCookie();
 
         // when & then
-        mockMvc.perform(post("/api/auth/sign-in")
+        mockMvc.perform(multipart("/api/auth/sign-in")
                         .cookie(csrfCookie)
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content("""
-                            {
-                              "email": "test@example.com",
-                              "password": "password123!"
-                            }
-                            """))
+                        .param("username", "test@example.com")
+                        .param("password", "password123!"))
                 .andExpect(status().isForbidden());
 
         verifyNoInteractions(authService);
@@ -160,27 +145,64 @@ class AuthControllerTest {
     @DisplayName("잘못된 CSRF 토큰으로 로그인 요청하면 403을 반환한다")
     void signIn_invalidCsrfToken_forbidden() throws Exception {
         // given
-        MvcResult csrfResult = mockMvc.perform(get("/api/auth/csrf"))
-                .andExpect(status().isOk())
-                .andReturn();
-
-        Cookie csrfCookie = csrfResult.getResponse()
-                .getCookie("XSRF-TOKEN");
-
-        assertNotNull(csrfCookie);
+        Cookie csrfCookie = issueCsrfCookie();
 
         // when & then
-        mockMvc.perform(post("/api/auth/sign-in")
+        mockMvc.perform(multipart("/api/auth/sign-in")
                         .cookie(csrfCookie)
                         .header("X-XSRF-TOKEN", "invalid-csrf-token")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content("""
-                            {
-                              "email": "test@example.com",
-                              "password": "password123!"
-                            }
-                            """))
+                        .param("username", "test@example.com")
+                        .param("password", "password123!"))
                 .andExpect(status().isForbidden());
+
+        verifyNoInteractions(authService);
+    }
+
+    @Test
+    @DisplayName("로그인 시 이메일 형식이 올바르지 않으면 400을 반환한다")
+    void signIn_invalidEmail_badRequest() throws Exception {
+        // given
+        Cookie csrfCookie = issueCsrfCookie();
+
+        // when & then
+        mockMvc.perform(multipart("/api/auth/sign-in")
+                        .cookie(csrfCookie)
+                        .header("X-XSRF-TOKEN", csrfCookie.getValue())
+                        .param("username", "invalid-email")
+                        .param("password", "password123!"))
+                .andExpect(status().isBadRequest());
+
+        verifyNoInteractions(authService);
+    }
+
+    @Test
+    @DisplayName("로그인 시 username이 누락되면 400을 반환한다")
+    void signIn_missingUsername_badRequest() throws Exception {
+        // given
+        Cookie csrfCookie = issueCsrfCookie();
+
+        // when & then
+        mockMvc.perform(multipart("/api/auth/sign-in")
+                        .cookie(csrfCookie)
+                        .header("X-XSRF-TOKEN", csrfCookie.getValue())
+                        .param("password", "password123!"))
+                .andExpect(status().isBadRequest());
+
+        verifyNoInteractions(authService);
+    }
+
+    @Test
+    @DisplayName("로그인 시 비밀번호가 누락되면 400을 반환한다")
+    void signIn_missingPassword_badRequest() throws Exception {
+        // given
+        Cookie csrfCookie = issueCsrfCookie();
+
+        // when & then
+        mockMvc.perform(multipart("/api/auth/sign-in")
+                        .cookie(csrfCookie)
+                        .header("X-XSRF-TOKEN", csrfCookie.getValue())
+                        .param("username", "test@example.com"))
+                .andExpect(status().isBadRequest());
 
         verifyNoInteractions(authService);
     }
@@ -199,15 +221,7 @@ class AuthControllerTest {
         when(authService.refresh(oldRefreshToken))
                 .thenReturn(result);
 
-        MvcResult csrfResult = mockMvc.perform(get("/api/auth/csrf"))
-                .andExpect(status().isOk())
-                .andExpect(cookie().exists("XSRF-TOKEN"))
-                .andReturn();
-
-        Cookie csrfCookie = csrfResult.getResponse()
-                .getCookie("XSRF-TOKEN");
-
-        assertNotNull(csrfCookie);
+        Cookie csrfCookie = issueCsrfCookie();
 
         Cookie refreshCookie = new Cookie(
                 "refreshToken",
@@ -237,15 +251,7 @@ class AuthControllerTest {
     @DisplayName("Refresh Token 쿠키가 없으면 재발급 요청을 거부한다")
     void refresh_missingCookie() throws Exception {
         // given
-        MvcResult csrfResult = mockMvc.perform(get("/api/auth/csrf"))
-                .andExpect(status().isOk())
-                .andExpect(cookie().exists("XSRF-TOKEN"))
-                .andReturn();
-
-        Cookie csrfCookie = csrfResult.getResponse()
-                .getCookie("XSRF-TOKEN");
-
-        assertNotNull(csrfCookie);
+        Cookie csrfCookie = issueCsrfCookie();
 
         // when & then
         mockMvc.perform(post("/api/auth/refresh")
@@ -260,15 +266,7 @@ class AuthControllerTest {
     @DisplayName("CSRF 헤더가 없으면 Refresh Token 재발급을 거부한다")
     void refresh_withoutCsrfHeader_forbidden() throws Exception {
         // given
-        MvcResult csrfResult = mockMvc.perform(get("/api/auth/csrf"))
-                .andExpect(status().isOk())
-                .andExpect(cookie().exists("XSRF-TOKEN"))
-                .andReturn();
-
-        Cookie csrfCookie = csrfResult.getResponse()
-                .getCookie("XSRF-TOKEN");
-
-        assertNotNull(csrfCookie);
+        Cookie csrfCookie = issueCsrfCookie();
 
         Cookie refreshCookie = new Cookie(
                 "refreshToken",
@@ -288,15 +286,7 @@ class AuthControllerTest {
     @DisplayName("잘못된 CSRF 토큰으로 Refresh Token 재발급 요청 시 403을 반환한다")
     void refresh_invalidCsrfToken_forbidden() throws Exception {
         // given
-        MvcResult csrfResult = mockMvc.perform(get("/api/auth/csrf"))
-                .andExpect(status().isOk())
-                .andExpect(cookie().exists("XSRF-TOKEN"))
-                .andReturn();
-
-        Cookie csrfCookie = csrfResult.getResponse()
-                .getCookie("XSRF-TOKEN");
-
-        assertNotNull(csrfCookie);
+        Cookie csrfCookie = issueCsrfCookie();
 
         Cookie refreshCookie = new Cookie(
                 "refreshToken",
@@ -319,15 +309,7 @@ class AuthControllerTest {
         // given
         String invalidRefreshToken = "invalid-refresh-token";
 
-        MvcResult csrfResult = mockMvc.perform(get("/api/auth/csrf"))
-                .andExpect(status().isOk())
-                .andExpect(cookie().exists("XSRF-TOKEN"))
-                .andReturn();
-
-        Cookie csrfCookie = csrfResult.getResponse()
-                .getCookie("XSRF-TOKEN");
-
-        assertNotNull(csrfCookie);
+        Cookie csrfCookie = issueCsrfCookie();
 
         when(authService.refresh(invalidRefreshToken))
                 .thenThrow(new InvalidRefreshTokenException());
@@ -342,6 +324,19 @@ class AuthControllerTest {
                 .andExpect(status().isUnauthorized());
 
         verify(authService).refresh(invalidRefreshToken);
+    }
+
+    private Cookie issueCsrfCookie() throws Exception {
+        MvcResult result = mockMvc.perform(get("/api/auth/csrf-token"))
+                .andExpect(status().isOk())
+                .andExpect(cookie().exists("XSRF-TOKEN"))
+                .andExpect(cookie().httpOnly("XSRF-TOKEN", false))
+                .andReturn();
+
+        Cookie csrfCookie = result.getResponse().getCookie("XSRF-TOKEN");
+        assertNotNull(csrfCookie);
+
+        return csrfCookie;
     }
 
 }
