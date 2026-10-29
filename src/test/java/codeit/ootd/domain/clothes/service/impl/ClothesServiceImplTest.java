@@ -34,10 +34,14 @@ import codeit.ootd.domain.clothes.repository.ClothesRepository;
 import codeit.ootd.domain.user.repository.UserRepository;
 import codeit.ootd.global.enums.SortDirection;
 import codeit.ootd.infra.storage.FileStorage;
+import codeit.ootd.infra.storage.TransactionalFileCleaner;
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -45,12 +49,13 @@ import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Captor;
 import org.mockito.InOrder;
-import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.test.util.ReflectionTestUtils;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 @ExtendWith(MockitoExtension.class)
 class ClothesServiceImplTest {
@@ -72,13 +77,28 @@ class ClothesServiceImplTest {
     @Mock
     private FileStorage fileStorage;
 
-    @InjectMocks
     private ClothesServiceImpl service;
 
     @Captor
     private ArgumentCaptor<Iterable<ClothesAttribute>> attributesCaptor;
     @Captor
     private ArgumentCaptor<ClothesAttribute> attributeCaptor;
+
+    @BeforeEach
+    void setUp() {
+        // 서비스가 등록하는 커밋·롤백 후 처리를 직접 실행해 볼 수 있도록 트랜잭션 동기화를 켜 둔다.
+        if (TransactionSynchronizationManager.isSynchronizationActive()) {
+            TransactionSynchronizationManager.clearSynchronization();
+        }
+        TransactionSynchronizationManager.initSynchronization();
+        service = new ClothesServiceImpl(clothesRepository, clothesQueryRepository, attributeRepository,
+                definitionRepository, userRepository, fileStorage, new TransactionalFileCleaner(fileStorage));
+    }
+
+    @AfterEach
+    void tearDown() {
+        TransactionSynchronizationManager.clearSynchronization();
+    }
 
     // ---------- 등록 ----------
 
@@ -175,7 +195,7 @@ class ClothesServiceImplTest {
     }
 
     @Test
-    void 저장_중_예외가_나면_업로드한_이미지를_삭제하고_예외를_다시_던진다() {
+    void 저장_중_예외로_롤백되면_업로드한_이미지를_삭제한다() {
         MockMultipartFile image = image();
         given(userRepository.existsById(OWNER_ID)).willReturn(true);
         given(fileStorage.upload(image, "clothes")).willReturn("/files/clothes/a.png");
@@ -184,8 +204,24 @@ class ClothesServiceImplTest {
         assertThatThrownBy(() -> service.create(
                 new ClothesCreateRequest(OWNER_ID, "셔츠", ClothesType.TOP, null), image))
                 .isInstanceOf(IllegalStateException.class);
+        verify(fileStorage, never()).delete(any());
+
+        rollback();
 
         verify(fileStorage).delete("/files/clothes/a.png");
+    }
+
+    @Test
+    void 등록이_커밋되면_업로드한_이미지는_삭제하지_않는다() {
+        MockMultipartFile image = image();
+        given(userRepository.existsById(OWNER_ID)).willReturn(true);
+        given(fileStorage.upload(image, "clothes")).willReturn("/files/clothes/a.png");
+        givenSaveAssignsId();
+
+        service.create(new ClothesCreateRequest(OWNER_ID, "셔츠", ClothesType.TOP, null), image);
+        commit();
+
+        verify(fileStorage, never()).delete(any());
     }
 
     // ---------- 목록 ----------
@@ -321,7 +357,7 @@ class ClothesServiceImplTest {
     }
 
     @Test
-    void 새_이미지를_올리면_저장한_뒤에_이전_이미지를_삭제한다() {
+    void 새_이미지를_올리면_커밋된_뒤에만_이전_이미지를_삭제한다() {
         MockMultipartFile image = image();
         given(clothesRepository.findById(CLOTHES_ID))
                 .willReturn(Optional.of(existingClothes("/files/clothes/old.png")));
@@ -330,9 +366,26 @@ class ClothesServiceImplTest {
         ClothesDto dto = service.update(CLOTHES_ID, new ClothesUpdateRequest(null, null, null), image);
 
         assertThat(dto.imageUrl()).isEqualTo("/files/clothes/new.png");
-        InOrder order = inOrder(fileStorage);
-        order.verify(fileStorage).upload(image, "clothes");
-        order.verify(fileStorage).delete("/files/clothes/old.png");
+        verify(fileStorage, never()).delete(any());
+
+        commit();
+
+        verify(fileStorage).delete("/files/clothes/old.png");
+        verify(fileStorage, never()).delete("/files/clothes/new.png");
+    }
+
+    @Test
+    void 수정이_롤백되면_새_이미지만_삭제하고_이전_이미지는_그대로_둔다() {
+        MockMultipartFile image = image();
+        given(clothesRepository.findById(CLOTHES_ID))
+                .willReturn(Optional.of(existingClothes("/files/clothes/old.png")));
+        given(fileStorage.upload(image, "clothes")).willReturn("/files/clothes/new.png");
+
+        service.update(CLOTHES_ID, new ClothesUpdateRequest(null, null, null), image);
+        rollback();
+
+        verify(fileStorage).delete("/files/clothes/new.png");
+        verify(fileStorage, never()).delete("/files/clothes/old.png");
     }
 
     @Test
@@ -348,6 +401,8 @@ class ClothesServiceImplTest {
         assertThatThrownBy(() -> service.update(CLOTHES_ID, new ClothesUpdateRequest(null, null,
                 List.of(new ClothesAttributeRequest(color.getId(), "검정"))), image))
                 .isInstanceOf(IllegalStateException.class);
+
+        rollback();
 
         verify(fileStorage).delete("/files/clothes/new.png");
         verify(fileStorage, never()).delete("/files/clothes/old.png");
@@ -388,17 +443,32 @@ class ClothesServiceImplTest {
     }
 
     @Test
-    void 삭제하면_속성과_의상을_지운_뒤_이미지를_삭제한다() {
+    void 삭제하면_속성과_의상을_지우고_커밋된_뒤에_이미지를_삭제한다() {
         Clothes existing = existingClothes("/files/clothes/old.png");
         given(clothesRepository.findById(CLOTHES_ID)).willReturn(Optional.of(existing));
 
         service.delete(CLOTHES_ID);
 
-        InOrder order = inOrder(attributeRepository, clothesRepository, fileStorage);
+        InOrder order = inOrder(attributeRepository, clothesRepository);
         order.verify(attributeRepository).deleteAllByClothesId(CLOTHES_ID);
         order.verify(clothesRepository).delete(existing);
         order.verify(clothesRepository).flush();
-        order.verify(fileStorage).delete("/files/clothes/old.png");
+        verifyNoInteractions(fileStorage);
+
+        commit();
+
+        verify(fileStorage).delete("/files/clothes/old.png");
+    }
+
+    @Test
+    void 삭제가_롤백되면_이미지를_삭제하지_않는다() {
+        given(clothesRepository.findById(CLOTHES_ID))
+                .willReturn(Optional.of(existingClothes("/files/clothes/old.png")));
+
+        service.delete(CLOTHES_ID);
+        rollback();
+
+        verifyNoInteractions(fileStorage);
     }
 
     @Test
@@ -413,6 +483,19 @@ class ClothesServiceImplTest {
     }
 
     // ---------- 준비 ----------
+
+    private void commit() {
+        List<TransactionSynchronization> synchronizations =
+                new ArrayList<>(TransactionSynchronizationManager.getSynchronizations());
+        synchronizations.forEach(TransactionSynchronization::afterCommit);
+        synchronizations.forEach(s -> s.afterCompletion(TransactionSynchronization.STATUS_COMMITTED));
+    }
+
+    private void rollback() {
+        List<TransactionSynchronization> synchronizations =
+                new ArrayList<>(TransactionSynchronizationManager.getSynchronizations());
+        synchronizations.forEach(s -> s.afterCompletion(TransactionSynchronization.STATUS_ROLLED_BACK));
+    }
 
     private void givenSaveAssignsId() {
         given(clothesRepository.save(any(Clothes.class))).willAnswer(invocation -> {

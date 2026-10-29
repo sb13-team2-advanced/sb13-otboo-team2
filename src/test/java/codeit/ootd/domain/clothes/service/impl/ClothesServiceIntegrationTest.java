@@ -6,6 +6,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doNothing;
 import static org.mockito.Mockito.doReturn;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 
 import codeit.ootd.domain.clothes.dto.request.ClothesAttributeRequest;
@@ -40,6 +41,7 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
+import org.springframework.test.context.transaction.TestTransaction;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
@@ -207,14 +209,11 @@ class ClothesServiceIntegrationTest {
     }
 
     @Test
-    void 삭제하면_의상과_속성이_함께_사라지고_이미지도_삭제된다() {
+    void 삭제하면_의상과_속성이_함께_사라진다() {
         UUID ownerId = newOwner();
         ClothesAttributeDefinition color = newDefinition("색상", "검정", "흰색");
-        MockMultipartFile image = new MockMultipartFile("image", "a.png", "image/png", new byte[] {1});
-        doReturn("/files/clothes/a.png").when(fileStorage).upload(any(), eq("clothes"));
-        doNothing().when(fileStorage).delete(any());
         ClothesDto created = service.create(new ClothesCreateRequest(ownerId, "셔츠", ClothesType.TOP,
-                List.of(new ClothesAttributeRequest(color.getId(), "검정"))), image);
+                List.of(new ClothesAttributeRequest(color.getId(), "검정"))), null);
         entityManager.flush();
         entityManager.clear();
 
@@ -224,7 +223,92 @@ class ClothesServiceIntegrationTest {
 
         assertThat(clothesRepository.findById(created.id())).isEmpty();
         assertThat(attributeRepository.findAllByClothesId(created.id())).isEmpty();
-        verify(fileStorage).delete("/files/clothes/a.png");
+    }
+
+    // ---------- 이미지 파일은 트랜잭션 결과에 맞춰 정리된다 ----------
+
+    @Test
+    void 등록이_롤백되면_업로드한_이미지를_삭제한다() {
+        UUID ownerId = newOwner();
+        stubStorage("/files/clothes/new.png");
+
+        service.create(new ClothesCreateRequest(ownerId, "셔츠", ClothesType.TOP, null), image());
+        verify(fileStorage, never()).delete(any());
+
+        TestTransaction.flagForRollback();
+        TestTransaction.end();
+
+        verify(fileStorage).delete("/files/clothes/new.png");
+    }
+
+    @Test
+    void 수정이_롤백되면_새_이미지만_삭제하고_이전_이미지는_남긴다() {
+        UUID ownerId = newOwner();
+        Clothes clothes = clothesRepository.saveAndFlush(
+                new Clothes(ownerId, "셔츠", ClothesType.TOP, "/files/clothes/old.png"));
+        stubStorage("/files/clothes/new.png");
+
+        service.update(clothes.getId(), new ClothesUpdateRequest(null, null, null), image());
+        verify(fileStorage, never()).delete(any());
+
+        TestTransaction.flagForRollback();
+        TestTransaction.end();
+
+        verify(fileStorage).delete("/files/clothes/new.png");
+        verify(fileStorage, never()).delete("/files/clothes/old.png");
+    }
+
+    @Test
+    void 수정이_커밋되면_이전_이미지를_삭제하고_새_이미지는_남긴다() {
+        UUID ownerId = newOwner();
+        Clothes clothes = clothesRepository.saveAndFlush(
+                new Clothes(ownerId, "셔츠", ClothesType.TOP, "/files/clothes/old.png"));
+        stubStorage("/files/clothes/new.png");
+
+        service.update(clothes.getId(), new ClothesUpdateRequest(null, null, null), image());
+        verify(fileStorage, never()).delete(any());
+
+        TestTransaction.flagForCommit();
+        TestTransaction.end();
+        try {
+            verify(fileStorage).delete("/files/clothes/old.png");
+            verify(fileStorage, never()).delete("/files/clothes/new.png");
+        } finally {
+            cleanUp(clothes.getId(), ownerId);
+        }
+    }
+
+    @Test
+    void 삭제가_롤백되면_이미지를_삭제하지_않는다() {
+        UUID ownerId = newOwner();
+        Clothes clothes = clothesRepository.saveAndFlush(
+                new Clothes(ownerId, "셔츠", ClothesType.TOP, "/files/clothes/old.png"));
+        stubStorage("/files/clothes/new.png");
+
+        service.delete(clothes.getId());
+        TestTransaction.flagForRollback();
+        TestTransaction.end();
+
+        verify(fileStorage, never()).delete(any());
+    }
+
+    @Test
+    void 삭제가_커밋되면_이미지를_삭제한다() {
+        UUID ownerId = newOwner();
+        Clothes clothes = clothesRepository.saveAndFlush(
+                new Clothes(ownerId, "셔츠", ClothesType.TOP, "/files/clothes/old.png"));
+        stubStorage("/files/clothes/new.png");
+
+        service.delete(clothes.getId());
+        verify(fileStorage, never()).delete(any());
+
+        TestTransaction.flagForCommit();
+        TestTransaction.end();
+        try {
+            verify(fileStorage).delete("/files/clothes/old.png");
+        } finally {
+            cleanUp(null, ownerId);
+        }
     }
 
     @Test
@@ -241,6 +325,28 @@ class ClothesServiceIntegrationTest {
     }
 
     // ---------- 준비 ----------
+
+    private void stubStorage(String uploadedUrl) {
+        doReturn(uploadedUrl).when(fileStorage).upload(any(), eq("clothes"));
+        doNothing().when(fileStorage).delete(any());
+    }
+
+    private MockMultipartFile image() {
+        return new MockMultipartFile("image", "a.png", "image/png", new byte[] {1});
+    }
+
+    /**
+     * 커밋까지 진행한 테스트가 남긴 데이터를 새 트랜잭션에서 지운다.
+     */
+    private void cleanUp(UUID clothesId, UUID ownerId) {
+        TestTransaction.start();
+        if (clothesId != null) {
+            clothesRepository.deleteById(clothesId);
+        }
+        userRepository.deleteById(ownerId);
+        TestTransaction.flagForCommit();
+        TestTransaction.end();
+    }
 
     private UUID newOwner() {
         return userRepository.saveAndFlush(

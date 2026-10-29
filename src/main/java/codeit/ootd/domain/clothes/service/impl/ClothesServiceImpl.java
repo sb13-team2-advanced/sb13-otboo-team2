@@ -25,6 +25,7 @@ import codeit.ootd.domain.clothes.service.ClothesService;
 import codeit.ootd.domain.user.repository.UserRepository;
 import codeit.ootd.global.enums.SortDirection;
 import codeit.ootd.infra.storage.FileStorage;
+import codeit.ootd.infra.storage.TransactionalFileCleaner;
 import java.time.Instant;
 import java.time.format.DateTimeParseException;
 import java.util.ArrayList;
@@ -59,6 +60,7 @@ public class ClothesServiceImpl implements ClothesService {
     private final ClothesAttributeDefinitionRepository definitionRepository;
     private final UserRepository userRepository;
     private final FileStorage fileStorage;
+    private final TransactionalFileCleaner fileCleaner;
 
     @Override
     @Transactional
@@ -72,20 +74,18 @@ public class ClothesServiceImpl implements ClothesService {
         validateAttributes(attributes);
 
         String imageUrl = hasFile(image) ? fileStorage.upload(image, IMAGE_DIRECTORY) : null;
-        try {
-            Clothes clothes = clothesRepository.save(
-                    new Clothes(request.ownerId(), request.name().strip(), request.type(), imageUrl));
-            attributeRepository.saveAll(attributes.stream()
-                    .map(a -> new ClothesAttribute(clothes.getId(), a.definitionId(), a.value().strip()))
-                    .toList());
+        // 이후 저장이나 커밋이 실패해 롤백되면 방금 올린 파일을 정리한다.
+        fileCleaner.deleteOnRollback(imageUrl);
 
-            ClothesDto dto = assemble(List.of(clothes)).get(0);
-            log.info("의상 등록 완료: clothesId={}", clothes.getId());
-            return dto;
-        } catch (RuntimeException e) {
-            fileStorage.delete(imageUrl);
-            throw e;
-        }
+        Clothes clothes = clothesRepository.save(
+                new Clothes(request.ownerId(), request.name().strip(), request.type(), imageUrl));
+        attributeRepository.saveAll(attributes.stream()
+                .map(a -> new ClothesAttribute(clothes.getId(), a.definitionId(), a.value().strip()))
+                .toList());
+
+        ClothesDto dto = assemble(List.of(clothes)).get(0);
+        log.info("의상 등록 완료: clothesId={}", clothes.getId());
+        return dto;
     }
 
     @Override
@@ -129,25 +129,20 @@ public class ClothesServiceImpl implements ClothesService {
         ClothesType type = request.type() == null ? clothes.getType() : request.type();
         String oldImageUrl = clothes.getImageUrl();
         String newImageUrl = hasFile(image) ? fileStorage.upload(image, IMAGE_DIRECTORY) : null;
+        // 롤백되면 새로 올린 파일을 정리하고, 이전 파일은 커밋이 끝난 뒤에만 지운다.
+        fileCleaner.deleteOnRollback(newImageUrl);
 
-        ClothesDto dto;
-        try {
-            clothes.update(name, type);
-            if (newImageUrl != null) {
-                clothes.changeImageUrl(newImageUrl);
-            }
-            if (attributes != null) {
-                syncAttributes(clothes.getId(), attributes);
-            }
-            dto = assemble(List.of(clothes)).get(0);
-        } catch (RuntimeException e) {
-            fileStorage.delete(newImageUrl);
-            throw e;
-        }
-
-        // 새 이미지가 저장된 뒤에만 이전 이미지를 지운다.
+        clothes.update(name, type);
         if (newImageUrl != null) {
-            fileStorage.delete(oldImageUrl);
+            clothes.changeImageUrl(newImageUrl);
+        }
+        if (attributes != null) {
+            syncAttributes(clothes.getId(), attributes);
+        }
+        ClothesDto dto = assemble(List.of(clothes)).get(0);
+
+        if (newImageUrl != null) {
+            fileCleaner.deleteAfterCommit(oldImageUrl);
         }
         log.info("의상 수정 완료: clothesId={}", clothesId);
         return dto;
@@ -171,7 +166,8 @@ public class ClothesServiceImpl implements ClothesService {
             throw new ClothesInUseException();
         }
 
-        fileStorage.delete(clothes.getImageUrl());
+        // DB 삭제가 커밋된 뒤에만 이미지 파일을 지운다.
+        fileCleaner.deleteAfterCommit(clothes.getImageUrl());
         log.info("의상 삭제 완료: clothesId={}", clothesId);
     }
 
