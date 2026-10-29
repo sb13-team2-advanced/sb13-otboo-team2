@@ -58,7 +58,10 @@ class UserSignupIntegrationTest {
         // when
         UserDto response = userService.signup(request);
 
+        // INSERT SQL을 DB에 반영
         userRepository.flush();
+
+        // 1차 캐시를 초기화해 DB에서 다시 조회
         entityManager.clear();
 
         // then
@@ -140,7 +143,7 @@ class UserSignupIntegrationTest {
                 )
         );
     }
-
+    
     @Test
     @DisplayName("이미 가입된 이메일로 회원가입하면 예외가 발생한다.")
     void signup_duplicateEmail() {
@@ -161,7 +164,7 @@ class UserSignupIntegrationTest {
 
         userService.signup(firstRequest);
         userRepository.flush();
-
+    
         // when & then
         assertThrows(
                 DuplicateEmailException.class,
