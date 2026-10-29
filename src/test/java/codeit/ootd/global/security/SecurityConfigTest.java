@@ -26,6 +26,7 @@ import org.springframework.web.bind.annotation.RestController;
 import java.util.Optional;
 import java.util.UUID;
 
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.mockito.Mockito.*;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
@@ -181,9 +182,34 @@ class SecurityConfigTest {
         verify(userRepository).findById(userId);
     }
 
+    @Test
+    @DisplayName("JWT 인증 요청에서 HttpSession을 생성하지 않는다")
+    void protectedApi_withValidToken_doesNotCreateSession() throws Exception {
+        // given
+        UUID userId = UUID.randomUUID();
+        UUID sessionId = UUID.randomUUID();
 
+        String accessToken = jwtProvider.generateAccessToken(userId, sessionId);
 
+        AuthSession session = mock(AuthSession.class);
+        when(session.getUserId()).thenReturn(userId);
+        when(authSessionService.getActiveSession(sessionId))
+                .thenReturn(session);
 
+        User user = mock(User.class);
+        when(user.getStatus()).thenReturn(UserStatus.ACTIVE);
+        when(user.getRole()).thenReturn(UserRole.USER);
+        when(userRepository.findById(userId))
+                .thenReturn(Optional.of(user));
+
+        // when & then
+        mockMvc.perform(get("/api/test/authenticated")
+                        .header("Authorization", "Bearer " + accessToken))
+                .andExpect(status().isOk())
+                .andExpect(result ->
+                        assertNull(result.getRequest().getSession(false))
+                );
+    }
 
 
     /**

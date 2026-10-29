@@ -14,6 +14,7 @@ import org.springframework.http.MediaType;
 import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
+import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 import org.springframework.security.web.csrf.CookieCsrfTokenRepository;
@@ -42,6 +43,15 @@ public class SecurityConfig {
                 .csrfTokenRequestHandler(
                         new SpaCsrfTokenRequestHandler()
                 )
+        );
+
+        // Spring Security 기본 로그인 방식 비활성화
+        http.formLogin(form -> form.disable());
+        http.httpBasic(basic -> basic.disable());
+
+        // 기존 API 접근 권한 설정
+        http.sessionManagement(session -> session
+                .sessionCreationPolicy(SessionCreationPolicy.STATELESS)
         );
 
         http.authorizeHttpRequests(auth -> auth
