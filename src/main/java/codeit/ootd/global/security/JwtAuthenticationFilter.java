@@ -40,6 +40,14 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
     private final JsonMapper jsonMapper;
 
     @Override
+    protected boolean shouldNotFilter(HttpServletRequest request) {
+        return "POST".equals(request.getMethod())
+                && "/api/auth/refresh".equals(
+                request.getServletPath()
+        );
+    }
+
+    @Override
     protected void doFilterInternal(
             HttpServletRequest request,
             HttpServletResponse response,

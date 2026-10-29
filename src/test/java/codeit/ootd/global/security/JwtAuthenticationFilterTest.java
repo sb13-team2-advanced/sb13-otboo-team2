@@ -562,7 +562,38 @@ class JwtAuthenticationFilterTest {
         verify(filterChain, never()).doFilter(any(), any());
     }
 
+    @Test
+    @DisplayName("재발급 요청은 만료된 Access Token이 있어도 JWT 필터를 건너뛴다")
+    void doFilter_refreshRequest_skipsJwtAuthentication() throws Exception {
+        // given
+        String accessToken = "expired-access-token";
 
+        MockHttpServletRequest request =
+                new MockHttpServletRequest("POST", "/api/auth/refresh");
+        request.setServletPath("/api/auth/refresh");
+        request.addHeader("Authorization", "Bearer " + accessToken);
 
+        MockHttpServletResponse response = new MockHttpServletResponse();
+
+        // when
+        jwtAuthenticationFilter.doFilter(
+                request,
+                response,
+                filterChain
+        );
+
+        // then
+        verifyNoInteractions(
+                jwtProvider,
+                authSessionService,
+                userRepository
+        );
+
+        verify(filterChain).doFilter(request, response);
+
+        assertNull(
+                SecurityContextHolder.getContext().getAuthentication()
+        );
+    }
 
 }
