@@ -126,7 +126,7 @@ class WeatherServiceTest {
         assertThat(saved.getTemperatureMax()).isEqualTo(18.0);
 
         assertThat(saved.getHumidityAvg()).isEqualTo((short) 70);
-        assertThat(saved.getWindSpeed()).isEqualTo(5.0);
+        assertThat(saved.getWindSpeed()).isEqualTo(10.0 / 3.0);
 
         assertThat(saved.getPrecipitationProbability())
             .isEqualTo(0.9);

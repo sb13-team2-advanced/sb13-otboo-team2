@@ -81,7 +81,7 @@ public class WeatherService {
 
         double windSpeed = forecasts.stream()
             .mapToDouble(WeatherForecast::getWindSpeed)
-            .max()
+            .average()
             .orElseThrow();
 
         Optional<WeatherForecast> nextDayStartForecast =
