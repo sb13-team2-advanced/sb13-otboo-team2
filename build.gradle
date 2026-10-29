@@ -118,16 +118,38 @@ tasks.named('test', Test) {
 }
 
 /**
- * 모든 entity 패키지를 임시로 제외하고 테스트 실행 후 HTML·XML 커버리지 보고서를 생성한다.
+ * 모든 entity·dto 패키지를 제외하고 테스트 실행 후 HTML·XML 커버리지 보고서를 생성한다.
  */
 jacoco {
     toolVersion = '0.8.15'
 }
 
+/**
+ * entity·dto 패키지를 제외하고 각 패키지의 라인 커버리지를 80.1% 이상으로 검증한다.
+ */
+tasks.named('jacocoTestCoverageVerification', JacocoCoverageVerification) {
+    dependsOn tasks.named('jacocoTestReport')
+    classDirectories.setFrom(tasks.named('jacocoTestReport', JacocoReport).map { it.classDirectories })
+    violationRules {
+        rule {
+            element = 'PACKAGE'
+            limit {
+                counter = 'LINE'
+                value = 'COVEREDRATIO'
+                minimum = 0.801
+            }
+        }
+    }
+}
+
+tasks.named('check') {
+    dependsOn tasks.named('jacocoTestCoverageVerification')
+}
+
 tasks.named('jacocoTestReport', JacocoReport) {
     dependsOn tasks.named('test')
     classDirectories.setFrom(sourceSets.main.output.asFileTree.matching {
-        exclude '**/entity/**'
+        exclude '**/entity/**', '**/dto/**'
     })
     reports {
         html.required = true
