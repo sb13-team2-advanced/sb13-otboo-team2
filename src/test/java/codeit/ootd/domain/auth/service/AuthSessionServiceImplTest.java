@@ -234,6 +234,107 @@ class AuthSessionServiceImplTest {
         verify(authSessionRepository).findById(sessionId);
     }
 
+    @Test
+    @DisplayName("로그아웃 시 활성 인증 세션을 폐기한다")
+    void revokeSession_success() {
+        // given
+        UUID userId = UUID.randomUUID();
+        UUID sessionId = UUID.randomUUID();
+
+        AuthSession session = AuthSession.create(
+                userId,
+                now.plus(Duration.ofDays(1))
+        );
+
+        when(authSessionRepository.findById(sessionId))
+                .thenReturn(Optional.of(session));
+
+        // when
+        authSessionService.revokeSession(sessionId);
+
+        // then
+        assertEquals(now, session.getRevokedAt());
+        assertFalse(session.isActive(now));
+
+        verify(authSessionRepository).findById(sessionId);
+    }
+
+    @Test
+    @DisplayName("존재하지 않는 인증 세션을 폐기하면 예외가 발생한다")
+    void revokeSession_notFound() {
+        // given
+        UUID sessionId = UUID.randomUUID();
+
+        when(authSessionRepository.findById(sessionId))
+                .thenReturn(Optional.empty());
+
+        // when & then
+        InvalidAuthSessionException exception = assertThrows(
+                InvalidAuthSessionException.class,
+                () -> authSessionService.revokeSession(sessionId)
+        );
+
+        assertEquals(
+                ErrorCode.INVALID_AUTH_SESSION,
+                exception.getErrorCode()
+        );
+
+        verify(authSessionRepository).findById(sessionId);
+    }
+
+    @Test
+    @DisplayName("이미 폐기된 인증 세션은 다시 폐기해도 기존 폐기 시간을 유지한다")
+    void revokeSession_alreadyRevoked() {
+        // given
+        UUID userId = UUID.randomUUID();
+        UUID sessionId = UUID.randomUUID();
+
+        AuthSession session = AuthSession.create(
+                userId,
+                now.plus(Duration.ofDays(1))
+        );
+
+        Instant firstRevokedAt = now.minus(Duration.ofMinutes(10));
+        session.revoke(firstRevokedAt);
+
+        when(authSessionRepository.findById(sessionId))
+                .thenReturn(Optional.of(session));
+
+        // when
+        authSessionService.revokeSession(sessionId);
+
+        // then
+        assertEquals(firstRevokedAt, session.getRevokedAt());
+        assertFalse(session.isActive(now));
+
+        verify(authSessionRepository).findById(sessionId);
+    }
+
+    @Test
+    @DisplayName("만료된 인증 세션도 폐기 처리할 수 있다")
+    void revokeSession_expiredSession() {
+        // given
+        UUID userId = UUID.randomUUID();
+        UUID sessionId = UUID.randomUUID();
+
+        AuthSession session = AuthSession.create(
+                userId,
+                now.minus(Duration.ofMinutes(1))
+        );
+
+        when(authSessionRepository.findById(sessionId))
+                .thenReturn(Optional.of(session));
+
+        // when
+        authSessionService.revokeSession(sessionId);
+
+        // then
+        assertEquals(now, session.getRevokedAt());
+        assertFalse(session.isActive(now));
+
+        verify(authSessionRepository).findById(sessionId);
+    }
+
     private enum SessionState {
         EXPIRED,
         REVOKED

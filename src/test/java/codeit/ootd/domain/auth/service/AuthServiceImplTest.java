@@ -32,12 +32,14 @@ import java.util.Optional;
 import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.assertAll;
+import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -516,6 +518,65 @@ class AuthServiceImplTest {
 
         verify(jwtProvider, never())
                 .generateAccessToken(any(), any());
+    }
+
+    @Test
+    @DisplayName("유효한 Refresh Token으로 로그아웃하면 인증 세션을 폐기한다")
+    void signOut_success() {
+        // given
+        String refreshToken = "valid-refresh-token";
+        UUID sessionId = UUID.randomUUID();
+
+        when(refreshTokenService.findSessionIdByToken(refreshToken))
+                .thenReturn(sessionId);
+
+        // when
+        authService.signOut(refreshToken);
+
+        // then
+        verify(refreshTokenService).findSessionIdByToken(refreshToken);
+        verify(authSessionService).revokeSession(sessionId);
+
+        verify(authSessionService, never()).createSession(any());
+        verify(refreshTokenService, never()).rotate(any(), anyString());
+        verify(jwtProvider, never())
+                .generateAccessToken(any(), any());
+    }
+
+    @Test
+    @DisplayName("유효하지 않은 Refresh Token으로 로그아웃해도 정상 종료한다")
+    void signOut_invalidRefreshToken() {
+        // given
+        String refreshToken = "invalid-refresh-token";
+
+        when(refreshTokenService.findSessionIdByToken(refreshToken))
+                .thenThrow(new InvalidRefreshTokenException());
+
+        // when & then
+        assertDoesNotThrow(() -> authService.signOut(refreshToken));
+
+        verify(authSessionService, never()).revokeSession(any());
+    }
+
+    @Test
+    @DisplayName("인증 세션이 존재하지 않아도 로그아웃은 정상 종료한다")
+    void signOut_invalidSession() {
+        // given
+        String refreshToken = "valid-refresh-token";
+        UUID sessionId = UUID.randomUUID();
+
+        when(refreshTokenService.findSessionIdByToken(refreshToken))
+                .thenReturn(sessionId);
+
+        doThrow(new InvalidAuthSessionException())
+                .when(authSessionService)
+                .revokeSession(sessionId);
+
+        // when & then
+        assertDoesNotThrow(() -> authService.signOut(refreshToken));
+
+        verify(refreshTokenService).findSessionIdByToken(refreshToken);
+        verify(authSessionService).revokeSession(sessionId);
     }
 
 

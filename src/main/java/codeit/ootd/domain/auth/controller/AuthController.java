@@ -19,7 +19,6 @@ import org.springframework.web.bind.annotation.CookieValue;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.ModelAttribute;
 import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -72,14 +71,44 @@ public class AuthController {
                 .body(new TokenRefreshResponse(result.accessToken()));
     }
 
-    private ResponseCookie createRefreshTokenCookie(String refreshToken) {
-        return ResponseCookie.from("refreshToken", refreshToken)
+    @PostMapping("/sign-out")
+    public ResponseEntity<Void> signOut(
+            @CookieValue(value = "refreshToken", required = false)
+            String refreshToken
+    ) {
+        if (refreshToken != null && !refreshToken.isBlank()) {
+            authService.signOut(refreshToken);
+        }
+
+        ResponseCookie cookie = deleteRefreshTokenCookie();
+
+        return ResponseEntity.noContent()
+                .header(HttpHeaders.SET_COOKIE, cookie.toString())
+                .build();
+    }
+
+
+    private ResponseCookie createRefreshTokenCookie(String token) {
+        return buildRefreshTokenCookie(token, Duration.ofDays(7));
+    }
+
+    private ResponseCookie deleteRefreshTokenCookie() {
+        return buildRefreshTokenCookie("", Duration.ZERO);
+    }
+
+    private ResponseCookie buildRefreshTokenCookie(
+            String token,
+            Duration maxAge
+    ) {
+        return ResponseCookie.from("refreshToken", token)
                 .httpOnly(true)
                 .secure(cookieSecure)
                 .sameSite("Lax")
                 .path("/api/auth")
-                .maxAge(Duration.ofDays(7))
+                .maxAge(maxAge)
                 .build();
     }
+
+
 
 }
