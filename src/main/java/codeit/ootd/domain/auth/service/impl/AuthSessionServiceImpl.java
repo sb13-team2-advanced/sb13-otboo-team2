@@ -1,6 +1,7 @@
 package codeit.ootd.domain.auth.service.impl;
 
 import codeit.ootd.domain.auth.entity.AuthSession;
+import codeit.ootd.domain.auth.exception.InvalidAuthSessionException;
 import codeit.ootd.domain.auth.repository.AuthSessionRepository;
 import codeit.ootd.domain.auth.service.AuthSessionService;
 import lombok.RequiredArgsConstructor;
@@ -56,6 +57,21 @@ public class AuthSessionServiceImpl implements AuthSessionService {
                 userId, activeSessions.size());
 
         return savedSession;
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public AuthSession getActiveSession(UUID sessionId) {
+        Instant now = clock.instant();
+
+        AuthSession session = authSessionRepository.findById(sessionId)
+                .orElseThrow(InvalidAuthSessionException::new);
+
+        if (!session.isActive(now)) {
+            throw new InvalidAuthSessionException();
+        }
+
+        return session;
     }
 
 }
