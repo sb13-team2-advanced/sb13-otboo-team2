@@ -11,6 +11,8 @@ import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 
 class WeatherDtoMapperTest {
 
@@ -98,6 +100,90 @@ class WeatherDtoMapperTest {
             windSpeed,
             (short) 8
         );
+    }
+
+    @Test
+    @DisplayName("toDto는 전날 대비 음수 기온 차이도 소수점 둘째 자리까지 반올림한다")
+    void toDtoRoundsNegativeTemperatureDifference() {
+        UUID locationId = UUID.randomUUID();
+
+        Weather today = createWeather(
+            locationId, LocalDate.of(2026, 10, 29),
+            17.234, (short) 60, 800, 0.0, 0.0, 2.0
+        );
+
+        Weather yesterday = createWeather(
+            locationId, LocalDate.of(2026, 10, 28),
+            20.0, (short) 75, 800, 0.0, 0.0, 2.0
+        );
+
+        WeatherDto result = mapper.toDto(
+            today, yesterday, createLocation()
+        );
+
+        assertThat(result.temperature().comparedToDayBefore())
+            .isEqualTo(-2.77);
+
+        assertThat(result.humidity().comparedToDayBefore())
+            .isEqualTo(-15.0);
+    }
+
+    @ParameterizedTest
+    @CsvSource({
+        "801, 0.0, 0.0, 5.4, CLEAR, NONE, WEAK",
+        "802, 0.0, 0.0, 5.5, MOSTLY_CLOUDY, NONE, MODERATE",
+        "803, 0.0, 0.0, 10.7, MOSTLY_CLOUDY, NONE, MODERATE",
+        "600, 0.0, 0.0, 10.8, CLOUDY, SNOW, STRONG",
+        "800, 0.0, 2.0, 2.0, CLEAR, SNOW, WEAK",
+        "500, 1.5, 0.5, 6.0, CLOUDY, RAIN_SNOW, MODERATE",
+        "521, 1.0, 0.0, 3.0, CLOUDY, SHOWER, WEAK",
+        "531, 0.0, 0.0, 3.0, CLOUDY, SHOWER, WEAK",
+        "200, 0.0, 0.0, 3.0, CLOUDY, RAIN, WEAK"
+    })
+    @DisplayName("toDto는 날씨 코드와 강수량 및 풍속에 따라 응답을 변환한다")
+    void toDtoMapsWeatherConditions(
+        int weatherCode,
+        double rainAmount,
+        double snowAmount,
+        double windSpeed,
+        String expectedSkyStatus,
+        String expectedPrecipitationType,
+        String expectedWindStrength
+    ) {
+        Weather weather = new Weather(
+            UUID.randomUUID(),
+            LocalDate.of(2026, 10, 29),
+            Instant.parse("2026-10-29T06:00:00Z"),
+            20.0,
+            15.0,
+            25.0,
+            (short) 60,
+            weatherCode,
+            0.7,
+            rainAmount,
+            snowAmount,
+            windSpeed,
+            (short) 8
+        );
+
+        WeatherDto result = mapper.toDto(
+            weather, null, createLocation()
+        );
+
+        assertThat(result.skyStatus())
+            .isEqualTo(expectedSkyStatus);
+
+        assertThat(result.precipitation().type())
+            .isEqualTo(expectedPrecipitationType);
+
+        assertThat(result.precipitation().amount())
+            .isEqualTo(rainAmount + snowAmount);
+
+        assertThat(result.precipitation().probability())
+            .isEqualTo(70.0);
+
+        assertThat(result.windSpeed().asWord())
+            .isEqualTo(expectedWindStrength);
     }
 
     private WeatherAPILocation createLocation() {
