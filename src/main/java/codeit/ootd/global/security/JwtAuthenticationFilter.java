@@ -13,7 +13,6 @@ import codeit.ootd.domain.user.repository.UserRepository;
 import codeit.ootd.global.exception.ErrorCode;
 import codeit.ootd.global.exception.ErrorResponse;
 import codeit.ootd.global.exception.OtbooException;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.JwtException;
 import jakarta.servlet.FilterChain;
@@ -26,6 +25,7 @@ import org.springframework.security.authentication.UsernamePasswordAuthenticatio
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.filter.OncePerRequestFilter;
+import tools.jackson.databind.json.JsonMapper;
 
 import java.io.IOException;
 import java.util.List;
@@ -37,8 +37,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
     private final JwtProvider jwtProvider;
     private final AuthSessionService authSessionService;
     private final UserRepository userRepository;
-    private final ObjectMapper objectMapper;
-
+    private final JsonMapper jsonMapper;
 
     @Override
     protected void doFilterInternal(
@@ -55,6 +54,16 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         }
 
         String token = authorization.substring(7);
+
+        if (token.isBlank()) {
+            SecurityContextHolder.clearContext();
+
+            writeAuthenticationError(
+                    response,
+                    ErrorCode.AUTHENTICATION_REQUIRED
+            );
+            return;
+        }
 
         try {
             Claims claims = jwtProvider.parseAccessToken(token);
@@ -162,7 +171,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         response.setContentType(MediaType.APPLICATION_JSON_VALUE);
         response.setCharacterEncoding("UTF-8");
 
-        objectMapper.writeValue(
+        jsonMapper.writeValue(
                 response.getWriter(),
                 errorResponse
         );

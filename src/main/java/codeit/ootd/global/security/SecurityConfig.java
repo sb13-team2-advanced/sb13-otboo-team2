@@ -1,20 +1,38 @@
 package codeit.ootd.global.security;
 
+import codeit.ootd.domain.auth.jwt.JwtProvider;
+import codeit.ootd.domain.auth.service.AuthSessionService;
+import codeit.ootd.domain.user.repository.UserRepository;
+import codeit.ootd.global.exception.ErrorCode;
+import codeit.ootd.global.exception.ErrorResponse;
+import codeit.ootd.global.exception.OtbooException;
+import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpMethod;
+import org.springframework.http.MediaType;
+import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.web.SecurityFilterChain;
+import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 import org.springframework.security.web.csrf.CookieCsrfTokenRepository;
+import tools.jackson.databind.json.JsonMapper;
+
+import java.io.IOException;
 
 @Configuration
 @EnableWebSecurity
+@EnableMethodSecurity
 public class SecurityConfig {
 
     @Bean
     public SecurityFilterChain securityFilterChain(
-            HttpSecurity http
+            HttpSecurity http,
+            JwtProvider jwtProvider,
+            AuthSessionService authSessionService,
+            UserRepository userRepository,
+            JsonMapper jsonMapper
     ) throws Exception {
 
         http.csrf(csrf -> csrf
@@ -49,6 +67,59 @@ public class SecurityConfig {
                 .anyRequest().authenticated()
         );
 
+        http.exceptionHandling(exception -> exception
+                .authenticationEntryPoint((request, response, authException) ->
+                        writeSecurityError(
+                                response,
+                                ErrorCode.AUTHENTICATION_REQUIRED,
+                                jsonMapper
+                        )
+                )
+                .accessDeniedHandler((request, response, accessDeniedException) ->
+                        writeSecurityError(
+                                response,
+                                ErrorCode.ACCESS_DENIED,
+                                jsonMapper
+                        )
+                )
+        );
+
+        JwtAuthenticationFilter jwtAuthenticationFilter =
+                new JwtAuthenticationFilter(
+                        jwtProvider,
+                        authSessionService,
+                        userRepository,
+                        jsonMapper
+                );
+
+        http.addFilterBefore(
+                jwtAuthenticationFilter,
+                UsernamePasswordAuthenticationFilter.class
+        );
+
         return http.build();
     }
+
+
+    private void writeSecurityError(
+            HttpServletResponse response,
+            ErrorCode errorCode,
+            JsonMapper jsonMapper
+    ) throws IOException {
+
+        ErrorResponse errorResponse = ErrorResponse.from(
+                new OtbooException(errorCode),
+                errorCode
+        );
+
+        response.setStatus(errorCode.getStatus().value());
+        response.setContentType(MediaType.APPLICATION_JSON_VALUE);
+        response.setCharacterEncoding("UTF-8");
+
+        jsonMapper.writeValue(
+                response.getWriter(),
+                errorResponse
+        );
+    }
+
 }

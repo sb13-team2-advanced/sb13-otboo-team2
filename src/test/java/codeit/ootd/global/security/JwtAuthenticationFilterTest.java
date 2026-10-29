@@ -8,7 +8,6 @@ import codeit.ootd.domain.user.entity.User;
 import codeit.ootd.domain.user.entity.UserRole;
 import codeit.ootd.domain.user.entity.UserStatus;
 import codeit.ootd.domain.user.repository.UserRepository;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.ExpiredJwtException;
 import io.jsonwebtoken.security.SignatureException;
@@ -25,6 +24,7 @@ import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.mock.web.MockHttpServletResponse;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
+import tools.jackson.databind.json.JsonMapper;
 
 import java.util.Optional;
 import java.util.UUID;
@@ -51,7 +51,7 @@ class JwtAuthenticationFilterTest {
     private JwtAuthenticationFilter jwtAuthenticationFilter;
 
     @Spy
-    private ObjectMapper objectMapper = new ObjectMapper();
+    private JsonMapper jsonMapper = new JsonMapper();
 
     @AfterEach
     void tearDown() {
@@ -494,6 +494,74 @@ class JwtAuthenticationFilterTest {
         verify(userRepository).findById(userId);
         verify(filterChain, never()).doFilter(any(), any());
     }
+
+    @Test
+    @DisplayName("JWT에 sessionId가 없으면 401을 반환한다")
+    void doFilter_missingSessionId_returnsUnauthorized() throws Exception {
+        // given
+        String accessToken = "missing-session-id-token";
+
+        MockHttpServletRequest request = new MockHttpServletRequest();
+        request.addHeader("Authorization", "Bearer " + accessToken);
+
+        MockHttpServletResponse response = new MockHttpServletResponse();
+
+        Claims claims = mock(Claims.class);
+        when(claims.getSubject()).thenReturn(UUID.randomUUID().toString());
+
+        when(jwtProvider.parseAccessToken(accessToken))
+                .thenReturn(claims);
+
+        // when
+        jwtAuthenticationFilter.doFilter(request, response, filterChain);
+
+        // then
+        assertEquals(401, response.getStatus());
+
+        assertTrue(response.getContentAsString().contains(
+                "\"message\":\"인증이 필요합니다.\""
+        ));
+
+        assertNull(SecurityContextHolder.getContext().getAuthentication());
+
+        verifyNoInteractions(authSessionService, userRepository);
+        verify(filterChain, never()).doFilter(any(), any());
+    }
+
+    @Test
+    @DisplayName("Bearer Token이 비어 있으면 401을 반환한다")
+    void doFilter_emptyBearerToken_returnsUnauthorized() throws Exception {
+        // given
+        MockHttpServletRequest request = new MockHttpServletRequest();
+        request.addHeader("Authorization", "Bearer ");
+
+        MockHttpServletResponse response = new MockHttpServletResponse();
+
+        // when
+        jwtAuthenticationFilter.doFilter(
+                request,
+                response,
+                filterChain
+        );
+
+        // then
+        assertEquals(401, response.getStatus());
+
+        assertTrue(response.getContentAsString().contains(
+                "\"message\":\"인증이 필요합니다.\""
+        ));
+
+        assertNull(SecurityContextHolder.getContext().getAuthentication());
+
+        verifyNoInteractions(
+                jwtProvider,
+                authSessionService,
+                userRepository
+        );
+
+        verify(filterChain, never()).doFilter(any(), any());
+    }
+
 
 
 
