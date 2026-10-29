@@ -9,6 +9,7 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 import codeit.ootd.domain.weather.entity.WeatherLocation;
@@ -48,11 +49,11 @@ class WeatherCollectionTaskletTest {
     private WeatherCollectionTasklet tasklet;
 
     @Test
-    @DisplayName("수집 대상 셀의 예보를 수집하고 5일치 날씨를 집계한다")
+    @DisplayName("최초 수집을 완료한 대상 셀의 예보를 수집하고 5일치 날씨를 집계한다")
     void executeCollectsAndAggregatesWeather() {
 
         when(weatherLocationRepository
-            .findTop20ByNextRefreshAtLessThanEqualOrderByNextRefreshAtAsc(
+            .findTop20ByLastCollectedAtIsNotNullAndNextRefreshAtLessThanEqualOrderByNextRefreshAtAsc(
                 any(Instant.class)
             ))
             .thenReturn(List.of(location));
@@ -61,6 +62,11 @@ class WeatherCollectionTaskletTest {
             mock(StepContribution.class),
             mock(ChunkContext.class)
         );
+
+        verify(weatherLocationRepository)
+            .findTop20ByLastCollectedAtIsNotNullAndNextRefreshAtLessThanEqualOrderByNextRefreshAtAsc(
+                any(Instant.class)
+            );
 
         verify(weatherForecastCollector).collectForecasts(location);
 
@@ -87,7 +93,7 @@ class WeatherCollectionTaskletTest {
         WeatherLocation secondLocation = mock(WeatherLocation.class);
 
         when(weatherLocationRepository
-            .findTop20ByNextRefreshAtLessThanEqualOrderByNextRefreshAtAsc(
+            .findTop20ByLastCollectedAtIsNotNullAndNextRefreshAtLessThanEqualOrderByNextRefreshAtAsc(
                 any(Instant.class)
             ))
             .thenReturn(List.of(location, secondLocation));
@@ -135,7 +141,7 @@ class WeatherCollectionTaskletTest {
     void executeSucceedsAfterRetries() {
 
         when(weatherLocationRepository
-            .findTop20ByNextRefreshAtLessThanEqualOrderByNextRefreshAtAsc(
+            .findTop20ByLastCollectedAtIsNotNullAndNextRefreshAtLessThanEqualOrderByNextRefreshAtAsc(
                 any(Instant.class)
             ))
             .thenReturn(List.of(location));
@@ -171,6 +177,35 @@ class WeatherCollectionTaskletTest {
         );
 
         verify(weatherLocationRepository).save(location);
+
+        assertThat(result).isEqualTo(RepeatStatus.FINISHED);
+    }
+
+    @Test
+    @DisplayName("Batch 수집 대상이 없으면 예보 수집과 일별 집계를 실행하지 않는다")
+    void executeSkipsCollectionWhenNoLocationsAreDue() {
+
+        when(weatherLocationRepository
+            .findTop20ByLastCollectedAtIsNotNullAndNextRefreshAtLessThanEqualOrderByNextRefreshAtAsc(
+                any(Instant.class)
+            ))
+            .thenReturn(List.of());
+
+        RepeatStatus result = tasklet.execute(
+            mock(StepContribution.class),
+            mock(ChunkContext.class)
+        );
+
+        verify(weatherLocationRepository)
+            .findTop20ByLastCollectedAtIsNotNullAndNextRefreshAtLessThanEqualOrderByNextRefreshAtAsc(
+                any(Instant.class)
+            );
+
+        verifyNoInteractions(weatherForecastCollector);
+        verifyNoInteractions(weatherService);
+
+        verify(weatherLocationRepository, never())
+            .save(any(WeatherLocation.class));
 
         assertThat(result).isEqualTo(RepeatStatus.FINISHED);
     }
