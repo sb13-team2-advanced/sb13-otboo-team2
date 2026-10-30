@@ -7,7 +7,6 @@ import static org.mockito.Mockito.when;
 import codeit.ootd.domain.weather.entity.WeatherForecast;
 import codeit.ootd.domain.weather.entity.WeatherLocation;
 import codeit.ootd.domain.weather.repository.WeatherForecastRepository;
-import codeit.ootd.infra.weather.OpenWeatherMapClient;
 import codeit.ootd.infra.weather.dto.OwmForecastResponse;
 import java.time.Instant;
 import java.util.List;
@@ -25,9 +24,6 @@ import org.mockito.junit.jupiter.MockitoExtension;
 class WeatherForecastServiceTest {
 
     @Mock
-    private OpenWeatherMapClient openWeatherMapClient;
-
-    @Mock
     private WeatherForecastRepository weatherForecastRepository;
 
     @InjectMocks
@@ -35,7 +31,7 @@ class WeatherForecastServiceTest {
 
     @Test
     @DisplayName("기존 예보가 없으면 새로운 예보를 저장한다")
-    void collectForecastsCreatesNewForecast() {
+    void saveForecastsCreatesNewForecast() {
 
         UUID locationId = UUID.randomUUID();
 
@@ -43,8 +39,6 @@ class WeatherForecastServiceTest {
             org.mockito.Mockito.mock(WeatherLocation.class);
 
         when(location.getId()).thenReturn(locationId);
-        when(location.getLatitude()).thenReturn(37.5665);
-        when(location.getLongitude()).thenReturn(126.9780);
 
         Instant forecastAt =
             Instant.parse("2026-10-27T06:00:00Z");
@@ -65,14 +59,11 @@ class WeatherForecastServiceTest {
         OwmForecastResponse response =
             new OwmForecastResponse(List.of(item));
 
-        when(openWeatherMapClient.getForecast(37.5665, 126.9780))
-            .thenReturn(response);
-
         when(weatherForecastRepository
             .findByLocationIdAndForecastAt(locationId, forecastAt))
             .thenReturn(Optional.empty());
 
-        weatherForecastService.collectForecasts(location);
+        weatherForecastService.saveForecasts(location, response);
 
         ArgumentCaptor<WeatherForecast> captor =
             ArgumentCaptor.forClass(WeatherForecast.class);
@@ -94,7 +85,7 @@ class WeatherForecastServiceTest {
 
     @Test
     @DisplayName("기존 예보가 있으면 최신 예보로 갱신한다")
-    void collectForecastsUpdatesExistingForecast() {
+    void saveForecastsUpdatesExistingForecast() {
 
         UUID locationId = UUID.randomUUID();
 
@@ -102,8 +93,6 @@ class WeatherForecastServiceTest {
             org.mockito.Mockito.mock(WeatherLocation.class);
 
         when(location.getId()).thenReturn(locationId);
-        when(location.getLatitude()).thenReturn(37.5665);
-        when(location.getLongitude()).thenReturn(126.9780);
 
         Instant forecastAt =
             Instant.parse("2026-10-27T06:00:00Z");
@@ -135,14 +124,13 @@ class WeatherForecastServiceTest {
                 new OwmForecastResponse.Wind(3.5)
             );
 
-        when(openWeatherMapClient.getForecast(37.5665, 126.9780))
-            .thenReturn(new OwmForecastResponse(List.of(item)));
+        OwmForecastResponse response = new OwmForecastResponse(List.of(item));
 
         when(weatherForecastRepository
             .findByLocationIdAndForecastAt(locationId, forecastAt))
             .thenReturn(Optional.of(existingForecast));
 
-        weatherForecastService.collectForecasts(location);
+        weatherForecastService.saveForecasts(location, response);
 
         verify(weatherForecastRepository).save(existingForecast);
 

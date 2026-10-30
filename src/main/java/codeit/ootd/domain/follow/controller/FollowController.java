@@ -1,12 +1,16 @@
 package codeit.ootd.domain.follow.controller;
 
 import codeit.ootd.domain.follow.dto.request.FollowCreateRequest;
-import codeit.ootd.domain.follow.dto.FollowDto;
-import codeit.ootd.domain.follow.dto.FollowListResponse;
-import codeit.ootd.domain.follow.dto.FollowSummaryDto;
+import codeit.ootd.domain.follow.dto.response.FollowDto;
+import codeit.ootd.domain.follow.dto.response.FollowListResponse;
+import codeit.ootd.domain.follow.dto.response.FollowSummaryDto;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import java.util.UUID;
+import java.security.Principal;
+import jakarta.validation.Valid;
+import lombok.RequiredArgsConstructor;
+import codeit.ootd.domain.follow.service.FollowService;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.DeleteMapping;
@@ -18,39 +22,49 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
-@Tag(name = "팔로우 관리", description = "팔로우 관련 API")
 @RestController
 @RequestMapping("/api/follows")
+@RequiredArgsConstructor
 public class FollowController {
 
-    // TODO: FollowService 구현 후 위임
-    @Operation(summary = "팔로우 생성", operationId = "createFollow")
+    private final FollowService followService;
+
+    private UUID currentUserId(Principal principal) {
+        return followService.currentUserId(principal == null ? null : principal.getName());
+    }
     @PostMapping
-    public ResponseEntity<FollowDto> createFollow(@RequestBody FollowCreateRequest request) {
-        return ResponseEntity.status(HttpStatus.NOT_IMPLEMENTED).build();
+    public ResponseEntity<FollowDto> createFollow(@Valid @RequestBody FollowCreateRequest request, Principal principal) {
+        return ResponseEntity.status(HttpStatus.CREATED).body(followService.create(request, currentUserId(principal)));
     }
 
-    @Operation(summary = "팔로우 요약 정보 조회", operationId = "getFollowSummary")
     @GetMapping("/summary")
-    public ResponseEntity<FollowSummaryDto> getFollowSummary(@RequestParam("userId") UUID userId) {
-        return ResponseEntity.status(HttpStatus.NOT_IMPLEMENTED).build();
+    public ResponseEntity<FollowSummaryDto> getFollowSummary(@RequestParam("userId") UUID userId, Principal principal) {
+        return ResponseEntity.ok(followService.getSummary(userId, currentUserId(principal)));
     }
 
-    @Operation(summary = "팔로잉 목록 조회", operationId = "getFollowings")
     @GetMapping("/followings")
-    public ResponseEntity<FollowListResponse> getFollowings() {
-        return ResponseEntity.status(HttpStatus.NOT_IMPLEMENTED).build();
+    public ResponseEntity<FollowListResponse> getFollowings(
+        @RequestParam("followerId") UUID followerId,
+        @RequestParam(value = "cursor", required = false) String cursor,
+        @RequestParam(value = "idAfter", required = false) UUID idAfter,
+        @RequestParam("limit") int limit,
+        @RequestParam(value = "nameLike", required = false) String nameLike) {
+        return ResponseEntity.ok(followService.getList(followerId, true, cursor, idAfter, limit, nameLike));
     }
 
-    @Operation(summary = "팔로워 목록 조회", operationId = "getFollowers")
     @GetMapping("/followers")
-    public ResponseEntity<FollowListResponse> getFollowers() {
-        return ResponseEntity.status(HttpStatus.NOT_IMPLEMENTED).build();
+    public ResponseEntity<FollowListResponse> getFollowers(
+        @RequestParam("followeeId") UUID followeeId,
+        @RequestParam(value = "cursor", required = false) String cursor,
+        @RequestParam(value = "idAfter", required = false) UUID idAfter,
+        @RequestParam("limit") int limit,
+        @RequestParam(value = "nameLike", required = false) String nameLike) {
+        return ResponseEntity.ok(followService.getList(followeeId, false, cursor, idAfter, limit, nameLike));
     }
 
-    @Operation(summary = "팔로우 취소", operationId = "cancelFollow")
     @DeleteMapping("/{followId}")
-    public ResponseEntity<Void> cancelFollow(@PathVariable("followId") UUID followId) {
-        return ResponseEntity.status(HttpStatus.NOT_IMPLEMENTED).build();
+    public ResponseEntity<Void> cancelFollow(@PathVariable("followId") UUID followId, Principal principal) {
+        followService.cancel(followId, currentUserId(principal));
+        return ResponseEntity.noContent().build();
     }
 }

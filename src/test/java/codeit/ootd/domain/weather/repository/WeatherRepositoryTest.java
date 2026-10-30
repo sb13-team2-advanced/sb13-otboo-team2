@@ -7,6 +7,8 @@ import codeit.ootd.domain.weather.entity.Weather;
 import codeit.ootd.domain.weather.entity.WeatherLocation;
 import java.time.Instant;
 import java.time.LocalDate;
+import java.util.List;
+import java.util.UUID;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -103,5 +105,78 @@ class WeatherRepositoryTest {
 
         assertThatThrownBy(() -> weatherRepository.saveAndFlush(duplicate))
             .isInstanceOf(DataIntegrityViolationException.class);
+    }
+
+    @Test
+    @DisplayName("findWeathersByDateRange는 지정한 위치의 날짜 범위를 오름차순으로 조회한다")
+    void findWeathersByDateRange() {
+
+        Instant now = Instant.parse("2026-10-28T06:00:00Z");
+
+        WeatherLocation location = new WeatherLocation(
+            "cell-range-1", 37.5665, 126.9780, now
+        );
+
+        WeatherLocation otherLocation = new WeatherLocation(
+            "cell-range-2", 37.5700, 126.9800, now
+        );
+
+        locationRepository.saveAllAndFlush(
+            List.of(location, otherLocation)
+        );
+
+        LocalDate startDate = LocalDate.of(2026, 10, 28);
+        LocalDate endDate = LocalDate.of(2026, 11, 1);
+
+        List<Weather> weathers = new java.util.ArrayList<>();
+
+        for (LocalDate date : List.of(
+            LocalDate.of(2026, 10, 27),
+            LocalDate.of(2026, 11, 1),
+            LocalDate.of(2026, 10, 30),
+            LocalDate.of(2026, 10, 28),
+            LocalDate.of(2026, 11, 2)
+        )) {
+            weathers.add(createWeather(location.getId(), date));
+        }
+
+        weathers.add(
+            createWeather(otherLocation.getId(), startDate)
+        );
+
+        weatherRepository.saveAllAndFlush(weathers);
+
+        List<Weather> result = weatherRepository
+            .findByLocationIdAndWeatherDateBetweenOrderByWeatherDateAsc(
+                location.getId(),
+                startDate,
+                endDate
+            );
+
+        assertThat(result)
+            .extracting(Weather::getWeatherDate)
+            .containsExactly(
+                LocalDate.of(2026, 10, 28),
+                LocalDate.of(2026, 10, 30),
+                LocalDate.of(2026, 11, 1)
+            );
+    }
+
+    private Weather createWeather(UUID locationId, LocalDate date) {
+        return new Weather(
+            locationId,
+            date,
+            Instant.parse("2026-10-28T06:00:00Z"),
+            17.0,
+            12.0,
+            21.0,
+            (short) 65,
+            800,
+            0.3,
+            0.0,
+            0.0,
+            2.5,
+            (short) 8
+        );
     }
 }

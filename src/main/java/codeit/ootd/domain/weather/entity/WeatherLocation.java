@@ -5,6 +5,7 @@ import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.Table;
 import java.time.Instant;
+import java.util.UUID;
 import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
@@ -32,6 +33,12 @@ public class WeatherLocation extends BaseTimeEntity {
     @Column(nullable = false)
     private Instant nextRefreshAt;
 
+    @Column(name = "initial_collection_in_progress", nullable = false)
+    private boolean initialCollectionInProgress = false;
+
+    @Column(name = "initial_collection_token")
+    private UUID initialCollectionToken;
+
     public WeatherLocation(
         String cellId,
         double latitude,
@@ -54,5 +61,15 @@ public class WeatherLocation extends BaseTimeEntity {
 
         this.lastCollectedAt = collectedAt;
         this.nextRefreshAt = nextRefreshAt;
+        this.initialCollectionInProgress = false;
+    }
+
+    public void scheduleRetry(Instant failedAt, Instant retryAt) {
+        if (!retryAt.isAfter(failedAt)) {
+            throw new IllegalArgumentException("재시도 예정 시간은 실패 시간보다 이후여야 합니다.");
+        }
+
+        this.nextRefreshAt = retryAt;
+        this.initialCollectionInProgress = false;
     }
 }
