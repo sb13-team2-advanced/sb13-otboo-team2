@@ -2,6 +2,7 @@ package codeit.ootd.domain.user.controller;
 
 import codeit.ootd.domain.user.dto.request.UserCreateRequest;
 import codeit.ootd.domain.user.dto.response.UserDto;
+import codeit.ootd.domain.user.dto.response.UserListResponse;
 import codeit.ootd.domain.user.entity.UserRole;
 import codeit.ootd.domain.user.exception.DuplicateEmailException;
 import codeit.ootd.domain.user.service.UserService;
@@ -21,6 +22,7 @@ import org.springframework.validation.beanvalidation.LocalValidatorFactoryBean;
 import tools.jackson.databind.json.JsonMapper;
 
 import java.time.Instant;
+import java.util.List;
 import java.util.UUID;
 
 import static org.mockito.Mockito.doThrow;
@@ -30,6 +32,7 @@ import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 
 @ExtendWith(MockitoExtension.class)
 class UserControllerTest {
@@ -288,6 +291,59 @@ class UserControllerTest {
 
         verifyNoInteractions(userService);
     }
+
+    @Test
+    @DisplayName("사용자 목록 조회 성공 시 200과 페이지네이션 정보를 반환한다")
+    void getUsers_success() throws Exception {
+        // given
+        UUID userId = UUID.randomUUID();
+        Instant createdAt = Instant.parse("2026-10-30T00:00:00Z");
+
+        UserDto userDto = new UserDto(
+                userId,
+                createdAt,
+                "test@example.com",
+                "테스트사용자",
+                UserRole.USER,
+                false
+        );
+
+        UserListResponse response = new UserListResponse(
+                List.of(userDto),
+                null,
+                null,
+                false,
+                1L,
+                "email",
+                "ASCENDING"
+        );
+
+        when(userService.getUsers(
+                null, null, 10, "email", "ASCENDING",
+                null, null, null
+        )).thenReturn(response);
+
+        // when & then
+        mockMvc.perform(get("/api/users")
+                        .param("limit", "10")
+                        .param("sortBy", "email")
+                        .param("sortDirection", "ASCENDING"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data[0].id").value(userId.toString()))
+                .andExpect(jsonPath("$.data[0].email").value("test@example.com"))
+                .andExpect(jsonPath("$.data[0].role").value("USER"))
+                .andExpect(jsonPath("$.hasNext").value(false))
+                .andExpect(jsonPath("$.totalCount").value(1))
+                .andExpect(jsonPath("$.sortBy").value("email"))
+                .andExpect(jsonPath("$.sortDirection").value("ASCENDING"));
+
+        verify(userService).getUsers(
+                null, null, 10, "email", "ASCENDING",
+                null, null, null
+        );
+    }
+
+
 
 
 }

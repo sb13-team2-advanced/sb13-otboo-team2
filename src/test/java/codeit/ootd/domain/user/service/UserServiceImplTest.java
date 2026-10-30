@@ -2,6 +2,7 @@ package codeit.ootd.domain.user.service;
 
 import codeit.ootd.domain.user.dto.request.UserCreateRequest;
 import codeit.ootd.domain.user.dto.response.UserDto;
+import codeit.ootd.domain.user.dto.response.UserListResponse;
 import codeit.ootd.domain.user.entity.User;
 import codeit.ootd.domain.user.entity.UserRole;
 import codeit.ootd.domain.user.entity.UserStatus;
@@ -17,9 +18,16 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Sort;
 import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.test.util.ReflectionTestUtils;
 
 import java.sql.SQLException;
+import java.util.List;
+import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.assertAll;
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -27,6 +35,7 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.never;
@@ -265,5 +274,120 @@ class UserServiceImplTest {
 
         assertSame(exception, thrown);
     }
+
+    @Test
+    @DisplayName("사용자 목록 첫 페이지 조회 시 이메일 오름차순으로 반환한다")
+    void getUsers_firstPage_success() {
+        // given
+        User user1 = User.create(
+                "사용자A", "aaa@example.com", "encoded-password"
+        );
+        User user2 = User.create(
+                "사용자B", "bbb@example.com", "encoded-password"
+        );
+        User user3 = User.create(
+                "사용자C", "ccc@example.com", "encoded-password"
+        );
+
+        List<User> users = List.of(user1, user2, user3);
+
+        Page<User> page = new PageImpl<>(
+                users,
+                PageRequest.of(
+                        0,
+                        10,
+                        Sort.by(Sort.Direction.ASC, "email")
+                ),
+                3
+        );
+
+        when(userRepository.findAll(any(
+                org.springframework.data.domain.Pageable.class
+        ))).thenReturn(page);
+
+        // when
+        UserListResponse response = userService.getUsers(
+                null,
+                null,
+                10,
+                "email",
+                "ASCENDING",
+                null,
+                null,
+                null
+        );
+
+        // then
+        assertAll(
+                () -> assertEquals(3, response.data().size()),
+                () -> assertEquals("aaa@example.com", response.data().get(0).email()),
+                () -> assertEquals("bbb@example.com", response.data().get(1).email()),
+                () -> assertEquals("ccc@example.com", response.data().get(2).email()),
+                () -> assertFalse(response.hasNext()),
+                () -> assertEquals(3L, response.totalCount()),
+                () -> assertNull(response.nextCursor()),
+                () -> assertNull(response.nextIdAfter()),
+                () -> assertEquals("email", response.sortBy()),
+                () -> assertEquals("ASCENDING", response.sortDirection())
+        );
+
+        verify(userRepository).findAll(any(
+                org.springframework.data.domain.Pageable.class
+        ));
+    }
+
+    @Test
+    @DisplayName("다음 페이지가 존재하면 마지막 사용자의 이메일과 ID를 커서로 반환한다")
+    void getUsers_firstPage_hasNext_returnsCursor() {
+        // given
+        User user1 = User.create("사용자A", "aaa@example.com", "encoded-password");
+        User user2 = User.create("사용자B", "bbb@example.com", "encoded-password");
+
+        UUID userId1 = UUID.randomUUID();
+        UUID userId2 = UUID.randomUUID();
+
+        ReflectionTestUtils.setField(user1, "id", userId1);
+        ReflectionTestUtils.setField(user2, "id", userId2);
+
+        var pageable = PageRequest.of(
+                0,
+                2,
+                Sort.by(Sort.Direction.ASC, "email")
+        );
+
+        var page = new PageImpl<>(
+                List.of(user1, user2),
+                pageable,
+                3
+        );
+
+        when(userRepository.findAll(pageable)).thenReturn(page);
+
+        // when
+        UserListResponse response = userService.getUsers(
+                null,
+                null,
+                2,
+                "email",
+                "ASCENDING",
+                null,
+                null,
+                null
+        );
+
+        // then
+        assertAll(
+                () -> assertEquals(2, response.data().size()),
+                () -> assertTrue(response.hasNext()),
+                () -> assertEquals(3L, response.totalCount()),
+                () -> assertEquals("bbb@example.com", response.nextCursor()),
+                () -> assertEquals(userId2, response.nextIdAfter()),
+                () -> assertEquals("email", response.sortBy()),
+                () -> assertEquals("ASCENDING", response.sortDirection())
+        );
+
+        verify(userRepository).findAll(pageable);
+    }
+
 
 }
