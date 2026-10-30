@@ -17,6 +17,10 @@ import static codeit.ootd.global.exception.ErrorCode.*;
 import java.time.Instant;
 import java.time.format.DateTimeParseException;
 import java.util.List;
+import java.util.Map;
+import java.util.LinkedHashMap;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.hibernate.exception.ConstraintViolationException;
@@ -97,9 +101,27 @@ public class FollowService {
         }
         List<Follow> rows = followQueryRepository.findList(userId, followings, after, idAfter, limit + 1, nameLike);
         boolean hasNext = rows.size() > limit;
-        List<FollowDto> data = rows.stream().limit(limit)
-            .map(f -> new FollowDto(f.getId(), summary(user(f.getFolloweeId())),
-                summary(user(f.getFollowerId()))))
+        List<Follow> page = rows.stream().limit(limit).toList();
+        List<UUID> ids = page.stream()
+            .flatMap(f -> java.util.stream.Stream.of(f.getFolloweeId(), f.getFollowerId()))
+            .distinct().toList();
+        Map<UUID, UserSummary> summaries = new LinkedHashMap<>();
+        if (!ids.isEmpty()) {
+            Map<UUID, User> users = userRepository.findAllById(ids).stream()
+                .collect(Collectors.toMap(User::getId, Function.identity()));
+            if (!users.keySet().containsAll(ids)) throw new OtbooException(FOLLOW_USER_NOT_FOUND);
+            Map<UUID, Profile> profiles = profileRepository.findByUserIdIn(ids).stream()
+                .collect(Collectors.toMap(Profile::getUserId, Function.identity()));
+            for (UUID id : ids) {
+                User user = users.get(id);
+                Profile profile = profiles.get(id);
+                summaries.put(id, new UserSummary(id, user.getName(),
+                    profile == null ? null : profile.getProfileImageUrl()));
+            }
+        }
+        List<FollowDto> data = page.stream()
+            .map(f -> new FollowDto(f.getId(), summaries.get(f.getFolloweeId()),
+                summaries.get(f.getFollowerId())))
             .toList();
         Follow last = hasNext ? rows.get(limit - 1) : null;
         long total = followQueryRepository.countList(userId, followings, nameLike);

@@ -12,10 +12,16 @@ spring:
   docker:
     compose:
       enabled: false
+  batch:
+    jdbc:
+      initialize-schema: always
 
 ootd:
   weather:
     openweathermap:
+      api-key: test-key
+  kakao:
+    local:
       api-key: test-key
 
 jwt:
