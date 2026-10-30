@@ -32,6 +32,8 @@ import org.springframework.transaction.annotation.Transactional;
 @RequiredArgsConstructor
 @Transactional(readOnly = true)
 public class FollowService {
+    private static final int MAX_LIMIT = 30;
+
     private final FollowRepository followRepository;
     private final FollowQueryRepository followQueryRepository;
     private final UserRepository userRepository;
@@ -84,7 +86,7 @@ public class FollowService {
 
     public FollowListResponse getList(UUID userId, boolean followings, String cursor,
         UUID idAfter, int limit, String nameLike) {
-        if (limit < 1 || limit == Integer.MAX_VALUE) throw new OtbooException(FOLLOW_INVALID_CURSOR);
+        if (limit < 1 || limit > MAX_LIMIT) throw new OtbooException(FOLLOW_INVALID_CURSOR);
         user(userId);
         Instant after = null;
         try {
@@ -93,10 +95,13 @@ public class FollowService {
             throw new OtbooException(FOLLOW_INVALID_CURSOR);
         }
         if (after != null && idAfter == null) throw new OtbooException(FOLLOW_INVALID_CURSOR);
-        if (after == null && idAfter != null) {
+        if (idAfter != null) {
             Follow anchor = followRepository.findById(idAfter)
                 .orElseThrow(() -> new OtbooException(FOLLOW_INVALID_CURSOR));
             if (!userId.equals(followings ? anchor.getFollowerId() : anchor.getFolloweeId())) {
+                throw new OtbooException(FOLLOW_INVALID_CURSOR);
+            }
+            if (after != null && !after.equals(anchor.getCreatedAt())) {
                 throw new OtbooException(FOLLOW_INVALID_CURSOR);
             }
             after = anchor.getCreatedAt();

@@ -20,6 +20,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
@@ -188,35 +189,41 @@ class FollowServiceTest {
         verifyNoInteractions(profiles);
     }
 
-    @Test
+    @ParameterizedTest
+    @ValueSource(booleans = {true, false})
     @DisplayName("검색어와 커서는 목록 조회에 전달하고 전체 개수에는 검색어만 전달한다")
-    void getList_passesSearchAndCursor() {
-        when(users.findById(me)).thenReturn(Optional.of(user(me)));
-        Instant cursor = Instant.parse("2026-10-27T00:00:00Z");
-        UUID idAfter = UUID.randomUUID();
+    void getList_passesSearchAndCursor(boolean followings) {
+        UUID userId = followings ? me : target;
+        when(users.findById(userId)).thenReturn(Optional.of(user(userId)));
+        Follow anchor = follow();
+        Instant cursor = anchor.getCreatedAt();
+        UUID idAfter = anchor.getId();
+        when(follows.findById(idAfter)).thenReturn(Optional.of(anchor));
         String nameLike = "A%_!";
-        when(queries.findList(me, true, cursor, idAfter, 11, nameLike))
+        when(queries.findList(userId, followings, cursor, idAfter, 11, nameLike))
             .thenReturn(List.of());
-        service.getList(me, true, cursor.toString(), idAfter, 10, "A%_!");
-        verify(queries).findList(me, true, cursor, idAfter, 11, nameLike);
-        verify(queries).countList(me, true, nameLike);
+        service.getList(userId, followings, cursor.toString(), idAfter, 10, nameLike);
+        verify(queries).findList(userId, followings, cursor, idAfter, 11, nameLike);
+        verify(queries).countList(userId, followings, nameLike);
     }
 
-    @Test
-    @DisplayName("팔로워 조회는 idAfter의 생성 시간을 커서로 사용한다")
-    void getList_followersResolvesIdOnlyCursor() {
-        when(users.findById(target)).thenReturn(Optional.of(user(target)));
+    @ParameterizedTest
+    @ValueSource(booleans = {true, false})
+    @DisplayName("팔로잉과 팔로워 조회는 idAfter의 생성 시간을 커서로 사용한다")
+    void getList_resolvesIdOnlyCursor(boolean followings) {
+        UUID userId = followings ? me : target;
+        when(users.findById(userId)).thenReturn(Optional.of(user(userId)));
         when(users.findAllById(List.of(target, me))).thenReturn(List.of(user(me), user(target)));
         Follow anchor = follow();
         when(follows.findById(anchor.getId())).thenReturn(Optional.of(anchor));
-        when(queries.findList(target, false, anchor.getCreatedAt(), anchor.getId(), 11, null))
+        when(queries.findList(userId, followings, anchor.getCreatedAt(), anchor.getId(), 11, null))
             .thenReturn(List.of(anchor));
-        var dto = service.getList(target, false, null, anchor.getId(), 10, null);
+        var dto = service.getList(userId, followings, null, anchor.getId(), 10, null);
         assertEquals(anchor.getId(), dto.data().get(0).id());
         assertEquals(target, dto.data().get(0).followee().userId());
         assertEquals(me, dto.data().get(0).follower().userId());
         assertFalse(dto.hasNext());
-        verify(queries).countList(target, false, null);
+        verify(queries).countList(userId, followings, null);
     }
 
     @ParameterizedTest
@@ -286,12 +293,75 @@ class FollowServiceTest {
         verifyNoInteractions(follows, queries);
     }
 
-    @Test
-    @DisplayName("조회 개수가 0이면 유효하지 않은 커서 예외가 발생한다")
-    void getList_rejectsInvalidLimit() {
+    @ParameterizedTest
+    @CsvSource({"true, true", "true, false", "false, true", "false, false"})
+    @DisplayName("시간 커서 유무와 관계없이 존재하지 않는 idAfter를 거부한다")
+    void getList_rejectsMissingAnchor(boolean followings, boolean withCursor) {
+        when(users.findById(me)).thenReturn(Optional.of(user(me)));
+        String cursor = withCursor ? "2026-10-27T00:00:00Z" : null;
+
         assertEquals(FOLLOW_INVALID_CURSOR,
-            assertThrows(OtbooException.class, () -> service.getList(me, true, null, null, 0, null)).getErrorCode());
+            assertThrows(OtbooException.class,
+                () -> service.getList(me, followings, cursor, UUID.randomUUID(), 10, null)).getErrorCode());
+        verifyNoInteractions(queries);
+    }
+
+    @ParameterizedTest
+    @CsvSource({"true, true", "true, false", "false, true", "false, false"})
+    @DisplayName("시간 커서 유무와 관계없이 조회 대상의 목록에 속하지 않는 idAfter를 거부한다")
+    void getList_rejectsUnrelatedAnchor(boolean followings, boolean withCursor) {
+        UUID userId = followings ? target : me;
+        when(users.findById(userId)).thenReturn(Optional.of(user(userId)));
+        Follow anchor = follow();
+        when(follows.findById(anchor.getId())).thenReturn(Optional.of(anchor));
+        String cursor = withCursor ? anchor.getCreatedAt().toString() : null;
+
+        assertEquals(FOLLOW_INVALID_CURSOR,
+            assertThrows(OtbooException.class,
+                () -> service.getList(userId, followings, cursor, anchor.getId(), 10, null)).getErrorCode());
+        verifyNoInteractions(queries);
+    }
+
+    @ParameterizedTest
+    @ValueSource(booleans = {true, false})
+    @DisplayName("시간 커서가 idAfter의 실제 생성 시간과 다르면 거부한다")
+    void getList_rejectsMismatchedCursor(boolean followings) {
+        UUID userId = followings ? me : target;
+        when(users.findById(userId)).thenReturn(Optional.of(user(userId)));
+        Follow anchor = follow();
+        when(follows.findById(anchor.getId())).thenReturn(Optional.of(anchor));
+        String cursor = anchor.getCreatedAt().plusNanos(1).toString();
+
+        assertEquals(FOLLOW_INVALID_CURSOR,
+            assertThrows(OtbooException.class,
+                () -> service.getList(userId, followings, cursor, anchor.getId(), 10, null)).getErrorCode());
+        verifyNoInteractions(queries);
+    }
+
+    @ParameterizedTest
+    @ValueSource(ints = {Integer.MIN_VALUE, -1, 0, 101, Integer.MAX_VALUE - 1, Integer.MAX_VALUE})
+    @DisplayName("조회 개수가 1~100 범위를 벗어나면 DB 조회 전에 거부한다")
+    void getList_rejectsInvalidLimit(int limit) {
+        for (boolean followings : List.of(true, false)) {
+            assertEquals(FOLLOW_INVALID_CURSOR,
+                assertThrows(OtbooException.class,
+                    () -> service.getList(me, followings, null, null, limit, null)).getErrorCode());
+        }
         verifyNoInteractions(users, follows, queries);
+    }
+
+    @ParameterizedTest
+    @CsvSource({"true, 1", "true, 100", "false, 1", "false, 100"})
+    @DisplayName("조회 개수의 최솟값과 최댓값을 허용하고 다음 페이지 확인을 위해 한 건 더 조회한다")
+    void getList_acceptsLimitBoundaries(boolean followings, int limit) {
+        when(users.findById(me)).thenReturn(Optional.of(user(me)));
+        when(queries.findList(me, followings, null, null, limit + 1, null)).thenReturn(List.of());
+
+        var dto = service.getList(me, followings, null, null, limit, null);
+
+        assertTrue(dto.data().isEmpty());
+        assertFalse(dto.hasNext());
+        verify(queries).findList(me, followings, null, null, limit + 1, null);
     }
 
     @Test
