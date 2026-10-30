@@ -1,6 +1,8 @@
 package codeit.ootd.domain.user.controller;
 
 import codeit.ootd.domain.user.dto.request.UserCreateRequest;
+import codeit.ootd.domain.user.dto.response.UserDto;
+import codeit.ootd.domain.user.entity.UserRole;
 import codeit.ootd.domain.user.exception.DuplicateEmailException;
 import codeit.ootd.domain.user.service.UserService;
 import codeit.ootd.global.exception.GlobalExceptionHandler;
@@ -18,9 +20,13 @@ import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.validation.beanvalidation.LocalValidatorFactoryBean;
 import tools.jackson.databind.json.JsonMapper;
 
+import java.time.Instant;
+import java.util.UUID;
+
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
+import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -59,16 +65,36 @@ class UserControllerTest {
     }
 
     @Test
-    @DisplayName("정상적인 회원가입 요청은 Service로 전달된다")
+    @DisplayName("회원가입 성공 시 201과 사용자 정보를 반환한다")
     void signup_success() throws Exception {
         // given
         UserCreateRequest request = validRequest();
+        UUID userId = UUID.randomUUID();
+        Instant createdAt = Instant.parse("2026-10-27T00:00:00Z");
+
+        UserDto response = new UserDto(
+                userId,
+                createdAt,
+                "test@example.com",
+                "테스트사용자",
+                UserRole.USER,
+                false
+        );
+
+        when(userService.signup(request)).thenReturn(response);
 
         // when & then
         mockMvc.perform(post("/api/users")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(request)))
-                .andExpect(status().isCreated());
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.id").value(userId.toString()))
+                .andExpect(jsonPath("$.createdAt").exists())
+                .andExpect(jsonPath("$.email").value("test@example.com"))
+                .andExpect(jsonPath("$.name").value("테스트사용자"))
+                .andExpect(jsonPath("$.role").value("USER"))
+                .andExpect(jsonPath("$.locked").value(false))
+                .andExpect(jsonPath("$.password").doesNotExist());
 
         verify(userService).signup(request);
     }
@@ -223,6 +249,44 @@ class UserControllerTest {
                 "test@example.com",
                 "password123!"
         );
+    }
+
+    @Test
+    @DisplayName("비밀번호가 72바이트를 초과하면 400 Bad Request를 반환한다")
+    void signup_passwordOver72Bytes_returnsBadRequest() throws Exception {
+        // given
+        UserCreateRequest request = new UserCreateRequest(
+                "테스트사용자",
+                "test@example.com",
+                "a".repeat(73)
+        );
+
+        // when & then
+        mockMvc.perform(post("/api/users")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isBadRequest());
+
+        verifyNoInteractions(userService);
+    }
+
+    @Test
+    @DisplayName("한글 비밀번호가 72바이트를 초과하면 400 Bad Request를 반환한다")
+    void signup_koreanPasswordOver72Bytes_returnsBadRequest() throws Exception {
+        // given
+        UserCreateRequest request = new UserCreateRequest(
+                "테스트사용자",
+                "test@example.com",
+                "가".repeat(25)
+        );
+
+        // when & then
+        mockMvc.perform(post("/api/users")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isBadRequest());
+
+        verifyNoInteractions(userService);
     }
 
 

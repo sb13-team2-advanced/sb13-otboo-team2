@@ -1,6 +1,7 @@
 package codeit.ootd.domain.user.controller;
 
 import codeit.ootd.domain.user.dto.request.UserCreateRequest;
+import codeit.ootd.domain.user.dto.response.UserDto;
 import codeit.ootd.domain.user.service.UserService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -21,13 +22,12 @@ public class UserController {
     private final UserService userService;
 
     @PostMapping
-    public ResponseEntity<Void> signup(@Valid @RequestBody UserCreateRequest request) {
+    public ResponseEntity<UserDto> signup(
+            @Valid @RequestBody UserCreateRequest request
+    ) {
+        UserDto response = userService.signup(request);
 
-        userService.signup(request);
-
-        log.info("회원가입 요청 처리 완료");
-
-        return ResponseEntity.status(HttpStatus.CREATED).build();
+        return ResponseEntity.status(HttpStatus.CREATED).body(response);
     }
 
 }

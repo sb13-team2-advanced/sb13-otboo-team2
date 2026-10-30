@@ -60,5 +60,17 @@ public class User extends BaseTimeEntity {
 
         return user;
     }
+
+    public void lock() {
+        this.locked = true;
+    }
+
+    public void deactivate() {
+        this.status = UserStatus.DEACTIVATED;
+    }
+
+    public void markDeleted() {
+        this.status = UserStatus.DELETED;
+    }
 }
 
