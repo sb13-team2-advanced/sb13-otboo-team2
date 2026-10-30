@@ -22,6 +22,7 @@ import codeit.ootd.domain.weather.mapper.WeatherDtoMapper;
 import codeit.ootd.domain.weather.repository.WeatherRepository;
 import codeit.ootd.global.exception.ErrorCode;
 import codeit.ootd.global.exception.OtbooException;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -69,6 +70,15 @@ public class FeedServiceImpl implements FeedService {
 
         if (clothes.size() != request.clothesIds().size()) {
             throw new OtbooException(ErrorCode.FEED_CLOTHES_NOT_FOUND);
+        }
+
+        boolean containsOthersClothes = clothes.stream()
+                .anyMatch(clothing ->
+                        !request.authorId().equals(clothing.getUserId())
+                );
+
+        if (containsOthersClothes) {
+            throw new OtbooException(ErrorCode.ACCESS_DENIED);
         }
 
         Weather previousWeather = weatherRepository
@@ -119,6 +129,11 @@ public class FeedServiceImpl implements FeedService {
                 || request.content().isBlank()
                 || request.clothesIds() == null
                 || request.clothesIds().stream().anyMatch(Objects::isNull)) {
+            throw new OtbooException(ErrorCode.FEED_CREATE_INVALID_REQUEST);
+        }
+
+        if (new HashSet<>(request.clothesIds()).size()
+                != request.clothesIds().size()) {
             throw new OtbooException(ErrorCode.FEED_CREATE_INVALID_REQUEST);
         }
     }

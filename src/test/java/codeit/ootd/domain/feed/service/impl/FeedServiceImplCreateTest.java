@@ -143,6 +143,8 @@ class FeedServiceImplCreateTest {
 
         when(firstClothes.getId()).thenReturn(firstClothesId);
         when(secondClothes.getId()).thenReturn(secondClothesId);
+        when(firstClothes.getUserId()).thenReturn(authorId);
+        when(secondClothes.getUserId()).thenReturn(authorId);
 
         // DB 조회 결과의 순서는 요청 순서와 다를 수 있다.
         when(clothesRepository.findAllById(request.clothesIds()))
