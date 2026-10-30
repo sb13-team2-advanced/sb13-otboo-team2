@@ -60,12 +60,12 @@ class OutfitRecommenderTest {
     }
 
     /**
-     * 기본 코디와 함께 모든 부가 종류에서 최적 두께의 의상을 한 벌씩 추가한다.
+     * 추천 대상이 아닌 부가 의상은 두께와 관계없이 제외한다.
      */
     @ParameterizedTest
-    @EnumSource(value = ClothesType.class, names = {"UNDERWEAR", "ACCESSORY", "SHOES",
+    @EnumSource(value = ClothesType.class, names = {"UNDERWEAR", "ACCESSORY",
             "SOCKS", "HAT", "BAG", "SCARF", "ETC"})
-    void 부가_종류도_한_벌씩_추천한다(ClothesType type) {
+    void 부가_의상은_추천에서_제외한다(ClothesType type) {
         // given
         RecommendationClothesResponse dress = item(ClothesType.DRESS, "보통");
         RecommendationClothesResponse suitable = item(type, "보통");
@@ -76,7 +76,7 @@ class OutfitRecommenderTest {
                 List.of(dress, suitable, unsuitable));
 
         // then
-        assertThat(result).containsExactly(dress, suitable);
+        assertThat(result).containsExactly(dress);
     }
 
     /**
@@ -104,8 +104,8 @@ class OutfitRecommenderTest {
             List<RecommendationClothesResponse> onePiece = recommender.recommend(15, clothes);
 
             // then
-            assertThat(separates).containsExactly(top, bottom, outer, underwear, accessory, shoes);
-            assertThat(onePiece).containsExactly(dress, outer, underwear, accessory, shoes);
+            assertThat(separates).containsExactly(top, bottom, outer, shoes);
+            assertThat(onePiece).containsExactly(dress, outer, shoes);
         }
     }
 
@@ -123,6 +123,40 @@ class OutfitRecommenderTest {
 
         // then
         assertThat(result).isEmpty();
+    }
+
+    /**
+     * 추운 날 얇은 원피스보다 두꺼운 상하의 조합을 우선한다.
+     */
+    @Test
+    void 원피스보다_상하의의_두께가_적합하면_상하의를_선택한다() {
+        // given
+        RecommendationClothesResponse top = item(ClothesType.TOP, "두꺼움");
+        RecommendationClothesResponse bottom = item(ClothesType.BOTTOM, "두꺼움");
+        RecommendationClothesResponse dress = item(ClothesType.DRESS, "얇음");
+
+        // when
+        List<RecommendationClothesResponse> result = recommender.recommend(5, List.of(top, bottom, dress));
+
+        // then
+        assertThat(result).containsExactly(top, bottom);
+    }
+
+    /**
+     * 상하의 차이 평균의 소수 부분을 유지하여 더 적합한 원피스를 선택한다.
+     */
+    @Test
+    void 상하의_차이의_평균보다_원피스_차이가_작으면_원피스를_선택한다() {
+        // given
+        RecommendationClothesResponse top = item(ClothesType.TOP, "보통");
+        RecommendationClothesResponse bottom = item(ClothesType.BOTTOM, "얇음");
+        RecommendationClothesResponse dress = item(ClothesType.DRESS, "보통");
+
+        // when
+        List<RecommendationClothesResponse> result = recommender.recommend(5, List.of(top, bottom, dress));
+
+        // then
+        assertThat(result).containsExactly(dress);
     }
 
     private static RecommendationClothesResponse item(ClothesType type, String thickness) {
