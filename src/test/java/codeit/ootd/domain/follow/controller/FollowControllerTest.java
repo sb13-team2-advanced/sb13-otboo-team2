@@ -13,6 +13,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
 
@@ -21,7 +22,7 @@ class FollowControllerTest {
     @Mock FollowService service;
     @InjectMocks FollowController controller;
     private final UUID me = UUID.randomUUID();
-    private final Principal principal = () -> "me@example.com";
+    private final Principal principal = new UsernamePasswordAuthenticationToken(me, null, List.of());
 
     @Test
     @DisplayName("팔로우 생성 시 201 상태 코드와 팔로우 정보를 반환한다")
@@ -33,6 +34,7 @@ class FollowControllerTest {
         var response = controller.createFollow(request, principal);
         assertEquals(201, response.getStatusCode().value());
         assertSame(dto, response.getBody());
+        verify(service).currentUserId(me.toString());
     }
 
     @Test
@@ -45,6 +47,7 @@ class FollowControllerTest {
         var response = controller.getFollowSummary(target, principal);
         assertEquals(200, response.getStatusCode().value());
         assertSame(dto, response.getBody());
+        verify(service).currentUserId(me.toString());
     }
 
     @Test
@@ -76,5 +79,6 @@ class FollowControllerTest {
         var response = controller.cancelFollow(id, principal);
         assertEquals(204, response.getStatusCode().value());
         verify(service).cancel(id, me);
+        verify(service).currentUserId(me.toString());
     }
 }

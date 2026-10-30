@@ -54,10 +54,19 @@ class FollowServiceTest {
     }
 
     @Test
-    @DisplayName("이메일로 현재 사용자의 ID를 조회한다")
+    @DisplayName("principal의 UUID를 현재 사용자 ID로 사용한다")
     void currentUserId_returnsUserId() {
-        when(users.findByEmail("me@example.com")).thenReturn(Optional.of(user(me)));
-        assertEquals(me, service.currentUserId("me@example.com"));
+        assertEquals(me, service.currentUserId(me.toString()));
+        verifyNoInteractions(users);
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"me@example.com", "", "invalid-uuid"})
+    @DisplayName("principal이 UUID 형식이 아니면 인증 필요 예외가 발생한다")
+    void currentUserId_rejectsInvalidPrincipal(String principalName) {
+        assertEquals(AUTHENTICATION_REQUIRED,
+            assertThrows(OtbooException.class, () -> service.currentUserId(principalName)).getErrorCode());
+        verifyNoInteractions(users);
     }
 
     @Test

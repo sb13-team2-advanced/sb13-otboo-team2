@@ -37,11 +37,13 @@ public class FollowService {
     private final UserRepository userRepository;
     private final ProfileRepository profileRepository;
 
-    // 인증 구현과 연결할 때 Principal의 이름을 이메일로 제공
-    public UUID currentUserId(String username) {
-        if (username == null) throw new OtbooException(AUTHENTICATION_REQUIRED);
-        return userRepository.findByEmail(username).map(User::getId)
-            .orElseThrow(() -> new OtbooException(AUTHENTICATION_REQUIRED));
+    public UUID currentUserId(String userId) {
+        if (userId == null) throw new OtbooException(AUTHENTICATION_REQUIRED);
+        try {
+            return UUID.fromString(userId);
+        } catch (IllegalArgumentException exception) {
+            throw new OtbooException(AUTHENTICATION_REQUIRED);
+        }
     }
 
     @Transactional
