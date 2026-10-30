@@ -164,7 +164,7 @@ class FeedServiceImplCreateTest {
         when(feedResponseAssembler.toOotdDto(secondClothes))
                 .thenReturn(secondOotd);
 
-        FeedDto result = feedService.create(request);
+        FeedDto result = feedService.create(request, request.authorId());
 
         verify(weatherDtoMapper).toDto(weather, previousWeather, null);
         verify(feedRepository).save(feedCaptor.capture());

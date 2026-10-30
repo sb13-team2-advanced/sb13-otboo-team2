@@ -48,10 +48,18 @@ public class FeedServiceImpl implements FeedService {
 
     @Override
     @Transactional
-    public FeedDto create(FeedCreateRequest request) {
+    public FeedDto create(FeedCreateRequest request, UUID userId) {
+        if (userId == null) {
+            throw new OtbooException(ErrorCode.AUTHENTICATION_REQUIRED);
+        }
+
         validateRequest(request);
 
-        User author = userRepository.findById(request.authorId())
+        if (!userId.equals(request.authorId())) {
+            throw new OtbooException(ErrorCode.ACCESS_DENIED);
+        }
+
+        User author = userRepository.findById(userId)
                 .orElseThrow(
                         () -> new OtbooException(
                                 ErrorCode.FEED_AUTHOR_NOT_FOUND
@@ -74,7 +82,7 @@ public class FeedServiceImpl implements FeedService {
 
         boolean containsOthersClothes = clothes.stream()
                 .anyMatch(clothing ->
-                        !request.authorId().equals(clothing.getUserId())
+                        !userId.equals(clothing.getUserId())
                 );
 
         if (containsOthersClothes) {
