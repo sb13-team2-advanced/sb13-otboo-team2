@@ -17,6 +17,10 @@ import static codeit.ootd.global.exception.ErrorCode.*;
 import java.time.Instant;
 import java.time.format.DateTimeParseException;
 import java.util.List;
+import java.util.Map;
+import java.util.LinkedHashMap;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.hibernate.exception.ConstraintViolationException;
@@ -28,21 +32,26 @@ import org.springframework.transaction.annotation.Transactional;
 @RequiredArgsConstructor
 @Transactional(readOnly = true)
 public class FollowService {
+    private static final int MAX_LIMIT = 30;
+
     private final FollowRepository followRepository;
     private final FollowQueryRepository followQueryRepository;
     private final UserRepository userRepository;
     private final ProfileRepository profileRepository;
 
-    // 인증 구현과 연결할 때 Principal의 이름을 이메일로 제공
-    public UUID currentUserId(String username) {
-        if (username == null) throw new OtbooException(AUTHENTICATION_REQUIRED);
-        return userRepository.findByEmail(username).map(User::getId)
-            .orElseThrow(() -> new OtbooException(AUTHENTICATION_REQUIRED));
+    public UUID currentUserId(String userId) {
+        if (userId == null) throw new OtbooException(AUTHENTICATION_REQUIRED);
+        try {
+            return UUID.fromString(userId);
+        } catch (IllegalArgumentException exception) {
+            throw new OtbooException(AUTHENTICATION_REQUIRED);
+        }
     }
 
     @Transactional
     public FollowDto create(FollowCreateRequest request, UUID currentUserId) {
         if (!currentUserId.equals(request.followerId())) throw new OtbooException(ACCESS_DENIED);
+        if (request.followerId().equals(request.followeeId())) throw new OtbooException(FOLLOW_SELF_NOT_ALLOWED);
         User follower = user(request.followerId());
         User followee = user(request.followeeId());
         if (followRepository.existsByFollowerIdAndFolloweeId(follower.getId(), followee.getId())) {
@@ -77,7 +86,7 @@ public class FollowService {
 
     public FollowListResponse getList(UUID userId, boolean followings, String cursor,
         UUID idAfter, int limit, String nameLike) {
-        if (limit < 1 || limit == Integer.MAX_VALUE) throw new OtbooException(FOLLOW_INVALID_CURSOR);
+        if (limit < 1 || limit > MAX_LIMIT) throw new OtbooException(FOLLOW_INVALID_CURSOR);
         user(userId);
         Instant after = null;
         try {
@@ -85,19 +94,41 @@ public class FollowService {
         } catch (DateTimeParseException exception) {
             throw new OtbooException(FOLLOW_INVALID_CURSOR);
         }
-        if (after == null && idAfter != null) {
+        if (after != null && idAfter == null) throw new OtbooException(FOLLOW_INVALID_CURSOR);
+        if (idAfter != null) {
             Follow anchor = followRepository.findById(idAfter)
                 .orElseThrow(() -> new OtbooException(FOLLOW_INVALID_CURSOR));
             if (!userId.equals(followings ? anchor.getFollowerId() : anchor.getFolloweeId())) {
+                throw new OtbooException(FOLLOW_INVALID_CURSOR);
+            }
+            if (after != null && !after.equals(anchor.getCreatedAt())) {
                 throw new OtbooException(FOLLOW_INVALID_CURSOR);
             }
             after = anchor.getCreatedAt();
         }
         List<Follow> rows = followQueryRepository.findList(userId, followings, after, idAfter, limit + 1, nameLike);
         boolean hasNext = rows.size() > limit;
-        List<FollowDto> data = rows.stream().limit(limit)
-            .map(f -> new FollowDto(f.getId(), summary(user(f.getFolloweeId())),
-                summary(user(f.getFollowerId()))))
+        List<Follow> page = rows.stream().limit(limit).toList();
+        List<UUID> ids = page.stream()
+            .flatMap(f -> java.util.stream.Stream.of(f.getFolloweeId(), f.getFollowerId()))
+            .distinct().toList();
+        Map<UUID, UserSummary> summaries = new LinkedHashMap<>();
+        if (!ids.isEmpty()) {
+            Map<UUID, User> users = userRepository.findAllById(ids).stream()
+                .collect(Collectors.toMap(User::getId, Function.identity()));
+            if (!users.keySet().containsAll(ids)) throw new OtbooException(FOLLOW_USER_NOT_FOUND);
+            Map<UUID, Profile> profiles = profileRepository.findByUserIdIn(ids).stream()
+                .collect(Collectors.toMap(Profile::getUserId, Function.identity()));
+            for (UUID id : ids) {
+                User user = users.get(id);
+                Profile profile = profiles.get(id);
+                summaries.put(id, new UserSummary(id, user.getName(),
+                    profile == null ? null : profile.getProfileImageUrl()));
+            }
+        }
+        List<FollowDto> data = page.stream()
+            .map(f -> new FollowDto(f.getId(), summaries.get(f.getFolloweeId()),
+                summaries.get(f.getFollowerId())))
             .toList();
         Follow last = hasNext ? rows.get(limit - 1) : null;
         long total = followQueryRepository.countList(userId, followings, nameLike);
