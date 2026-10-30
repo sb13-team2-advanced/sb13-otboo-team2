@@ -23,6 +23,7 @@ import codeit.ootd.domain.user.entity.UserRole;
 import codeit.ootd.domain.user.entity.UserStatus;
 import codeit.ootd.domain.user.repository.UserRepository;
 import codeit.ootd.global.exception.ErrorCode;
+import codeit.ootd.global.exception.OtbooException;
 import jakarta.servlet.http.Cookie;
 import java.time.Instant;
 import java.util.List;
@@ -67,7 +68,7 @@ class FeedControllerSecurityTest {
     private FeedService feedService;
 
     @Test
-    @DisplayName("유효한 JWT와 CSRF 토큰으로 본인 피드를 등록한다")
+    @DisplayName("유효한 JWT의 사용자 ID를 Service에 전달하고 등록한다")
     void createsFeedWithValidAuthentication() throws Exception {
         UUID userId = UUID.randomUUID();
         UUID feedId = UUID.randomUUID();
@@ -88,7 +89,7 @@ class FeedControllerSecurityTest {
                 false
         );
 
-        when(feedService.create(request)).thenReturn(response);
+        when(feedService.create(request, userId)).thenReturn(response);
 
         mockMvc.perform(postWithCsrf(request)
                         .header("Authorization", "Bearer " + token))
@@ -98,7 +99,7 @@ class FeedControllerSecurityTest {
                         .value(userId.toString()))
                 .andExpect(jsonPath("$.content").value(request.content()));
 
-        verify(feedService).create(request);
+        verify(feedService).create(request, userId);
     }
 
     @Test
@@ -127,11 +128,15 @@ class FeedControllerSecurityTest {
     }
 
     @Test
-    @DisplayName("JWT의 사용자와 작성자 ID가 다르면 403으로 거절한다")
-    void rejectsDifferentAuthor() throws Exception {
+    @DisplayName("JWT 사용자 ID를 Service에 전달하고 작성자 불일치 예외를 403으로 반환한다")
+    void returnsAuthorMismatchFromService() throws Exception {
         UUID userId = UUID.randomUUID();
         String token = validAccessToken(userId);
         FeedCreateRequest request = request(UUID.randomUUID());
+
+        when(feedService.create(request, userId)).thenThrow(
+                new OtbooException(ErrorCode.ACCESS_DENIED)
+        );
 
         mockMvc.perform(postWithCsrf(request)
                         .header("Authorization", "Bearer " + token))
@@ -140,17 +145,14 @@ class FeedControllerSecurityTest {
                         ErrorCode.ACCESS_DENIED.getMessage()
                 ));
 
-        verifyNoInteractions(feedService);
+        verify(feedService).create(request, userId);
     }
 
     @Test
-    @DisplayName("JWT가 있어도 CSRF 토큰이 없으면 403으로 거절한다")
+    @DisplayName("유효한 JWT와 사용자·세션을 준비해도 CSRF가 없으면 403으로 거절한다")
     void rejectsMissingCsrf() throws Exception {
         UUID userId = UUID.randomUUID();
-        String token = jwtProvider.generateAccessToken(
-                userId,
-                UUID.randomUUID()
-        );
+        String token = validAccessToken(userId);
 
         mockMvc.perform(post("/api/feeds")
                         .header("Authorization", "Bearer " + token)

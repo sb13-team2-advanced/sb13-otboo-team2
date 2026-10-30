@@ -67,7 +67,7 @@ class FeedServiceImplTest {
 
         OtbooException exception = assertThrows(
                 OtbooException.class,
-                () -> feedService.create(request)
+                () -> feedService.create(request, request.authorId())
         );
 
         assertThat(exception.getErrorCode())
@@ -103,7 +103,7 @@ class FeedServiceImplTest {
 
         OtbooException exception = assertThrows(
                 OtbooException.class,
-                () -> feedService.create(request)
+                () -> feedService.create(request, request.authorId())
         );
 
         assertThat(exception.getErrorCode())
@@ -146,7 +146,7 @@ class FeedServiceImplTest {
 
         OtbooException exception = assertThrows(
                 OtbooException.class,
-                () -> feedService.create(request)
+                () -> feedService.create(request, request.authorId())
         );
 
         assertThat(exception.getErrorCode())

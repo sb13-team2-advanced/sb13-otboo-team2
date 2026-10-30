@@ -68,7 +68,7 @@ class FeedControllerTest {
     }
 
     @Test
-    @DisplayName("본인 명의로 등록하면 201과 피드 응답을 반환한다")
+    @DisplayName("인증된 사용자 ID를 Service에 전달하고 201과 피드를 반환한다")
     void createReturnsCreatedFeed() throws Exception {
         UUID userId = UUID.randomUUID();
         UUID feedId = UUID.randomUUID();
@@ -89,7 +89,7 @@ class FeedControllerTest {
         );
 
         authenticate(userId);
-        when(feedService.create(request)).thenReturn(response);
+        when(feedService.create(request, userId)).thenReturn(response);
 
         mockMvc.perform(post(URL)
                         .contentType(MediaType.APPLICATION_JSON)
@@ -105,13 +105,17 @@ class FeedControllerTest {
                 .andExpect(jsonPath("$.commentCount").value(0))
                 .andExpect(jsonPath("$.likedByMe").value(false));
 
-        verify(feedService).create(request);
+        verify(feedService).create(request, userId);
     }
 
     @Test
-    @DisplayName("로그인 정보가 없으면 401로 거절한다")
-    void rejectsMissingAuthentication() throws Exception {
+    @DisplayName("Service의 인증 정보 누락 예외를 401로 반환한다")
+    void returnsUnauthorizedFromService() throws Exception {
         FeedCreateRequest request = request(UUID.randomUUID());
+
+        when(feedService.create(request, null)).thenThrow(
+                new OtbooException(ErrorCode.AUTHENTICATION_REQUIRED)
+        );
 
         mockMvc.perform(post(URL)
                         .contentType(MediaType.APPLICATION_JSON)
@@ -121,15 +125,19 @@ class FeedControllerTest {
                         ErrorCode.AUTHENTICATION_REQUIRED.getMessage()
                 ));
 
-        verifyNoInteractions(feedService);
+        verify(feedService).create(request, null);
     }
 
     @Test
-    @DisplayName("로그인 사용자와 작성자가 다르면 403으로 거절한다")
-    void rejectsDifferentAuthor() throws Exception {
+    @DisplayName("요청 작성자와 별개로 인증된 ID를 전달하고 거절 응답을 반환한다")
+    void passesAuthenticatedUserIdForDifferentAuthor() throws Exception {
         UUID userId = UUID.randomUUID();
         FeedCreateRequest request = request(UUID.randomUUID());
         authenticate(userId);
+
+        when(feedService.create(request, userId)).thenThrow(
+                new OtbooException(ErrorCode.ACCESS_DENIED)
+        );
 
         mockMvc.perform(post(URL)
                         .contentType(MediaType.APPLICATION_JSON)
@@ -139,14 +147,19 @@ class FeedControllerTest {
                         ErrorCode.ACCESS_DENIED.getMessage()
                 ));
 
-        verifyNoInteractions(feedService);
+        verify(feedService).create(request, userId);
     }
 
     @Test
-    @DisplayName("작성자 ID가 없으면 400으로 거절한다")
-    void rejectsMissingAuthorId() throws Exception {
-        authenticate(UUID.randomUUID());
+    @DisplayName("Service의 잘못된 요청 예외를 400으로 반환한다")
+    void returnsInvalidRequestFromService() throws Exception {
+        UUID userId = UUID.randomUUID();
+        authenticate(userId);
         FeedCreateRequest request = request(null);
+
+        when(feedService.create(request, userId)).thenThrow(
+                new OtbooException(ErrorCode.FEED_CREATE_INVALID_REQUEST)
+        );
 
         mockMvc.perform(post(URL)
                         .contentType(MediaType.APPLICATION_JSON)
@@ -156,11 +169,11 @@ class FeedControllerTest {
                         ErrorCode.FEED_CREATE_INVALID_REQUEST.getMessage()
                 ));
 
-        verifyNoInteractions(feedService);
+        verify(feedService).create(request, userId);
     }
 
     @Test
-    @DisplayName("요청 본문이 없으면 400으로 거절한다")
+    @DisplayName("요청 본문이 없으면 Service 호출 전에 400으로 거절한다")
     void rejectsMissingBody() throws Exception {
         authenticate(UUID.randomUUID());
 
@@ -175,7 +188,7 @@ class FeedControllerTest {
     }
 
     @Test
-    @DisplayName("UUID 형식이 잘못되면 400으로 거절한다")
+    @DisplayName("UUID 형식이 잘못되면 Service 호출 전에 400으로 거절한다")
     void rejectsMalformedUuid() throws Exception {
         authenticate(UUID.randomUUID());
 
@@ -197,13 +210,13 @@ class FeedControllerTest {
     }
 
     @Test
-    @DisplayName("서비스에서 날씨를 찾지 못하면 400 오류 응답을 반환한다")
+    @DisplayName("Service의 날씨 조회 실패 예외를 400으로 반환한다")
     void returnsServiceError() throws Exception {
         UUID userId = UUID.randomUUID();
         FeedCreateRequest request = request(userId);
         authenticate(userId);
 
-        when(feedService.create(request)).thenThrow(
+        when(feedService.create(request, userId)).thenThrow(
                 new OtbooException(ErrorCode.FEED_WEATHER_NOT_FOUND)
         );
 
@@ -217,7 +230,7 @@ class FeedControllerTest {
                         ErrorCode.FEED_WEATHER_NOT_FOUND.getMessage()
                 ));
 
-        verify(feedService).create(request);
+        verify(feedService).create(request, userId);
     }
 
     private FeedCreateRequest request(UUID authorId) {

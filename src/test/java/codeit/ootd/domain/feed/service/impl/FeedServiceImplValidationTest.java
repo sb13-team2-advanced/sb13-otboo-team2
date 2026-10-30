@@ -17,6 +17,7 @@ import java.util.List;
 import java.util.UUID;
 import java.util.stream.Stream;
 import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
@@ -28,6 +29,12 @@ import org.mockito.junit.jupiter.MockitoExtension;
 @ExtendWith(MockitoExtension.class)
 @DisplayName("피드 등록 요청 검증 테스트")
 class FeedServiceImplValidationTest {
+
+    private static final UUID USER_ID =
+            UUID.fromString("00000000-0000-0000-0000-000000000001");
+
+    private static final UUID OTHER_USER_ID =
+            UUID.fromString("00000000-0000-0000-0000-000000000002");
 
     @Mock
     private UserRepository userRepository;
@@ -56,12 +63,48 @@ class FeedServiceImplValidationTest {
     ) {
         OtbooException exception = assertThrows(
                 OtbooException.class,
-                () -> feedService.create(request)
+                () -> feedService.create(request, USER_ID)
         );
 
         assertThat(exception.getErrorCode())
                 .isEqualTo(ErrorCode.FEED_CREATE_INVALID_REQUEST);
 
+        verifyNoDatabaseAccess();
+    }
+
+    @Test
+    @DisplayName("인증된 사용자 ID가 없으면 DB 조회 전에 거절한다")
+    void rejectsMissingAuthenticatedUser() {
+        FeedCreateRequest request = validRequest(USER_ID);
+
+        OtbooException exception = assertThrows(
+                OtbooException.class,
+                () -> feedService.create(request, null)
+        );
+
+        assertThat(exception.getErrorCode())
+                .isEqualTo(ErrorCode.AUTHENTICATION_REQUIRED);
+
+        verifyNoDatabaseAccess();
+    }
+
+    @Test
+    @DisplayName("Service 직접 호출에서도 작성자가 다르면 DB 조회 전에 거절한다")
+    void rejectsDifferentAuthorWhenCalledDirectly() {
+        FeedCreateRequest request = validRequest(OTHER_USER_ID);
+
+        OtbooException exception = assertThrows(
+                OtbooException.class,
+                () -> feedService.create(request, USER_ID)
+        );
+
+        assertThat(exception.getErrorCode())
+                .isEqualTo(ErrorCode.ACCESS_DENIED);
+
+        verifyNoDatabaseAccess();
+    }
+
+    private void verifyNoDatabaseAccess() {
         verifyNoInteractions(
                 userRepository,
                 weatherRepository,
@@ -71,8 +114,16 @@ class FeedServiceImplValidationTest {
         );
     }
 
+    private FeedCreateRequest validRequest(UUID authorId) {
+        return new FeedCreateRequest(
+                authorId,
+                UUID.randomUUID(),
+                List.of(UUID.randomUUID()),
+                "오늘의 코디"
+        );
+    }
+
     private static Stream<Arguments> invalidRequests() {
-        UUID authorId = UUID.randomUUID();
         UUID weatherId = UUID.randomUUID();
         List<UUID> clothesIds = List.of(UUID.randomUUID());
 
@@ -90,37 +141,37 @@ class FeedServiceImplValidationTest {
                 Arguments.of(
                         "날씨 ID가 없는 경우",
                         new FeedCreateRequest(
-                                authorId, null, clothesIds, "오늘의 코디"
+                                USER_ID, null, clothesIds, "오늘의 코디"
                         )
                 ),
                 Arguments.of(
                         "내용이 null인 경우",
                         new FeedCreateRequest(
-                                authorId, weatherId, clothesIds, null
+                                USER_ID, weatherId, clothesIds, null
                         )
                 ),
                 Arguments.of(
                         "내용이 빈 문자열인 경우",
                         new FeedCreateRequest(
-                                authorId, weatherId, clothesIds, ""
+                                USER_ID, weatherId, clothesIds, ""
                         )
                 ),
                 Arguments.of(
                         "내용이 공백뿐인 경우",
                         new FeedCreateRequest(
-                                authorId, weatherId, clothesIds, " \t\n "
+                                USER_ID, weatherId, clothesIds, " \t\n "
                         )
                 ),
                 Arguments.of(
                         "의상 목록이 null인 경우",
                         new FeedCreateRequest(
-                                authorId, weatherId, null, "오늘의 코디"
+                                USER_ID, weatherId, null, "오늘의 코디"
                         )
                 ),
                 Arguments.of(
                         "의상 목록에 null ID가 포함된 경우",
                         new FeedCreateRequest(
-                                authorId,
+                                USER_ID,
                                 weatherId,
                                 Collections.singletonList(null),
                                 "오늘의 코디"
