@@ -339,8 +339,8 @@ class FollowServiceTest {
     }
 
     @ParameterizedTest
-    @ValueSource(ints = {Integer.MIN_VALUE, -1, 0, 101, Integer.MAX_VALUE - 1, Integer.MAX_VALUE})
-    @DisplayName("조회 개수가 1~100 범위를 벗어나면 DB 조회 전에 거부한다")
+    @ValueSource(ints = {Integer.MIN_VALUE, -1, 0, 31, Integer.MAX_VALUE - 1, Integer.MAX_VALUE})
+    @DisplayName("조회 개수가 1~30 범위를 벗어나면 DB 조회 전에 거부한다")
     void getList_rejectsInvalidLimit(int limit) {
         for (boolean followings : List.of(true, false)) {
             assertEquals(FOLLOW_INVALID_CURSOR,
@@ -351,7 +351,7 @@ class FollowServiceTest {
     }
 
     @ParameterizedTest
-    @CsvSource({"true, 1", "true, 100", "false, 1", "false, 100"})
+    @CsvSource({"true, 1", "true, 30", "false, 1", "false, 30"})
     @DisplayName("조회 개수의 최솟값과 최댓값을 허용하고 다음 페이지 확인을 위해 한 건 더 조회한다")
     void getList_acceptsLimitBoundaries(boolean followings, int limit) {
         when(users.findById(me)).thenReturn(Optional.of(user(me)));
