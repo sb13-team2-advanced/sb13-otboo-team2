@@ -343,7 +343,104 @@ class UserControllerTest {
         );
     }
 
+    @Test
+    @DisplayName("사용자 목록 조회 시 limit가 0이면 400을 반환한다")
+    void getUsers_zeroLimit_returnsBadRequest() throws Exception {
+        // when & then
+        mockMvc.perform(get("/api/users")
+                        .param("limit", "0")
+                        .param("sortBy", "email")
+                        .param("sortDirection", "ASCENDING"))
+                .andExpect(status().isBadRequest());
 
+        verifyNoInteractions(userService);
+    }
 
+    @Test
+    @DisplayName("사용자 목록 조회 시 limit가 음수이면 400을 반환한다")
+    void getUsers_negativeLimit_returnsBadRequest() throws Exception {
+        // when & then
+        mockMvc.perform(get("/api/users")
+                        .param("limit", "-1")
+                        .param("sortBy", "email")
+                        .param("sortDirection", "ASCENDING"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.exceptionName")
+                        .value("InvalidUserQueryException"))
+                .andExpect(jsonPath("$.message")
+                        .value("잘못된 사용자 조회 요청입니다."));
+
+        verifyNoInteractions(userService);
+    }
+
+    @Test
+    @DisplayName("사용자 목록 조회 시 지원하지 않는 정렬 기준이면 400을 반환한다")
+    void getUsers_invalidSortBy_returnsBadRequest() throws Exception {
+        // when & then
+        mockMvc.perform(get("/api/users")
+                        .param("limit", "10")
+                        .param("sortBy", "name")
+                        .param("sortDirection", "ASCENDING"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.exceptionName")
+                        .value("InvalidUserQueryException"))
+                .andExpect(jsonPath("$.message")
+                        .value("잘못된 사용자 조회 요청입니다."));
+
+        verifyNoInteractions(userService);
+    }
+
+    @Test
+    @DisplayName("사용자 목록 조회 시 지원하지 않는 정렬 방향이면 400을 반환한다")
+    void getUsers_invalidSortDirection_returnsBadRequest() throws Exception {
+        // when & then
+        mockMvc.perform(get("/api/users")
+                        .param("limit", "10")
+                        .param("sortBy", "email")
+                        .param("sortDirection", "ASC"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.exceptionName")
+                        .value("InvalidUserQueryException"))
+                .andExpect(jsonPath("$.message")
+                        .value("잘못된 사용자 조회 요청입니다."));
+
+        verifyNoInteractions(userService);
+    }
+
+    @Test
+    @DisplayName("사용자 목록 조회 시 cursor만 전달하면 400을 반환한다")
+    void getUsers_cursorWithoutIdAfter_returnsBadRequest() throws Exception {
+        // when & then
+        mockMvc.perform(get("/api/users")
+                        .param("cursor", "test@example.com")
+                        .param("limit", "10")
+                        .param("sortBy", "email")
+                        .param("sortDirection", "ASCENDING"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.exceptionName")
+                        .value("InvalidUserQueryException"))
+                .andExpect(jsonPath("$.message")
+                        .value("잘못된 사용자 조회 요청입니다."));
+
+        verifyNoInteractions(userService);
+    }
+
+    @Test
+    @DisplayName("생성일 커서 형식이 잘못되면 400을 반환한다")
+    void getUsers_invalidCreatedAtCursor_returnsBadRequest() throws Exception {
+        mockMvc.perform(get("/api/users")
+                        .param("cursor", "invalid-date")
+                        .param("idAfter", UUID.randomUUID().toString())
+                        .param("limit", "10")
+                        .param("sortBy", "createdAt")
+                        .param("sortDirection", "ASCENDING"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.exceptionName")
+                        .value("InvalidUserQueryException"))
+                .andExpect(jsonPath("$.message")
+                        .value("잘못된 사용자 조회 요청입니다."));
+
+        verifyNoInteractions(userService);
+    }
 
 }

@@ -18,10 +18,8 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.dao.DataIntegrityViolationException;
-import org.springframework.data.domain.Page;
-import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
-import org.springframework.data.domain.Sort;
+import org.springframework.data.domain.SliceImpl;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.test.util.ReflectionTestUtils;
 
@@ -279,42 +277,28 @@ class UserServiceImplTest {
     @DisplayName("사용자 목록 첫 페이지 조회 시 이메일 오름차순으로 반환한다")
     void getUsers_firstPage_success() {
         // given
-        User user1 = User.create(
-                "사용자A", "aaa@example.com", "encoded-password"
-        );
-        User user2 = User.create(
-                "사용자B", "bbb@example.com", "encoded-password"
-        );
-        User user3 = User.create(
-                "사용자C", "ccc@example.com", "encoded-password"
+        User user1 = User.create("사용자A", "aaa@example.com", "encoded-password");
+        User user2 = User.create("사용자B", "bbb@example.com", "encoded-password");
+        User user3 = User.create("사용자C", "ccc@example.com", "encoded-password");
+
+        var slice = new SliceImpl<>(
+                List.of(user1, user2, user3),
+                PageRequest.of(0, 10),
+                false
         );
 
-        List<User> users = List.of(user1, user2, user3);
+        when(userRepository.findUsers(
+                null, null, 10, "email", "ASCENDING",
+                null, null, null
+        )).thenReturn(slice);
 
-        Page<User> page = new PageImpl<>(
-                users,
-                PageRequest.of(
-                        0,
-                        10,
-                        Sort.by(Sort.Direction.ASC, "email")
-                ),
-                3
-        );
-
-        when(userRepository.findAll(any(
-                org.springframework.data.domain.Pageable.class
-        ))).thenReturn(page);
+        when(userRepository.countUsers(null, null, null))
+                .thenReturn(3L);
 
         // when
         UserListResponse response = userService.getUsers(
-                null,
-                null,
-                10,
-                "email",
-                "ASCENDING",
-                null,
-                null,
-                null
+                null, null, 10, "email", "ASCENDING",
+                null, null, null
         );
 
         // then
@@ -331,9 +315,11 @@ class UserServiceImplTest {
                 () -> assertEquals("ASCENDING", response.sortDirection())
         );
 
-        verify(userRepository).findAll(any(
-                org.springframework.data.domain.Pageable.class
-        ));
+        verify(userRepository).findUsers(
+                null, null, 10, "email", "ASCENDING",
+                null, null, null
+        );
+        verify(userRepository).countUsers(null, null, null);
     }
 
     @Test
@@ -349,30 +335,24 @@ class UserServiceImplTest {
         ReflectionTestUtils.setField(user1, "id", userId1);
         ReflectionTestUtils.setField(user2, "id", userId2);
 
-        var pageable = PageRequest.of(
-                0,
-                2,
-                Sort.by(Sort.Direction.ASC, "email")
-        );
-
-        var page = new PageImpl<>(
+        var slice = new SliceImpl<>(
                 List.of(user1, user2),
-                pageable,
-                3
+                PageRequest.of(0, 2),
+                true
         );
 
-        when(userRepository.findAll(pageable)).thenReturn(page);
+        when(userRepository.findUsers(
+                null, null, 2, "email", "ASCENDING",
+                null, null, null
+        )).thenReturn(slice);
+
+        when(userRepository.countUsers(null, null, null))
+                .thenReturn(3L);
 
         // when
         UserListResponse response = userService.getUsers(
-                null,
-                null,
-                2,
-                "email",
-                "ASCENDING",
-                null,
-                null,
-                null
+                null, null, 2, "email", "ASCENDING",
+                null, null, null
         );
 
         // then
@@ -386,8 +366,61 @@ class UserServiceImplTest {
                 () -> assertEquals("ASCENDING", response.sortDirection())
         );
 
-        verify(userRepository).findAll(pageable);
+        verify(userRepository).findUsers(
+                null, null, 2, "email", "ASCENDING",
+                null, null, null
+        );
+        verify(userRepository).countUsers(null, null, null);
     }
+
+    @Test
+    @DisplayName("사용자 목록 조회 시 QueryDSL 조회 결과와 전체 사용자 수를 반환한다")
+    void getUsers_usesCustomRepository() {
+        // given
+        User userA = User.create(
+                "사용자A", "aaa@example.com", "encoded-password"
+        );
+        User userB = User.create(
+                "사용자B", "bbb@example.com", "encoded-password"
+        );
+
+        var slice = new SliceImpl<>(
+                List.of(userA, userB),
+                PageRequest.of(0, 2),
+                true
+        );
+
+        when(userRepository.findUsers(
+                null, null, 2, "email", "ASCENDING",
+                null, null, null
+        )).thenReturn(slice);
+
+        when(userRepository.countUsers(null, null, null))
+                .thenReturn(5L);
+
+        // when
+        UserListResponse response = userService.getUsers(
+                null, null, 2, "email", "ASCENDING",
+                null, null, null
+        );
+
+        // then
+        assertAll(
+                () -> assertEquals(2, response.data().size()),
+                () -> assertEquals("aaa@example.com", response.data().get(0).email()),
+                () -> assertEquals("bbb@example.com", response.data().get(1).email()),
+                () -> assertTrue(response.hasNext()),
+                () -> assertEquals(5L, response.totalCount())
+        );
+
+        verify(userRepository).findUsers(
+                null, null, 2, "email", "ASCENDING",
+                null, null, null
+        );
+        verify(userRepository).countUsers(null, null, null);
+    }
+
+
 
 
 }

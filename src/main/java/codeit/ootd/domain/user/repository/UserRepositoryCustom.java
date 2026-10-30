@@ -18,4 +18,10 @@ public interface UserRepositoryCustom {
             UserRole roleEqual,
             Boolean locked
     );
+
+    long countUsers(
+            String emailLike,
+            UserRole roleEqual,
+            Boolean locked
+    );
 }

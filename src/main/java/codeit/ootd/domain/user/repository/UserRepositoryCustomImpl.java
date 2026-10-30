@@ -85,21 +85,14 @@ public class UserRepositoryCustomImpl implements UserRepositoryCustom {
             }
         }
 
-        BooleanExpression emailCondition = null;
-
-        if (emailLike != null && !emailLike.isBlank()) {
-            emailCondition = user.email.containsIgnoreCase(emailLike);
-        }
-
-        BooleanExpression roleCondition = null;
-
-        if (roleEqual != null) {
-            roleCondition = user.role.eq(roleEqual);
-        }
-
         List<User> users = queryFactory
                 .selectFrom(user)
-                .where(cursorCondition, emailCondition, roleCondition)
+                .where(
+                        cursorCondition,
+                        emailCondition(user, emailLike),
+                        roleCondition(user, roleEqual),
+                        lockedCondition(user, locked)
+                )
                 .orderBy(primaryOrder, idOrder)
                 .limit((long) limit + 1)
                 .fetch();
@@ -116,4 +109,55 @@ public class UserRepositoryCustomImpl implements UserRepositoryCustom {
                 hasNext
         );
     }
+
+    @Override
+    public long countUsers(
+            String emailLike,
+            UserRole roleEqual,
+            Boolean locked
+    ) {
+        QUser user = QUser.user;
+
+        Long count = queryFactory
+                .select(user.count())
+                .from(user)
+                .where(
+                        emailCondition(user, emailLike),
+                        roleCondition(user, roleEqual),
+                        lockedCondition(user, locked)
+                )
+                .fetchOne();
+
+        return count != null ? count : 0L;
+    }
+
+    private BooleanExpression emailCondition(
+            QUser user,
+            String emailLike
+    ) {
+        return emailLike == null || emailLike.isBlank()
+                ? null
+                : user.email.containsIgnoreCase(emailLike);
+    }
+
+    private BooleanExpression roleCondition(
+            QUser user,
+            UserRole roleEqual
+    ) {
+        return roleEqual == null
+                ? null
+                : user.role.eq(roleEqual);
+    }
+
+    private BooleanExpression lockedCondition(
+            QUser user,
+            Boolean locked
+    ) {
+        return locked == null
+                ? null
+                : user.locked.eq(locked);
+    }
+
+
+
 }

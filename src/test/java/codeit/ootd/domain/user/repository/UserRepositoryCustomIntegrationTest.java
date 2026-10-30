@@ -485,10 +485,179 @@ class UserRepositoryCustomIntegrationTest {
         assertFalse(result.hasNext());
     }
 
+    @Test
+    @DisplayName("잠금 여부가 true이면 잠긴 사용자만 조회한다")
+    void findUsers_lockedTrue_returnsLockedUsers() {
+        // given
+        User lockedUser = User.create(
+                "잠긴 사용자", "locked@example.com", "encoded-password"
+        );
+        lockedUser.lock();
+
+        User activeUser = User.create(
+                "일반 사용자", "active@example.com", "encoded-password"
+        );
+
+        userRepository.saveAllAndFlush(List.of(lockedUser, activeUser));
+
+        // when
+        var result = userRepository.findUsers(
+                null,
+                null,
+                10,
+                "email",
+                "ASCENDING",
+                null,
+                null,
+                true
+        );
+
+        // then
+        assertEquals(1, result.getContent().size());
+        assertEquals(
+                "locked@example.com",
+                result.getContent().get(0).getEmail()
+        );
+        assertTrue(result.getContent().get(0).isLocked());
+        assertFalse(result.hasNext());
+    }
+
+    @Test
+    @DisplayName("잠금 여부가 false이면 잠기지 않은 사용자만 조회한다")
+    void findUsers_lockedFalse_returnsUnlockedUsers() {
+        // given
+        User lockedUser = User.create(
+                "잠긴 사용자", "locked@example.com", "encoded-password"
+        );
+        lockedUser.lock();
+
+        User unlockedUser = User.create(
+                "일반 사용자", "unlocked@example.com", "encoded-password"
+        );
+
+        userRepository.saveAllAndFlush(
+                List.of(lockedUser, unlockedUser)
+        );
+
+        // when
+        var result = userRepository.findUsers(
+                null,
+                null,
+                10,
+                "email",
+                "ASCENDING",
+                null,
+                null,
+                false
+        );
+
+        // then
+        assertEquals(1, result.getContent().size());
+        assertEquals(
+                "unlocked@example.com",
+                result.getContent().get(0).getEmail()
+        );
+        assertFalse(result.getContent().get(0).isLocked());
+        assertFalse(result.hasNext());
+    }
 
 
+    @Test
+    @DisplayName("이메일, 권한, 잠금 여부를 동시에 필터링한다")
+    void findUsers_multipleFilters_returnsMatchingUsers() {
+        // given
+        User adminLocked = User.create(
+                "잠긴 관리자", "admin@gmail.com", "encoded-password"
+        );
+        ReflectionTestUtils.setField(adminLocked, "role", UserRole.ADMIN);
+        adminLocked.lock();
 
+        User adminUnlocked = User.create(
+                "일반 관리자", "manager@gmail.com", "encoded-password"
+        );
+        ReflectionTestUtils.setField(adminUnlocked, "role", UserRole.ADMIN);
 
+        User userLocked = User.create(
+                "잠긴 일반 사용자", "user@gmail.com", "encoded-password"
+        );
+        userLocked.lock();
+
+        User anotherAdminLocked = User.create(
+                "다른 이메일 관리자", "admin@naver.com", "encoded-password"
+        );
+        ReflectionTestUtils.setField(anotherAdminLocked, "role", UserRole.ADMIN);
+        anotherAdminLocked.lock();
+
+        userRepository.saveAllAndFlush(
+                List.of(adminLocked, adminUnlocked, userLocked, anotherAdminLocked)
+        );
+
+        // when
+        var result = userRepository.findUsers(
+                null,
+                null,
+                10,
+                "email",
+                "ASCENDING",
+                "gmail",
+                UserRole.ADMIN,
+                true
+        );
+
+        // then
+        assertEquals(1, result.getContent().size());
+        assertEquals(
+                "admin@gmail.com",
+                result.getContent().get(0).getEmail()
+        );
+        assertEquals(
+                UserRole.ADMIN,
+                result.getContent().get(0).getRole()
+        );
+        assertTrue(result.getContent().get(0).isLocked());
+        assertFalse(result.hasNext());
+    }
+
+    @Test
+    @DisplayName("전체 사용자 수는 이메일, 권한, 잠금 필터를 모두 적용하여 계산한다")
+    void countUsers_multipleFilters_returnsMatchingCount() {
+        // given
+        User lockedAdmin = User.create(
+                "잠긴 관리자", "admin@gmail.com", "encoded-password"
+        );
+        ReflectionTestUtils.setField(lockedAdmin, "role", UserRole.ADMIN);
+        lockedAdmin.lock();
+
+        User unlockedAdmin = User.create(
+                "일반 관리자", "manager@gmail.com", "encoded-password"
+        );
+        ReflectionTestUtils.setField(unlockedAdmin, "role", UserRole.ADMIN);
+
+        User lockedUser = User.create(
+                "잠긴 사용자", "user@gmail.com", "encoded-password"
+        );
+        lockedUser.lock();
+
+        User otherAdmin = User.create(
+                "다른 관리자", "admin@naver.com", "encoded-password"
+        );
+        ReflectionTestUtils.setField(otherAdmin, "role", UserRole.ADMIN);
+        otherAdmin.lock();
+
+        userRepository.saveAllAndFlush(
+                List.of(lockedAdmin, unlockedAdmin, lockedUser, otherAdmin)
+        );
+
+        // when
+        long totalCount = userRepository.countUsers(
+                "gmail",
+                UserRole.ADMIN,
+                true
+        );
+
+        // then
+        assertEquals(1L, totalCount);
+    }
 
 
 

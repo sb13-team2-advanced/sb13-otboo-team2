@@ -15,6 +15,7 @@ import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Slice;
 import org.springframework.data.domain.Sort;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
@@ -94,32 +95,31 @@ public class UserServiceImpl implements UserService {
             UserRole roleEqual,
             Boolean locked
     ) {
-        Sort.Direction direction = switch (sortDirection) {
-            case "ASCENDING" -> Sort.Direction.ASC;
-            case "DESCENDING" -> Sort.Direction.DESC;
-            default -> throw new IllegalArgumentException(
-                    "지원하지 않는 정렬 방향입니다: " + sortDirection
-            );
-        };
-
-        Pageable pageable = PageRequest.of(
-                0,
+        Slice<User> slice = userRepository.findUsers(
+                cursor,
+                idAfter,
                 limit,
-                Sort.by(direction, sortBy)
+                sortBy,
+                sortDirection,
+                emailLike,
+                roleEqual,
+                locked
         );
 
-        Page<User> page = userRepository.findAll(pageable);
+        long totalCount = userRepository.countUsers(
+                emailLike,
+                roleEqual,
+                locked
+        );
 
-        List<UserDto> data = page.getContent().stream()
+        List<UserDto> data = slice.getContent().stream()
                 .map(UserDto::from)
                 .toList();
-
-        log.debug("사용자 목록 첫 페이지 조회: 조회 건수={}", data.size());
 
         String nextCursor = null;
         UUID nextIdAfter = null;
 
-        if (page.hasNext() && !data.isEmpty()) {
+        if (slice.hasNext() && !data.isEmpty()) {
             UserDto lastUser = data.get(data.size() - 1);
 
             nextCursor = switch (sortBy) {
@@ -133,14 +133,19 @@ public class UserServiceImpl implements UserService {
             nextIdAfter = lastUser.id();
         }
 
+        log.debug("사용자 목록 조회: 조회 건수={}, 전체 건수={}",
+                data.size(), totalCount);
+
         return new UserListResponse(
                 data,
                 nextCursor,
                 nextIdAfter,
-                page.hasNext(),
-                page.getTotalElements(),
+                slice.hasNext(),
+                totalCount,
                 sortBy,
                 sortDirection
         );
     }
+
+
 }
