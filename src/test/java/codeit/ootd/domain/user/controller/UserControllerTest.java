@@ -443,4 +443,67 @@ class UserControllerTest {
         verifyNoInteractions(userService);
     }
 
+    @Test
+    @DisplayName("사용자 목록 조회 시 공백 cursor를 전달하면 400을 반환한다")
+    void getUsers_blankCursor_returnsBadRequest() throws Exception {
+        // when & then
+        mockMvc.perform(get("/api/users")
+                        .param("cursor", " ")
+                        .param("limit", "10")
+                        .param("sortBy", "email")
+                        .param("sortDirection", "ASCENDING"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.exceptionName")
+                        .value("InvalidUserQueryException"))
+                .andExpect(jsonPath("$.message")
+                        .value("잘못된 사용자 조회 요청입니다."));
+
+        verifyNoInteractions(userService);
+    }
+
+    @Test
+    @DisplayName("사용자 목록 조회 시 limit가 100을 초과하면 400을 반환한다")
+    void getUsers_limitExceedsMaximum_returnsBadRequest() throws Exception {
+        mockMvc.perform(get("/api/users")
+                        .param("limit", "101")
+                        .param("sortBy", "email")
+                        .param("sortDirection", "ASCENDING"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.exceptionName")
+                        .value("InvalidUserQueryException"))
+                .andExpect(jsonPath("$.message")
+                        .value("잘못된 사용자 조회 요청입니다."));
+
+        verifyNoInteractions(userService);
+    }
+
+    @Test
+    @DisplayName("사용자 목록 조회 시 limit가 100이면 정상 처리한다")
+    void getUsers_limit100_returnsOk() throws Exception {
+        // given
+        UserListResponse response = new UserListResponse(
+                List.of(), null, null, false, 0L,
+                "email", "ASCENDING"
+        );
+
+        when(userService.getUsers(
+                null, null, 100, "email", "ASCENDING",
+                null, null, null
+        )).thenReturn(response);
+
+        // when & then
+        mockMvc.perform(get("/api/users")
+                        .param("limit", "100")
+                        .param("sortBy", "email")
+                        .param("sortDirection", "ASCENDING"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data").isArray());
+
+        verify(userService).getUsers(
+                null, null, 100, "email", "ASCENDING",
+                null, null, null
+        );
+    }
+
+
 }

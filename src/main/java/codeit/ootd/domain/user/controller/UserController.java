@@ -52,7 +52,7 @@ public class UserController {
             @RequestParam(required = false) Boolean locked
     ) {
 
-        if (limit < 1) {
+        if (limit < 1 || limit > 100) {
             throw new InvalidUserQueryException();
         }
 
