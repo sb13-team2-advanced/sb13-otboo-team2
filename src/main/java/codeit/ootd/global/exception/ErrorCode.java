@@ -14,6 +14,8 @@ public enum ErrorCode {
 
     // 사용자 관리
     USER_EMAIL_DUPLICATED(HttpStatus.CONFLICT, "이미 사용 중인 이메일입니다."),
+    INVALID_USER_QUERY(HttpStatus.BAD_REQUEST, "잘못된 사용자 조회 요청입니다."),
+    USER_NOT_FOUND(HttpStatus.NOT_FOUND, "사용자를 찾을 수 없습니다."),
 
     // 인증 및 권한
     AUTHENTICATION_REQUIRED(HttpStatus.UNAUTHORIZED, "인증이 필요합니다."),

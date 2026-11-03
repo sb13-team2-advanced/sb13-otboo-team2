@@ -335,6 +335,41 @@ class AuthSessionServiceImplTest {
         verify(authSessionRepository).findById(sessionId);
     }
 
+    @Test
+    @DisplayName("사용자의 모든 활성 인증 세션을 폐기한다")
+    void revokeAllSessions_success() {
+        // given
+        UUID userId = UUID.randomUUID();
+
+        AuthSession session1 = AuthSession.create(
+                userId,
+                now.plus(Duration.ofDays(1))
+        );
+
+        AuthSession session2 = AuthSession.create(
+                userId,
+                now.plus(Duration.ofDays(2))
+        );
+
+        when(authSessionRepository
+                .findAllByUserIdAndRevokedAtIsNullAndExpiresAtAfter(userId, now))
+                .thenReturn(List.of(session1, session2));
+
+        // when
+        authSessionService.revokeAllSessions(userId);
+
+        // then
+        assertAll(
+                () -> assertEquals(now, session1.getRevokedAt()),
+                () -> assertEquals(now, session2.getRevokedAt()),
+                () -> assertFalse(session1.isActive(now)),
+                () -> assertFalse(session2.isActive(now))
+        );
+
+        verify(authSessionRepository)
+                .findAllByUserIdAndRevokedAtIsNullAndExpiresAtAfter(userId, now);
+    }
+
     private enum SessionState {
         EXPIRED,
         REVOKED
