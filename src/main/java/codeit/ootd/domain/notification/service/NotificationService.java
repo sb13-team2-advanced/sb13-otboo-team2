@@ -1,7 +1,23 @@
 package codeit.ootd.domain.notification.service;
 
+import codeit.ootd.domain.notification.entity.Notification;
+import codeit.ootd.domain.notification.enums.NotificationLevel;
+import codeit.ootd.domain.notification.repository.NotificationRepository;
+import java.util.UUID;
+import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Propagation;
+import org.springframework.transaction.annotation.Transactional;
 
 @Service
+@RequiredArgsConstructor
 public class NotificationService {
+
+    private final NotificationRepository notificationRepository;
+
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    public void saveNotification(UUID receiverId, String title, String content,
+            NotificationLevel level) {
+        notificationRepository.save(new Notification(receiverId, title, content, level));
+    }
 }

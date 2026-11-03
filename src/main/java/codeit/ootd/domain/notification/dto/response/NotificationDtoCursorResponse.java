@@ -1,6 +1,7 @@
-package codeit.ootd.domain.notification.dto;
+package codeit.ootd.domain.notification.dto.response;
 
 // import codeit.ootd.global.enums.SortDirection;
+import codeit.ootd.global.enums.SortDirection;
 import java.util.List;
 import java.util.UUID;
 
@@ -10,7 +11,7 @@ public record NotificationDtoCursorResponse(
     UUID nextIdAfter,
     Boolean hasNext,
     Long totalCount,
-    String sortBy
-    // , SortDirection sortDirection
+    String sortBy,
+    SortDirection sortDirection
 ) {
 }
