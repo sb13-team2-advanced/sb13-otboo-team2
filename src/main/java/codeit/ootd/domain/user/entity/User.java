@@ -7,6 +7,7 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 
 import java.time.Instant;
+import java.util.Objects;
 
 @Entity
 @Getter
@@ -71,6 +72,10 @@ public class User extends BaseTimeEntity {
 
     public void markDeleted() {
         this.status = UserStatus.DELETED;
+    }
+
+    public void updateRole(UserRole role) {
+        this.role = Objects.requireNonNull(role, "role은 필수입니다.");
     }
 }
 

@@ -29,6 +29,7 @@ import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -504,6 +505,58 @@ class UserControllerTest {
                 null, null, null
         );
     }
+
+    @Test
+    @DisplayName("사용자 권한 변경 요청 시 200과 변경된 사용자 정보를 반환한다")
+    void updateUserRole_success() throws Exception {
+        // given
+        UUID userId = UUID.randomUUID();
+        Instant createdAt = Instant.parse("2026-10-30T00:00:00Z");
+
+        UserDto response = new UserDto(
+                userId,
+                createdAt,
+                "test@example.com",
+                "테스트사용자",
+                UserRole.ADMIN,
+                false
+        );
+
+        when(userService.updateRole(userId, UserRole.ADMIN))
+                .thenReturn(response);
+
+        // when & then
+        mockMvc.perform(patch("/api/users/{userId}/role", userId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                            {
+                              "role": "ADMIN"
+                            }
+                            """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.id").value(userId.toString()))
+                .andExpect(jsonPath("$.role").value("ADMIN"))
+                .andExpect(jsonPath("$.email").value("test@example.com"));
+
+        verify(userService).updateRole(userId, UserRole.ADMIN);
+    }
+
+    @Test
+    @DisplayName("사용자 권한 변경 시 role이 null이면 400을 반환한다")
+    void updateUserRole_nullRole_returnsBadRequest() throws Exception {
+        // when & then
+        mockMvc.perform(patch("/api/users/{userId}/role", UUID.randomUUID())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                            {
+                              "role": null
+                            }
+                            """))
+                .andExpect(status().isBadRequest());
+
+        verifyNoInteractions(userService);
+    }
+
 
 
 }

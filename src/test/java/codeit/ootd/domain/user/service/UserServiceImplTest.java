@@ -1,5 +1,6 @@
 package codeit.ootd.domain.user.service;
 
+import codeit.ootd.domain.auth.service.AuthSessionService;
 import codeit.ootd.domain.user.dto.request.UserCreateRequest;
 import codeit.ootd.domain.user.dto.response.UserDto;
 import codeit.ootd.domain.user.dto.response.UserListResponse;
@@ -7,6 +8,7 @@ import codeit.ootd.domain.user.entity.User;
 import codeit.ootd.domain.user.entity.UserRole;
 import codeit.ootd.domain.user.entity.UserStatus;
 import codeit.ootd.domain.user.exception.DuplicateEmailException;
+import codeit.ootd.domain.user.exception.UserNotFoundException;
 import codeit.ootd.domain.user.repository.UserRepository;
 import codeit.ootd.domain.user.service.impl.UserServiceImpl;
 import org.hibernate.exception.ConstraintViolationException;
@@ -25,8 +27,11 @@ import org.springframework.test.util.ReflectionTestUtils;
 
 import java.sql.SQLException;
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 
+import static org.assertj.core.api.AssertionsForClassTypes.assertThat;
+import static org.assertj.core.api.AssertionsForClassTypes.assertThatThrownBy;
 import static org.junit.jupiter.api.Assertions.assertAll;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -49,6 +54,9 @@ class UserServiceImplTest {
 
     @Mock
     private PasswordEncoder passwordEncoder;
+
+    @Mock
+    private AuthSessionService authSessionService;
 
     @InjectMocks
     private UserServiceImpl userService;
@@ -419,6 +427,79 @@ class UserServiceImplTest {
         );
         verify(userRepository).countUsers(null, null, null);
     }
+
+    @Test
+    @DisplayName("사용자 권한을 USER에서 ADMIN으로 변경한다")
+    void updateRole_success() {
+        // given
+        UUID userId = UUID.randomUUID();
+
+        User user = User.create(
+                "테스트사용자",
+                "test@example.com",
+                "encodedPassword"
+        );
+
+        ReflectionTestUtils.setField(user, "id", userId);
+
+        when(userRepository.findById(userId))
+                .thenReturn(Optional.of(user));
+
+        // when
+        UserDto result = userService.updateRole(userId, UserRole.ADMIN);
+
+        // then
+        assertThat(result.id()).isEqualTo(userId);
+        assertThat(result.role()).isEqualTo(UserRole.ADMIN);
+        assertThat(user.getRole()).isEqualTo(UserRole.ADMIN);
+
+        verify(userRepository).findById(userId);
+    }
+
+
+    @Test
+    @DisplayName("존재하지 않는 사용자의 권한 변경 시 예외가 발생한다")
+    void updateRole_userNotFound_throwsException() {
+        // given
+        UUID userId = UUID.randomUUID();
+
+        when(userRepository.findById(userId))
+                .thenReturn(Optional.empty());
+
+        // when & then
+        assertThatThrownBy(() ->
+                userService.updateRole(userId, UserRole.ADMIN)
+        ).isInstanceOf(UserNotFoundException.class);
+
+        verify(userRepository).findById(userId);
+    }
+
+    @Test
+    @DisplayName("사용자 권한 변경 시 모든 활성 인증 세션을 폐기한다")
+    void updateRole_revokesAllSessions() {
+        // given
+        UUID userId = UUID.randomUUID();
+
+        User user = User.create(
+                "테스트사용자",
+                "test@example.com",
+                "encodedPassword"
+        );
+
+        ReflectionTestUtils.setField(user, "id", userId);
+
+        when(userRepository.findById(userId))
+                .thenReturn(Optional.of(user));
+
+        // when
+        userService.updateRole(userId, UserRole.ADMIN);
+
+        // then
+        assertThat(user.getRole()).isEqualTo(UserRole.ADMIN);
+
+        verify(authSessionService).revokeAllSessions(userId);
+    }
+
 
 
 

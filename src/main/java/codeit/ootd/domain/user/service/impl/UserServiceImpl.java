@@ -1,11 +1,13 @@
 package codeit.ootd.domain.user.service.impl;
 
+import codeit.ootd.domain.auth.service.AuthSessionService;
 import codeit.ootd.domain.user.dto.request.UserCreateRequest;
 import codeit.ootd.domain.user.dto.response.UserDto;
 import codeit.ootd.domain.user.dto.response.UserListResponse;
 import codeit.ootd.domain.user.entity.User;
 import codeit.ootd.domain.user.entity.UserRole;
 import codeit.ootd.domain.user.exception.DuplicateEmailException;
+import codeit.ootd.domain.user.exception.UserNotFoundException;
 import codeit.ootd.domain.user.repository.UserRepository;
 import codeit.ootd.domain.user.service.UserService;
 import lombok.RequiredArgsConstructor;
@@ -31,6 +33,7 @@ public class UserServiceImpl implements UserService {
 
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
+    private final AuthSessionService authSessionService;
 
     @Override
     @Transactional
@@ -146,6 +149,22 @@ public class UserServiceImpl implements UserService {
                 sortDirection
         );
     }
+
+    @Override
+    @Transactional
+    public UserDto updateRole(UUID userId, UserRole role) {
+        User user = userRepository.findById(userId)
+                .orElseThrow(UserNotFoundException::new);
+
+        user.updateRole(role);
+
+        authSessionService.revokeAllSessions(userId);
+
+        log.info("사용자 권한 변경 완료: userId={}, role={}", userId, role);
+
+        return UserDto.from(user);
+    }
+
 
 
 }

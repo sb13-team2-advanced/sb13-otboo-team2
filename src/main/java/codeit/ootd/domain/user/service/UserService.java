@@ -21,4 +21,6 @@ public interface UserService {
             UserRole roleEqual,
             Boolean locked
     );
+
+    UserDto updateRole(UUID userId, UserRole role);
 }

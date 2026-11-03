@@ -1,6 +1,7 @@
 package codeit.ootd.domain.user.controller;
 
 import codeit.ootd.domain.user.dto.request.UserCreateRequest;
+import codeit.ootd.domain.user.dto.request.UserRoleUpdateRequest;
 import codeit.ootd.domain.user.dto.response.UserDto;
 import codeit.ootd.domain.user.dto.response.UserListResponse;
 import codeit.ootd.domain.user.entity.UserRole;
@@ -12,6 +13,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.*;
@@ -94,5 +96,22 @@ public class UserController {
 
         return ResponseEntity.ok(response);
     }
+
+    @PreAuthorize("hasRole('ADMIN')")
+    @PatchMapping("/{userId}/role")
+    public ResponseEntity<UserDto> updateRole(
+            @PathVariable UUID userId,
+            @Valid @RequestBody UserRoleUpdateRequest request
+    ) {
+        UserDto response = userService.updateRole(
+                userId,
+                request.role()
+        );
+
+        return ResponseEntity.ok(response);
+    }
+
+
+
 
 }
