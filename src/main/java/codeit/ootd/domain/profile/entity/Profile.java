@@ -60,4 +60,31 @@ public class Profile extends BaseTimeEntity {
     public Profile(UUID userId) {
         this.userId = Objects.requireNonNull(userId, "userId must not be null");
     }
+
+    /**
+     * 값이 있는 항목만 바꾼다. null이면 기존 값을 유지한다.
+     */
+    public void update(Gender gender, LocalDate birthDate, Integer temperatureSensitivity) {
+        if (gender != null) {
+            this.gender = gender;
+        }
+        if (birthDate != null) {
+            this.birthDate = birthDate;
+        }
+        if (temperatureSensitivity != null) {
+            this.temperatureSensitivity = temperatureSensitivity;
+        }
+    }
+
+    /**
+     * 위경도만 저장한다. 지명은 저장하지 않고 조회할 때 좌표로 가져온다.
+     */
+    public void updateLocation(double latitude, double longitude) {
+        this.latitude = latitude;
+        this.longitude = longitude;
+    }
+
+    public void changeProfileImageUrl(String profileImageUrl) {
+        this.profileImageUrl = profileImageUrl;
+    }
 }
