@@ -557,6 +557,40 @@ class UserControllerTest {
         verifyNoInteractions(userService);
     }
 
+    @Test
+    @DisplayName("계정 잠금 요청 시 변경된 사용자 정보를 반환한다")
+    void updateLock_success() throws Exception {
+        // given
+        UUID userId = UUID.randomUUID();
+
+        UserDto response = new UserDto(
+                userId,
+                Instant.parse("2026-11-03T00:00:00Z"),
+                "test@example.com",
+                "테스트사용자",
+                UserRole.USER,
+                true
+        );
+
+        when(userService.updateLock(userId, true))
+                .thenReturn(response);
+
+        // when & then
+        mockMvc.perform(patch("/api/users/{userId}/lock", userId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                            {
+                              "locked": true
+                            }
+                            """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.id").value(userId.toString()))
+                .andExpect(jsonPath("$.locked").value(true));
+
+        verify(userService).updateLock(userId, true);
+    }
+
+
 
 
 }

@@ -1,6 +1,7 @@
 package codeit.ootd.domain.user.controller;
 
 import codeit.ootd.domain.user.dto.request.UserCreateRequest;
+import codeit.ootd.domain.user.dto.request.UserLockUpdateRequest;
 import codeit.ootd.domain.user.dto.request.UserRoleUpdateRequest;
 import codeit.ootd.domain.user.dto.response.UserDto;
 import codeit.ootd.domain.user.dto.response.UserListResponse;
@@ -111,6 +112,19 @@ public class UserController {
         return ResponseEntity.ok(response);
     }
 
+    @PreAuthorize("hasRole('ADMIN')")
+    @PatchMapping("/{userId}/lock")
+    public ResponseEntity<UserDto> updateLock(
+            @PathVariable UUID userId,
+            @Valid @RequestBody UserLockUpdateRequest request
+    ) {
+        UserDto response = userService.updateLock(
+                userId,
+                request.locked()
+        );
+
+        return ResponseEntity.ok(response);
+    }
 
 
 
