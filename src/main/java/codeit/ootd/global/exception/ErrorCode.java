@@ -43,6 +43,9 @@ public enum ErrorCode {
     FEED_WEATHER_NOT_FOUND(HttpStatus.BAD_REQUEST, "피드에 사용할 날씨를 찾을 수 없습니다."),
     FEED_CLOTHES_NOT_FOUND(HttpStatus.BAD_REQUEST, "피드에 사용할 의상을 찾을 수 없습니다."),
 
+    // 프로필
+    PROFILE_USER_NOT_FOUND(HttpStatus.NOT_FOUND, "프로필의 사용자를 찾을 수 없습니다."),
+
     // 팔로우
     FOLLOW_SELF_NOT_ALLOWED(HttpStatus.BAD_REQUEST, "자기 자신을 팔로우할 수 없습니다."),
     FOLLOW_ALREADY_EXISTS(HttpStatus.BAD_REQUEST, "이미 팔로우한 사용자입니다."),

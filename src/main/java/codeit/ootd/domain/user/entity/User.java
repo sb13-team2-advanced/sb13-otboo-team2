@@ -62,6 +62,10 @@ public class User extends BaseTimeEntity {
         return user;
     }
 
+    public void changeName(String name) {
+        this.name = Objects.requireNonNull(name, "name must not be null");
+    }
+
     public void lock() {
         this.locked = true;
     }
