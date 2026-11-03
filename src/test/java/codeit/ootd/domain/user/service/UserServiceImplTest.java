@@ -500,6 +500,34 @@ class UserServiceImplTest {
         verify(authSessionService).revokeAllSessions(userId);
     }
 
+    @Test
+    @DisplayName("사용자 계정 잠금 시 잠금 상태를 변경하고 활성 세션을 폐기한다")
+    void updateLock_lockUser_revokesSessions() {
+        // given
+        UUID userId = UUID.randomUUID();
+
+        User user = User.create(
+                "테스트사용자",
+                "test@example.com",
+                "encodedPassword"
+        );
+
+        ReflectionTestUtils.setField(user, "id", userId);
+
+        when(userRepository.findById(userId))
+                .thenReturn(Optional.of(user));
+
+        // when
+        UserDto result = userService.updateLock(userId, true);
+
+        // then
+        assertThat(result.locked()).isTrue();
+        assertThat(user.isLocked()).isTrue();
+
+        verify(authSessionService).revokeAllSessions(userId);
+    }
+
+
 
 
 

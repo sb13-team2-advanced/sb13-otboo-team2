@@ -165,6 +165,24 @@ public class UserServiceImpl implements UserService {
         return UserDto.from(user);
     }
 
+    @Override
+    @Transactional
+    public UserDto updateLock(UUID userId, boolean locked) {
+        User user = userRepository.findById(userId)
+                .orElseThrow(UserNotFoundException::new);
+
+        if (locked) {
+            user.lock();
+            authSessionService.revokeAllSessions(userId);
+        } else {
+            user.unlock();
+        }
+
+        log.info("사용자 계정 잠금 상태 변경: userId={}, locked={}", userId, locked);
+
+        return UserDto.from(user);
+    }
+
 
 
 }

@@ -77,5 +77,9 @@ public class User extends BaseTimeEntity {
     public void updateRole(UserRole role) {
         this.role = Objects.requireNonNull(role, "role은 필수입니다.");
     }
+
+    public void unlock() {
+        this.locked = false;
+    }
 }
 
