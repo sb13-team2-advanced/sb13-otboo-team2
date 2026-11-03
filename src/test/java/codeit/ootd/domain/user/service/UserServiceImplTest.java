@@ -527,6 +527,35 @@ class UserServiceImplTest {
         verify(authSessionService).revokeAllSessions(userId);
     }
 
+    @Test
+    @DisplayName("계정 잠금 해제 시 잠금 상태를 해제하고 세션 폐기는 호출하지 않는다")
+    void updateLock_unlockUser_doesNotRevokeSessions() {
+        // given
+        UUID userId = UUID.randomUUID();
+
+        User user = User.create(
+                "테스트사용자",
+                "test@example.com",
+                "encodedPassword"
+        );
+
+        user.lock();
+        ReflectionTestUtils.setField(user, "id", userId);
+
+        when(userRepository.findById(userId))
+                .thenReturn(Optional.of(user));
+
+        // when
+        UserDto result = userService.updateLock(userId, false);
+
+        // then
+        assertThat(result.locked()).isFalse();
+        assertThat(user.isLocked()).isFalse();
+
+        verify(authSessionService, never()).revokeAllSessions(any());
+    }
+
+
 
 
 
