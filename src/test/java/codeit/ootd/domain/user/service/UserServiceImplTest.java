@@ -555,10 +555,4 @@ class UserServiceImplTest {
         verify(authSessionService, never()).revokeAllSessions(any());
     }
 
-
-
-
-
-
-
 }
