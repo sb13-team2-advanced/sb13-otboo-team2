@@ -107,4 +107,47 @@ class AdminInitializerTest {
 
         verify(userRepository, never()).save(any(User.class));
     }
+
+    @Test
+    @DisplayName("초기 관리자 비밀번호가 설정되지 않으면 초기화에 실패한다")
+    void initialize_missingPassword_throwsException() {
+        // given
+        AdminInitializer initializer = new AdminInitializer(
+                userRepository,
+                passwordEncoder,
+                "관리자",
+                ADMIN_EMAIL,
+                ""
+        );
+
+        // when & then
+        assertThatThrownBy(initializer::initialize)
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessage("초기 관리자 이메일과 비밀번호 설정이 필요합니다.");
+
+        verifyNoInteractions(userRepository, passwordEncoder);
+    }
+
+    @Test
+    @DisplayName("기존 관리자 계정이 잠겨 있으면 초기화에 실패한다")
+    void initialize_lockedAdmin_throwsException() {
+        // given
+        User existingAdmin = mock(User.class);
+
+        when(existingAdmin.getRole()).thenReturn(UserRole.ADMIN);
+        when(existingAdmin.getStatus()).thenReturn(UserStatus.ACTIVE);
+        when(existingAdmin.isLocked()).thenReturn(true);
+        when(userRepository.findByEmail(ADMIN_EMAIL))
+                .thenReturn(Optional.of(existingAdmin));
+
+        // when & then
+        assertThatThrownBy(adminInitializer::initialize)
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessage("초기 관리자 이메일에 사용 가능한 ADMIN 계정이 존재하지 않습니다.");
+
+        verify(userRepository, never()).save(any(User.class));
+        verifyNoInteractions(passwordEncoder);
+    }
+
+
 }
