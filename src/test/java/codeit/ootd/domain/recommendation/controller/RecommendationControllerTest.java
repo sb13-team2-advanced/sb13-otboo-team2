@@ -2,7 +2,9 @@ package codeit.ootd.domain.recommendation.controller;
 
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.BDDMockito.given;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.authentication;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -18,6 +20,7 @@ import java.util.UUID;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.test.context.support.WithMockUser;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
@@ -52,11 +55,11 @@ class RecommendationControllerTest {
     }
 
     /**
-     * 로그인 이름이 사용자 UUID가 아닌 경우 인증 실패로 응답하는지 검증한다.
+     * JWT 인증에서 생성하는 UUID 타입의 인증 주체가 아니면 인증 실패로 응답한다.
      */
     @Test
     @WithMockUser(username = "invalid-user-id")
-    void 인증_사용자_ID가_UUID가_아니면_실패한다() throws Exception {
+    void 인증_주체가_UUID가_아니면_실패한다() throws Exception {
         // given
         UUID weatherId = UUID.randomUUID();
 
@@ -67,18 +70,20 @@ class RecommendationControllerTest {
     }
 
     @Test
-    @WithMockUser(username = USER_ID)
     void 인증_사용자와_날씨에_대한_추천을_반환한다() throws Exception {
         // given
         UUID weatherId = UUID.randomUUID();
         given(service.recommend(UUID.fromString(USER_ID), weatherId))
                 .willReturn(new RecommendationResponse(weatherId, UUID.fromString(USER_ID), List.of()));
         // when then
-        mockMvc.perform(get("/api/recommendations").param("weatherId", weatherId.toString()))
+        mockMvc.perform(get("/api/recommendations").param("weatherId", weatherId.toString())
+                        .with(authentication(new UsernamePasswordAuthenticationToken(
+                                UUID.fromString(USER_ID), null, List.of()))))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.userId").value(USER_ID))
                 .andExpect(jsonPath("$.weatherId").value(weatherId.toString()))
                 .andExpect(jsonPath("$.clothes").isEmpty());
+        verify(service).recommend(UUID.fromString(USER_ID), weatherId);
     }
 
     @Test
