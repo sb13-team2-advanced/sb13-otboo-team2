@@ -2,6 +2,7 @@ package codeit.ootd.domain.user.init;
 
 import codeit.ootd.domain.user.entity.User;
 import codeit.ootd.domain.user.entity.UserRole;
+import codeit.ootd.domain.user.entity.UserStatus;
 import codeit.ootd.domain.user.repository.UserRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -12,7 +13,10 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.security.crypto.password.PasswordEncoder;
 
+import java.util.Optional;
+
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.AssertionsForClassTypes.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
 
@@ -45,7 +49,9 @@ class AdminInitializerTest {
     @DisplayName("초기 관리자 계정이 없으면 ADMIN 권한으로 생성한다")
     void initialize_adminNotExists_createsAdmin() {
         // given
-        when(userRepository.existsByEmail(ADMIN_EMAIL)).thenReturn(false);
+        when(userRepository.findByEmail(ADMIN_EMAIL))
+                .thenReturn(Optional.empty());
+
         when(passwordEncoder.encode(ADMIN_PASSWORD))
                 .thenReturn("encoded-password");
 
@@ -68,7 +74,14 @@ class AdminInitializerTest {
     @DisplayName("초기 관리자 계정이 이미 존재하면 중복 생성하지 않는다")
     void initialize_adminExists_doesNotCreateAdmin() {
         // given
-        when(userRepository.existsByEmail(ADMIN_EMAIL)).thenReturn(true);
+        User existingAdmin = mock(User.class);
+
+        when(existingAdmin.getRole()).thenReturn(UserRole.ADMIN);
+        when(existingAdmin.getStatus()).thenReturn(UserStatus.ACTIVE);
+        when(existingAdmin.isLocked()).thenReturn(false);
+
+        when(userRepository.findByEmail(ADMIN_EMAIL))
+                .thenReturn(Optional.of(existingAdmin));
 
         // when
         adminInitializer.initialize();
@@ -76,5 +89,22 @@ class AdminInitializerTest {
         // then
         verify(userRepository, never()).save(any(User.class));
         verifyNoInteractions(passwordEncoder);
+    }
+
+    @Test
+    @DisplayName("초기 관리자 이메일이 일반 사용자에게 사용 중이면 초기화에 실패한다")
+    void initialize_emailBelongsToUser_throwsException() {
+        // given
+        User existingUser = mock(User.class);
+
+        when(existingUser.getRole()).thenReturn(UserRole.USER);
+        when(userRepository.findByEmail(ADMIN_EMAIL))
+                .thenReturn(Optional.of(existingUser));
+
+        // when & then
+        assertThatThrownBy(() -> adminInitializer.initialize())
+                .isInstanceOf(IllegalStateException.class);
+
+        verify(userRepository, never()).save(any(User.class));
     }
 }

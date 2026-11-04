@@ -30,6 +30,10 @@ otboo:
     local:
       root-path: ./uploads
       base-url: /files
+  admin:
+    name: ${ADMIN_NAME:관리자}
+    email: ${ADMIN_EMAIL:}
+    password: ${ADMIN_PASSWORD:}
 
 jwt:
   secret: ${JWT_SECRET}
