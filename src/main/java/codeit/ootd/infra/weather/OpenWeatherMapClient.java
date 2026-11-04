@@ -1,6 +1,7 @@
 package codeit.ootd.infra.weather;
 
 import codeit.ootd.infra.weather.dto.OwmForecastResponse;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestClient;
@@ -12,12 +13,10 @@ public class OpenWeatherMapClient {
     private final String apiKey;
 
     public OpenWeatherMapClient(
-        RestClient.Builder restClientBuilder,
+        @Qualifier("openWeatherMapRestClient") RestClient restClient,
         @Value("${ootd.weather.openweathermap.api-key}") String apiKey
     ) {
-        this.restClient = restClientBuilder
-            .baseUrl("https://api.openweathermap.org")
-            .build();
+        this.restClient = restClient;
         this.apiKey = apiKey;
     }
 
