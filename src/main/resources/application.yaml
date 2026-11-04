@@ -39,6 +39,11 @@ ootd:
   weather:
     openweathermap:
       api-key: ${OWM_API_KEY}
+      connect-timeout: ${OWM_CONNECT_TIMEOUT:2s}
+      read-timeout: ${OWM_READ_TIMEOUT:5s}
+    batch:
+      scheduler-enabled: ${OOTD_WEATHER_BATCH_SCHEDULER_ENABLED:false}
+      min-request-interval: ${OOTD_BATCH_MIN_REQUEST_INTERVAL:2s}
   kakao:
     local:
       api-key: ${KAKAO_API_KEY}

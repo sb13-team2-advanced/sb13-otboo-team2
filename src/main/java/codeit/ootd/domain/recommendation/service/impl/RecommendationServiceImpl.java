@@ -7,6 +7,8 @@ import codeit.ootd.domain.clothes.entity.ClothesAttributeDefinition;
 import codeit.ootd.domain.clothes.repository.ClothesAttributeDefinitionRepository;
 import codeit.ootd.domain.clothes.repository.ClothesAttributeRepository;
 import codeit.ootd.domain.clothes.repository.ClothesRepository;
+import codeit.ootd.domain.profile.entity.Profile;
+import codeit.ootd.domain.profile.repository.ProfileRepository;
 import codeit.ootd.domain.recommendation.algorithm.OutfitRecommender;
 import codeit.ootd.domain.recommendation.dto.response.RecommendationClothesResponse;
 import codeit.ootd.domain.recommendation.dto.response.RecommendationResponse;
@@ -31,14 +33,18 @@ import org.springframework.transaction.annotation.Transactional;
 @Transactional
 public class RecommendationServiceImpl implements RecommendationService {
 
+    private static final int DEFAULT_TEMPERATURE_SENSITIVITY = 3;
+    private static final double TEMPERATURE_ADJUSTMENT_PER_LEVEL = 2.0;
+
     private final WeatherRepository weatherRepository;
     private final ClothesRepository clothesRepository;
     private final ClothesAttributeRepository attributeRepository;
     private final ClothesAttributeDefinitionRepository definitionRepository;
+    private final ProfileRepository profileRepository;
     private final OutfitRecommender recommender;
 
     /**
-     * 사용자 소유 의상과 속성을 일괄 조회하고 해당 날씨의 평균 기온으로 추천한다.
+     * 사용자 소유 의상과 속성을 일괄 조회하고 프로필의 온도 민감도로 보정한 평균 기온으로 추천한다.
      */
     @Transactional(readOnly = true)
     @Override
@@ -54,8 +60,25 @@ public class RecommendationServiceImpl implements RecommendationService {
         }
 
         List<RecommendationClothesResponse> candidates = createCandidates(clothes);
+
+        double temperature = recommendationTemperature(userId, weather.getTemperatureAvg());
+
         return new RecommendationResponse(weatherId, userId,
-                recommender.recommend(weather.getTemperatureAvg(), candidates));
+                recommender.recommend(temperature, candidates));
+    }
+
+    /**
+     * 민감도 1은 추위, 5는 더위에 민감하므로 3을 기준으로 단계마다 2도를 더한다.
+     * 프로필이나 민감도가 없으면 기본값 3을 적용해 실제 평균 기온을 유지한다.
+     */
+    private double recommendationTemperature(UUID userId, double temperature) {
+
+        int sensitivity = profileRepository.findByUserId(userId)
+                .map(Profile::getTemperatureSensitivity)
+                .orElse(DEFAULT_TEMPERATURE_SENSITIVITY);
+
+        return temperature + (sensitivity - DEFAULT_TEMPERATURE_SENSITIVITY)
+                * TEMPERATURE_ADJUSTMENT_PER_LEVEL;
     }
 
     /**
