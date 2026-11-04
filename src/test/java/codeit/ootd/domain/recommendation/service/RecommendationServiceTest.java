@@ -15,6 +15,8 @@ import codeit.ootd.domain.clothes.enums.ClothesType;
 import codeit.ootd.domain.clothes.repository.ClothesRepository;
 import codeit.ootd.domain.clothes.repository.ClothesAttributeRepository;
 import codeit.ootd.domain.clothes.repository.ClothesAttributeDefinitionRepository;
+import codeit.ootd.domain.profile.entity.Profile;
+import codeit.ootd.domain.profile.repository.ProfileRepository;
 import codeit.ootd.domain.recommendation.algorithm.OutfitRecommender;
 import codeit.ootd.domain.recommendation.dto.response.RecommendationClothesResponse;
 import codeit.ootd.domain.recommendation.dto.response.RecommendationResponse;
@@ -30,6 +32,8 @@ import java.util.UUID;
 
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -43,6 +47,7 @@ class RecommendationServiceTest {
     @Mock private ClothesRepository clothesRepository;
     @Mock private ClothesAttributeRepository attributeRepository;
     @Mock private ClothesAttributeDefinitionRepository definitionRepository;
+    @Mock private ProfileRepository profileRepository;
     @Mock private OutfitRecommender recommender;
     @InjectMocks private RecommendationServiceImpl service;
 
@@ -73,7 +78,7 @@ class RecommendationServiceTest {
     }
 
     @Test
-    void 의상과_속성을_조합해_알고리즘에_전달한다() {
+    void 프로필이_없으면_의상과_속성을_조합해_평균_기온으로_추천한다() {
 
         // given
         UUID userId = UUID.randomUUID();
@@ -96,6 +101,7 @@ class RecommendationServiceTest {
         given(definition.getId()).willReturn(definitionId);
         given(definition.getName()).willReturn("두께");
         given(definition.getSelectableValues()).willReturn(List.of("얇음", "보통", "두꺼움"));
+        given(profileRepository.findByUserId(userId)).willReturn(Optional.empty());
 
         RecommendationClothesResponse expected = new RecommendationClothesResponse(
                 clothesId, "니트", null, ClothesType.TOP,
@@ -110,6 +116,7 @@ class RecommendationServiceTest {
         // then
         assertThat(response.clothes()).containsExactly(expected);
         verify(clothesRepository).findAllByUserId(userId);
+        verify(profileRepository).findByUserId(userId);
         verify(recommender).recommend(15.0, List.of(expected));
     }
 
@@ -124,7 +131,7 @@ class RecommendationServiceTest {
         assertThatThrownBy(() -> service.recommend(UUID.randomUUID(), weatherId))
                 .isInstanceOfSatisfying(OtbooException.class, exception ->
                         assertThat(exception.getErrorCode()).isEqualTo(ErrorCode.RECOMMENDATION_WEATHER_NOT_FOUND));
-        verifyNoInteractions(clothesRepository, recommender);
+        verifyNoInteractions(clothesRepository, profileRepository, recommender);
     }
 
     @Test
@@ -144,6 +151,58 @@ class RecommendationServiceTest {
         assertThat(response.weatherId()).isEqualTo(weatherId);
         assertThat(response.clothes()).isEmpty();
         verify(clothesRepository).findAllByUserId(userId);
-        verifyNoInteractions(attributeRepository, definitionRepository, recommender);
+        verifyNoInteractions(attributeRepository, definitionRepository, profileRepository, recommender);
+    }
+
+    @ParameterizedTest
+    @CsvSource({"1, 11.0", "2, 13.0", "3, 15.0", "4, 17.0", "5, 19.0"})
+    void 프로필_민감도로_보정한_기온을_추천기에_전달한다(int sensitivity, double expectedTemperature) {
+        // given
+        UUID userId = UUID.randomUUID();
+        UUID weatherId = UUID.randomUUID();
+        Weather weather = mock(Weather.class);
+        Clothes clothes = mock(Clothes.class);
+        UUID clothesId = UUID.randomUUID();
+        Profile profile = new Profile(userId);
+        profile.update(null, null, sensitivity);
+        given(weatherRepository.findById(weatherId)).willReturn(Optional.of(weather));
+        given(weather.getTemperatureAvg()).willReturn(15.0);
+        given(clothesRepository.findAllByUserId(userId)).willReturn(List.of(clothes));
+        given(clothes.getId()).willReturn(clothesId);
+        given(clothes.getName()).willReturn("상의");
+        given(clothes.getType()).willReturn(ClothesType.TOP);
+        given(profileRepository.findByUserId(userId)).willReturn(Optional.of(profile));
+        RecommendationClothesResponse candidate = new RecommendationClothesResponse(
+                clothesId, "상의", null, ClothesType.TOP, List.of());
+        given(recommender.recommend(expectedTemperature, List.of(candidate))).willReturn(List.of(candidate));
+
+        // when
+        RecommendationResponse response = service.recommend(userId, weatherId);
+
+        // then
+        assertThat(response.clothes()).containsExactly(candidate);
+        assertThat(response.userId()).isEqualTo(userId);
+        assertThat(response.weatherId()).isEqualTo(weatherId);
+        verify(profileRepository).findByUserId(userId);
+        verify(recommender).recommend(expectedTemperature, List.of(candidate));
+    }
+
+    @Test
+    void 프로필의_민감도가_없으면_평균_기온으로_추천한다() {
+        // given
+        UUID userId = UUID.randomUUID();
+        UUID weatherId = UUID.randomUUID();
+        Weather weather = mock(Weather.class);
+        Clothes clothes = mock(Clothes.class);
+        given(weatherRepository.findById(weatherId)).willReturn(Optional.of(weather));
+        given(weather.getTemperatureAvg()).willReturn(15.0);
+        given(clothesRepository.findAllByUserId(userId)).willReturn(List.of(clothes));
+        given(profileRepository.findByUserId(userId)).willReturn(Optional.of(new Profile(userId)));
+
+        // when
+        service.recommend(userId, weatherId);
+
+        // then
+        verify(recommender).recommend(eq(15.0), anyList());
     }
 }
