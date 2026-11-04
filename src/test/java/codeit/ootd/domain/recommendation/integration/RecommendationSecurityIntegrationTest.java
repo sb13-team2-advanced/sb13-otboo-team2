@@ -15,6 +15,8 @@ import codeit.ootd.domain.clothes.enums.ClothesType;
 import codeit.ootd.domain.clothes.repository.ClothesAttributeDefinitionRepository;
 import codeit.ootd.domain.clothes.repository.ClothesAttributeRepository;
 import codeit.ootd.domain.clothes.repository.ClothesRepository;
+import codeit.ootd.domain.profile.entity.Profile;
+import codeit.ootd.domain.profile.repository.ProfileRepository;
 import codeit.ootd.domain.user.entity.User;
 import codeit.ootd.domain.user.repository.UserRepository;
 import codeit.ootd.domain.weather.entity.Weather;
@@ -27,6 +29,8 @@ import java.time.LocalDate;
 import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
@@ -54,6 +58,7 @@ class RecommendationSecurityIntegrationTest {
     @Autowired private ClothesAttributeDefinitionRepository definitionRepository;
     @Autowired private WeatherLocationRepository locationRepository;
     @Autowired private WeatherRepository weatherRepository;
+    @Autowired private ProfileRepository profileRepository;
 
     @Test
     void JWT_사용자의_의상과_속성으로만_추천하고_다른_사용자_ID는_무시한다() throws Exception {
@@ -203,6 +208,64 @@ class RecommendationSecurityIntegrationTest {
                 .andExpect(jsonPath("$.message").value(ErrorCode.RECOMMENDATION_WEATHER_NOT_FOUND.getMessage()));
     }
 
+    /**
+     * 인증 사용자 프로필로 두께와 아우터 선택이 바뀌며, 민감도가 없으면 기본 추천을 유지하는지 검증한다.
+     */
+    @ParameterizedTest
+    @CsvSource({
+            "21.0, 1, 보통, 3",
+            "21.0, 2, 보통, 3",
+            "21.0, 3, 보통, 2",
+            "21.0, 4, 얇음, 2",
+            "21.0, 5, 얇음, 2",
+            "21.0, , 보통, 2",
+            "11.0, 1, 두꺼움, 3",
+            "19.0, 5, 얇음, 2"
+    })
+    void JWT_사용자의_온도_민감도로_의상_두께와_아우터를_추천한다(
+            double temperature, Integer sensitivity, String expectedThickness, int expectedCount) throws Exception {
+        // given
+        User user = saveUser();
+        User otherUser = saveUser();
+        String token = accessToken(user.getId());
+        Profile profile = new Profile(user.getId());
+        profile.update(null, null, sensitivity);
+        profileRepository.save(profile);
+        Profile otherProfile = new Profile(otherUser.getId());
+        otherProfile.update(null, null, 5);
+        profileRepository.save(otherProfile);
+        Weather weather = saveWeather(temperature);
+        ClothesAttributeDefinition definition = definitionRepository.save(
+                new ClothesAttributeDefinition("두께", List.of("얇음", "보통", "두꺼움")));
+        saveClothesWithThickness(user.getId(), ClothesType.TOP, definition, "얇음");
+        saveClothesWithThickness(user.getId(), ClothesType.TOP, definition, "보통");
+        saveClothesWithThickness(user.getId(), ClothesType.TOP, definition, "두꺼움");
+        saveClothesWithThickness(user.getId(), ClothesType.BOTTOM, definition, "얇음");
+        saveClothesWithThickness(user.getId(), ClothesType.BOTTOM, definition, "보통");
+        saveClothesWithThickness(user.getId(), ClothesType.BOTTOM, definition, "두꺼움");
+        saveClothesWithThickness(user.getId(), ClothesType.OUTER, definition, "보통");
+
+        // when then
+        mockMvc.perform(get("/api/recommendations")
+                        .header("Authorization", "Bearer " + token)
+                        .param("weatherId", weather.getId().toString())
+                        .param("userId", otherUser.getId().toString()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.userId").value(user.getId().toString()))
+                .andExpect(jsonPath("$.weatherId").value(weather.getId().toString()))
+                .andExpect(jsonPath("$.clothes.length()").value(expectedCount))
+                .andExpect(jsonPath("$.clothes[?(@.type == 'TOP')].attributes[0].value")
+                        .value(containsInAnyOrder(expectedThickness)))
+                .andExpect(jsonPath("$.clothes[?(@.type == 'BOTTOM')].attributes[0].value")
+                        .value(containsInAnyOrder(expectedThickness)));
+    }
+
+    private void saveClothesWithThickness(UUID userId, ClothesType type,
+                                         ClothesAttributeDefinition definition, String thickness) {
+        Clothes clothes = saveClothes(userId, type);
+        attributeRepository.save(new ClothesAttribute(clothes.getId(), definition.getId(), thickness));
+    }
+
     private User saveUser() {
         return userRepository.save(User.create("추천 사용자", UUID.randomUUID() + "@example.com", "encoded-password"));
     }
@@ -217,10 +280,14 @@ class RecommendationSecurityIntegrationTest {
     }
 
     private Weather saveWeather() {
+        return saveWeather(25.0);
+    }
+
+    private Weather saveWeather(double temperature) {
         Instant now = Instant.now();
         WeatherLocation location = locationRepository.save(
                 new WeatherLocation("recommendation-test", 37.5, 127.0, now));
         return weatherRepository.save(new Weather(location.getId(), LocalDate.of(2026, 11, 4),
-                now, 25.0, 20.0, 28.0, (short) 50, 800, 0.0, 0.0, 0.0, 1.0, (short) 8));
+                now, temperature, temperature, temperature, (short) 50, 800, 0.0, 0.0, 0.0, 1.0, (short) 8));
     }
 }
