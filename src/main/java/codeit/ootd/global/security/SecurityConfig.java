@@ -74,6 +74,7 @@ public class SecurityConfig {
                         "/api/auth/csrf",
                         "/api/auth/csrf-token"
                 ).permitAll()
+                .requestMatchers(HttpMethod.GET, "/sse/**").permitAll()
                 .anyRequest().authenticated()
         );
 
