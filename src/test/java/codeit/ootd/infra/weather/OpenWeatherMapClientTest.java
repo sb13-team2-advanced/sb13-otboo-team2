@@ -33,7 +33,10 @@ class OpenWeatherMapClientTest {
         RestClient.Builder builder = RestClient.builder();
 
         server = MockRestServiceServer.bindTo(builder).build();
-        client = new OpenWeatherMapClient(builder, "test-key");
+        client = new OpenWeatherMapClient(
+            builder.baseUrl("https://api.openweathermap.org").build(),
+            "test-key"
+        );
     }
 
     @Test
