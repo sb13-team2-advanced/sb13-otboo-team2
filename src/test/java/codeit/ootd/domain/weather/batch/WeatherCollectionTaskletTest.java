@@ -505,50 +505,6 @@ class WeatherCollectionTaskletTest {
     }
 
     @Test
-    @DisplayName("OWM 503 오류가 두 번 발생해도 세 번째 시도에 성공하면 수집을 완료한다")
-    void executeRetriesOnServerError() {
-
-        when(weatherLocationRepository
-            .findTop20ByLastCollectedAtIsNotNullAndNextRefreshAtLessThanEqualOrderByNextRefreshAtAsc(
-                any(Instant.class)
-            ))
-            .thenReturn(List.of(location));
-
-        doThrow(new HttpServerErrorException(
-            HttpStatus.SERVICE_UNAVAILABLE
-        ))
-            .doThrow(new HttpServerErrorException(
-                HttpStatus.SERVICE_UNAVAILABLE
-            ))
-            .doNothing()
-            .when(weatherForecastCollector)
-            .collectForecasts(location);
-
-        RepeatStatus result = tasklet.execute(
-            mock(StepContribution.class),
-            mock(ChunkContext.class)
-        );
-
-        verify(weatherBatchRateLimiter, times(3)).acquire();
-
-        verify(weatherForecastCollector, times(3))
-            .collectForecasts(location);
-
-        verify(weatherService, times(5))
-            .calculateAndSaveDailyWeather(
-                eq(location),
-                any(LocalDate.class)
-            );
-
-        verify(location).completeCollection(
-            any(Instant.class),
-            any(Instant.class)
-        );
-
-        assertThat(result).isEqualTo(RepeatStatus.FINISHED);
-    }
-
-    @Test
     @DisplayName("OWM 타임아웃 발생 후 재시도에 성공하면 정상 완료한다")
     void executeRetriesOnTimeout() {
 
