@@ -6,6 +6,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
+import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
@@ -44,6 +45,19 @@ public class NotificationSseService {
       throw new IllegalStateException("SSE 연결 확인 메시지 전송에 실패했습니다.", e);
     }
     return emitter;
+  }
+
+  // 프런트 EventSourcePolyfill의 기본 수신 대기 시간(45초)보다 짧게 유지한다.
+  @Scheduled(fixedDelay = 30_000, scheduler = "notificationHeartbeatScheduler")
+  public void sendHeartbeats() {
+    emitters.forEach((userId, connections) ->
+        connections.forEach((connectionId, emitter) -> {
+          try {
+            emitter.send(SseEmitter.event().comment("heartbeat"));
+          } catch (IOException | IllegalStateException e) {
+            remove(userId, connectionId);
+          }
+        }));
   }
 
   public void send(UUID receiverId, NotificationDto notification) {

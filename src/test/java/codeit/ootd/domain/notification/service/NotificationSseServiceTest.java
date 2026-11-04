@@ -40,8 +40,8 @@ class NotificationSseServiceTest {
   private final NotificationSseService service = new NotificationSseService();
 
   @Test
-  @DisplayName("SSE 구독 시 연결 주석을 전송하고 완료된 연결만 제거한다")
-  void streamsInitialCommentAndRemovesOnlyCompletedConnection() throws Exception {
+  @DisplayName("SSE 응답으로 heartbeat를 수신하고 완료된 연결에는 더 이상 전송하지 않는다")
+  void receivesHeartbeatAndStopsSendingToCompletedConnection() throws Exception {
     UUID userId = UUID.randomUUID();
     var mvc = MockMvcBuilders.standaloneSetup(new NotificationSseController(service))
         .setCustomArgumentResolvers(new HandlerMethodArgumentResolver() {
@@ -65,6 +65,9 @@ class NotificationSseServiceTest {
     assertEquals(":connected\n\n", result.getResponse().getContentAsString());
     assertTrue(result.getResponse().getContentType().startsWith("text/event-stream"));
 
+    service.sendHeartbeats();
+    assertEquals(":connected\n\n:heartbeat\n\n", result.getResponse().getContentAsString());
+
     SseEmitter secondTab = service.subscribe(userId);
     assertEquals(2, connections().get(userId).size());
 
@@ -74,6 +77,8 @@ class NotificationSseServiceTest {
     }
     assertEquals(1, connections().get(userId).size());
     assertTrue(connections().get(userId).containsValue(secondTab));
+    service.sendHeartbeats();
+    assertEquals(":connected\n\n:heartbeat\n\n", result.getResponse().getContentAsString());
   }
 
   @Test
@@ -154,6 +159,31 @@ class NotificationSseServiceTest {
     UUID receiverId = UUID.randomUUID();
     service.send(receiverId, notification(receiverId));
     assertTrue(connections().isEmpty());
+  }
+
+  @Test
+  @DisplayName("heartbeat 실패 연결을 제거하고 다른 사용자의 정상 연결에는 계속 전송한다")
+  void removesFailedHeartbeatConnectionsAndKeepsSending() throws Exception {
+    UUID receiverId = UUID.randomUUID();
+    SseEmitter disconnected = mock(SseEmitter.class);
+    SseEmitter completed = mock(SseEmitter.class);
+    SseEmitter healthy = mock(SseEmitter.class);
+    connections().put(receiverId, new ConcurrentHashMap<>(Map.of(
+        UUID.randomUUID(), disconnected, UUID.randomUUID(), completed)));
+    connections().put(UUID.randomUUID(), new ConcurrentHashMap<>(Map.of(
+        UUID.randomUUID(), healthy)));
+    doThrow(new IOException("disconnected"))
+        .when(disconnected).send(any(SseEmitter.SseEventBuilder.class));
+    doThrow(new IllegalStateException("completed"))
+        .when(completed).send(any(SseEmitter.SseEventBuilder.class));
+
+    service.sendHeartbeats();
+
+    assertFalse(connections().containsKey(receiverId));
+    verify(healthy).send(any(SseEmitter.SseEventBuilder.class));
+    service.sendHeartbeats();
+    verify(disconnected).send(any(SseEmitter.SseEventBuilder.class));
+    verify(completed).send(any(SseEmitter.SseEventBuilder.class));
   }
 
   private NotificationDto notification(UUID receiverId) {
