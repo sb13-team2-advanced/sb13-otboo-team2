@@ -68,7 +68,7 @@ public class AuthController {
 
         return ResponseEntity.ok()
                 .header(HttpHeaders.SET_COOKIE, cookie.toString())
-                .body(new TokenRefreshResponse(result.accessToken()));
+                .body(TokenRefreshResponse.from(result));
     }
 
     @PostMapping("/sign-out")

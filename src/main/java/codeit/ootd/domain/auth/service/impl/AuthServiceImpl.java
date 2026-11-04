@@ -116,6 +116,7 @@ public class AuthServiceImpl implements AuthService {
         );
 
         return new TokenRefreshResult(
+                UserDto.from(user),
                 newAccessToken,
                 newRefreshToken
         );
