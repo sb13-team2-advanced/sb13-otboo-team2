@@ -2,6 +2,7 @@ package codeit.ootd.domain.user.controller;
 
 import codeit.ootd.domain.user.dto.request.UserCreateRequest;
 import codeit.ootd.domain.user.dto.response.UserDto;
+import codeit.ootd.domain.user.dto.response.UserListResponse;
 import codeit.ootd.domain.user.entity.UserRole;
 import codeit.ootd.domain.user.exception.DuplicateEmailException;
 import codeit.ootd.domain.user.service.UserService;
@@ -21,15 +22,18 @@ import org.springframework.validation.beanvalidation.LocalValidatorFactoryBean;
 import tools.jackson.databind.json.JsonMapper;
 
 import java.time.Instant;
+import java.util.List;
 import java.util.UUID;
 
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 
 @ExtendWith(MockitoExtension.class)
 class UserControllerTest {
@@ -288,6 +292,305 @@ class UserControllerTest {
 
         verifyNoInteractions(userService);
     }
+
+    @Test
+    @DisplayName("사용자 목록 조회 성공 시 200과 페이지네이션 정보를 반환한다")
+    void getUsers_success() throws Exception {
+        // given
+        UUID userId = UUID.randomUUID();
+        Instant createdAt = Instant.parse("2026-10-30T00:00:00Z");
+
+        UserDto userDto = new UserDto(
+                userId,
+                createdAt,
+                "test@example.com",
+                "테스트사용자",
+                UserRole.USER,
+                false
+        );
+
+        UserListResponse response = new UserListResponse(
+                List.of(userDto),
+                null,
+                null,
+                false,
+                1L,
+                "email",
+                "ASCENDING"
+        );
+
+        when(userService.getUsers(
+                null, null, 10, "email", "ASCENDING",
+                null, null, null
+        )).thenReturn(response);
+
+        // when & then
+        mockMvc.perform(get("/api/users")
+                        .param("limit", "10")
+                        .param("sortBy", "email")
+                        .param("sortDirection", "ASCENDING"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data[0].id").value(userId.toString()))
+                .andExpect(jsonPath("$.data[0].email").value("test@example.com"))
+                .andExpect(jsonPath("$.data[0].role").value("USER"))
+                .andExpect(jsonPath("$.hasNext").value(false))
+                .andExpect(jsonPath("$.totalCount").value(1))
+                .andExpect(jsonPath("$.sortBy").value("email"))
+                .andExpect(jsonPath("$.sortDirection").value("ASCENDING"));
+
+        verify(userService).getUsers(
+                null, null, 10, "email", "ASCENDING",
+                null, null, null
+        );
+    }
+
+    @Test
+    @DisplayName("사용자 목록 조회 시 limit가 0이면 400을 반환한다")
+    void getUsers_zeroLimit_returnsBadRequest() throws Exception {
+        // when & then
+        mockMvc.perform(get("/api/users")
+                        .param("limit", "0")
+                        .param("sortBy", "email")
+                        .param("sortDirection", "ASCENDING"))
+                .andExpect(status().isBadRequest());
+
+        verifyNoInteractions(userService);
+    }
+
+    @Test
+    @DisplayName("사용자 목록 조회 시 limit가 음수이면 400을 반환한다")
+    void getUsers_negativeLimit_returnsBadRequest() throws Exception {
+        // when & then
+        mockMvc.perform(get("/api/users")
+                        .param("limit", "-1")
+                        .param("sortBy", "email")
+                        .param("sortDirection", "ASCENDING"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.exceptionName")
+                        .value("InvalidUserQueryException"))
+                .andExpect(jsonPath("$.message")
+                        .value("잘못된 사용자 조회 요청입니다."));
+
+        verifyNoInteractions(userService);
+    }
+
+    @Test
+    @DisplayName("사용자 목록 조회 시 지원하지 않는 정렬 기준이면 400을 반환한다")
+    void getUsers_invalidSortBy_returnsBadRequest() throws Exception {
+        // when & then
+        mockMvc.perform(get("/api/users")
+                        .param("limit", "10")
+                        .param("sortBy", "name")
+                        .param("sortDirection", "ASCENDING"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.exceptionName")
+                        .value("InvalidUserQueryException"))
+                .andExpect(jsonPath("$.message")
+                        .value("잘못된 사용자 조회 요청입니다."));
+
+        verifyNoInteractions(userService);
+    }
+
+    @Test
+    @DisplayName("사용자 목록 조회 시 지원하지 않는 정렬 방향이면 400을 반환한다")
+    void getUsers_invalidSortDirection_returnsBadRequest() throws Exception {
+        // when & then
+        mockMvc.perform(get("/api/users")
+                        .param("limit", "10")
+                        .param("sortBy", "email")
+                        .param("sortDirection", "ASC"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.exceptionName")
+                        .value("InvalidUserQueryException"))
+                .andExpect(jsonPath("$.message")
+                        .value("잘못된 사용자 조회 요청입니다."));
+
+        verifyNoInteractions(userService);
+    }
+
+    @Test
+    @DisplayName("사용자 목록 조회 시 cursor만 전달하면 400을 반환한다")
+    void getUsers_cursorWithoutIdAfter_returnsBadRequest() throws Exception {
+        // when & then
+        mockMvc.perform(get("/api/users")
+                        .param("cursor", "test@example.com")
+                        .param("limit", "10")
+                        .param("sortBy", "email")
+                        .param("sortDirection", "ASCENDING"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.exceptionName")
+                        .value("InvalidUserQueryException"))
+                .andExpect(jsonPath("$.message")
+                        .value("잘못된 사용자 조회 요청입니다."));
+
+        verifyNoInteractions(userService);
+    }
+
+    @Test
+    @DisplayName("생성일 커서 형식이 잘못되면 400을 반환한다")
+    void getUsers_invalidCreatedAtCursor_returnsBadRequest() throws Exception {
+        mockMvc.perform(get("/api/users")
+                        .param("cursor", "invalid-date")
+                        .param("idAfter", UUID.randomUUID().toString())
+                        .param("limit", "10")
+                        .param("sortBy", "createdAt")
+                        .param("sortDirection", "ASCENDING"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.exceptionName")
+                        .value("InvalidUserQueryException"))
+                .andExpect(jsonPath("$.message")
+                        .value("잘못된 사용자 조회 요청입니다."));
+
+        verifyNoInteractions(userService);
+    }
+
+    @Test
+    @DisplayName("사용자 목록 조회 시 공백 cursor를 전달하면 400을 반환한다")
+    void getUsers_blankCursor_returnsBadRequest() throws Exception {
+        // when & then
+        mockMvc.perform(get("/api/users")
+                        .param("cursor", " ")
+                        .param("limit", "10")
+                        .param("sortBy", "email")
+                        .param("sortDirection", "ASCENDING"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.exceptionName")
+                        .value("InvalidUserQueryException"))
+                .andExpect(jsonPath("$.message")
+                        .value("잘못된 사용자 조회 요청입니다."));
+
+        verifyNoInteractions(userService);
+    }
+
+    @Test
+    @DisplayName("사용자 목록 조회 시 limit가 100을 초과하면 400을 반환한다")
+    void getUsers_limitExceedsMaximum_returnsBadRequest() throws Exception {
+        mockMvc.perform(get("/api/users")
+                        .param("limit", "101")
+                        .param("sortBy", "email")
+                        .param("sortDirection", "ASCENDING"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.exceptionName")
+                        .value("InvalidUserQueryException"))
+                .andExpect(jsonPath("$.message")
+                        .value("잘못된 사용자 조회 요청입니다."));
+
+        verifyNoInteractions(userService);
+    }
+
+    @Test
+    @DisplayName("사용자 목록 조회 시 limit가 100이면 정상 처리한다")
+    void getUsers_limit100_returnsOk() throws Exception {
+        // given
+        UserListResponse response = new UserListResponse(
+                List.of(), null, null, false, 0L,
+                "email", "ASCENDING"
+        );
+
+        when(userService.getUsers(
+                null, null, 100, "email", "ASCENDING",
+                null, null, null
+        )).thenReturn(response);
+
+        // when & then
+        mockMvc.perform(get("/api/users")
+                        .param("limit", "100")
+                        .param("sortBy", "email")
+                        .param("sortDirection", "ASCENDING"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data").isArray());
+
+        verify(userService).getUsers(
+                null, null, 100, "email", "ASCENDING",
+                null, null, null
+        );
+    }
+
+    @Test
+    @DisplayName("사용자 권한 변경 요청 시 200과 변경된 사용자 정보를 반환한다")
+    void updateUserRole_success() throws Exception {
+        // given
+        UUID userId = UUID.randomUUID();
+        Instant createdAt = Instant.parse("2026-10-30T00:00:00Z");
+
+        UserDto response = new UserDto(
+                userId,
+                createdAt,
+                "test@example.com",
+                "테스트사용자",
+                UserRole.ADMIN,
+                false
+        );
+
+        when(userService.updateRole(userId, UserRole.ADMIN))
+                .thenReturn(response);
+
+        // when & then
+        mockMvc.perform(patch("/api/users/{userId}/role", userId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                            {
+                              "role": "ADMIN"
+                            }
+                            """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.id").value(userId.toString()))
+                .andExpect(jsonPath("$.role").value("ADMIN"))
+                .andExpect(jsonPath("$.email").value("test@example.com"));
+
+        verify(userService).updateRole(userId, UserRole.ADMIN);
+    }
+
+    @Test
+    @DisplayName("사용자 권한 변경 시 role이 null이면 400을 반환한다")
+    void updateUserRole_nullRole_returnsBadRequest() throws Exception {
+        // when & then
+        mockMvc.perform(patch("/api/users/{userId}/role", UUID.randomUUID())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                            {
+                              "role": null
+                            }
+                            """))
+                .andExpect(status().isBadRequest());
+
+        verifyNoInteractions(userService);
+    }
+
+    @Test
+    @DisplayName("계정 잠금 요청 시 변경된 사용자 정보를 반환한다")
+    void updateLock_success() throws Exception {
+        // given
+        UUID userId = UUID.randomUUID();
+
+        UserDto response = new UserDto(
+                userId,
+                Instant.parse("2026-11-03T00:00:00Z"),
+                "test@example.com",
+                "테스트사용자",
+                UserRole.USER,
+                true
+        );
+
+        when(userService.updateLock(userId, true))
+                .thenReturn(response);
+
+        // when & then
+        mockMvc.perform(patch("/api/users/{userId}/lock", userId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                            {
+                              "locked": true
+                            }
+                            """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.id").value(userId.toString()))
+                .andExpect(jsonPath("$.locked").value(true));
+
+        verify(userService).updateLock(userId, true);
+    }
+
+
 
 
 }

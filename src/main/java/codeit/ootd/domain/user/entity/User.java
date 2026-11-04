@@ -7,6 +7,7 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 
 import java.time.Instant;
+import java.util.Objects;
 
 @Entity
 @Getter
@@ -61,6 +62,10 @@ public class User extends BaseTimeEntity {
         return user;
     }
 
+    public void changeName(String name) {
+        this.name = Objects.requireNonNull(name, "name must not be null");
+    }
+
     public void lock() {
         this.locked = true;
     }
@@ -71,6 +76,14 @@ public class User extends BaseTimeEntity {
 
     public void markDeleted() {
         this.status = UserStatus.DELETED;
+    }
+
+    public void updateRole(UserRole role) {
+        this.role = Objects.requireNonNull(role, "role은 필수입니다.");
+    }
+
+    public void unlock() {
+        this.locked = false;
     }
 }
 

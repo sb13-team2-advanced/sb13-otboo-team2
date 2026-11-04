@@ -87,4 +87,24 @@ public class AuthSessionServiceImpl implements AuthSessionService {
         log.debug("인증 세션 폐기 완료: sessionId={}", sessionId);
     }
 
+    @Override
+    @Transactional
+    public void revokeAllSessions(UUID userId) {
+        Instant now = clock.instant();
+
+        List<AuthSession> activeSessions =
+                authSessionRepository
+                        .findAllByUserIdAndRevokedAtIsNullAndExpiresAtAfter(
+                                userId, now
+                        );
+
+        for (AuthSession session : activeSessions) {
+            session.revoke(now);
+        }
+
+        log.debug("사용자 전체 인증 세션 폐기 완료: userId={}, count={}",
+                userId, activeSessions.size());
+    }
+
+
 }
