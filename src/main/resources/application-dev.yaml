@@ -45,3 +45,7 @@ ootd:
   openapi:
     server-url: http://localhost:${server.port:8080}
     server-description: 로컬 개발 서버
+
+auth:
+  cookie:
+    secure: false

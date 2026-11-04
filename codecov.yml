@@ -1,7 +1,14 @@
 ignore:
   - "**/entity/**"
+  - "**/dto/**"
 
 coverage:
   status:
-    project: false
-    patch: false
+    project:
+      default:
+        target: 80.1%
+        threshold: 0%
+    patch:
+      default:
+        target: 80.1%
+        threshold: 0%

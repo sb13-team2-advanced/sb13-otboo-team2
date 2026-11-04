@@ -1,6 +1,7 @@
 package codeit.ootd.domain.user.integration;
 
 import codeit.ootd.domain.user.dto.request.UserCreateRequest;
+import codeit.ootd.domain.user.dto.response.UserDto;
 import codeit.ootd.domain.user.entity.User;
 import codeit.ootd.domain.user.entity.UserRole;
 import codeit.ootd.domain.user.entity.UserStatus;
@@ -19,6 +20,7 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.Duration;
 import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -54,7 +56,7 @@ class UserSignupIntegrationTest {
         );
 
         // when
-        userService.signup(request);
+        UserDto response = userService.signup(request);
 
         // INSERT SQL을 DB에 반영
         userRepository.flush();
@@ -111,6 +113,33 @@ class UserSignupIntegrationTest {
                 ),
                 () -> assertNotNull(
                         savedUser.getUpdatedAt()
+                ),
+
+                // UserDto 응답 검증
+                () -> assertNotNull(
+                        response
+                ),
+                () -> assertEquals(
+                        savedUser.getId(), response.id()
+                ),
+                () -> assertTrue(
+                        Duration.between(
+                                savedUser.getCreatedAt(),
+                                response.createdAt()
+                        ).abs().compareTo(Duration.ofMillis(1)) < 0,
+                        "DB에 저장된 생성 시간과 DTO 생성 시간의 차이는 1ms 미만이어야 한다"
+                ),
+                () -> assertEquals(
+                        savedUser.getEmail(), response.email()
+                ),
+                () -> assertEquals(
+                        savedUser.getName(), response.name()
+                ),
+                () -> assertEquals(
+                        savedUser.getRole(), response.role()
+                ),
+                () -> assertEquals(
+                        savedUser.isLocked(), response.locked()
                 )
         );
     }
