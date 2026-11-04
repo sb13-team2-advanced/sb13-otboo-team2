@@ -2,11 +2,13 @@ package codeit.ootd.domain.notification.service;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.mockConstruction;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -79,6 +81,24 @@ class NotificationSseServiceTest {
     assertTrue(connections().get(userId).containsValue(secondTab));
     service.sendHeartbeats();
     assertEquals(":connected\n\n:heartbeat\n\n", result.getResponse().getContentAsString());
+  }
+
+  @Test
+  @DisplayName("최초 연결 메시지 전송에 실패하면 등록한 연결을 제거하고 원인 예외를 반환한다")
+  void removesConnectionWhenInitialMessageFails() {
+    UUID userId = UUID.randomUUID();
+    IOException failure = new IOException("disconnected");
+
+    try (var mocked = mockConstruction(SseEmitter.class, (emitter, context) ->
+        doThrow(failure).when(emitter).send(any(SseEmitter.SseEventBuilder.class)))) {
+      IllegalStateException exception = assertThrows(IllegalStateException.class,
+          () -> service.subscribe(userId));
+
+      assertEquals("SSE 연결 확인 메시지 전송에 실패했습니다.", exception.getMessage());
+      assertSame(failure, exception.getCause());
+      assertFalse(connections().containsKey(userId));
+      assertEquals(1, mocked.constructed().size());
+    }
   }
 
   @Test
