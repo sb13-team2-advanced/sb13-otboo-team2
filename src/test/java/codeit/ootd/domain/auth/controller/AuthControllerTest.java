@@ -214,8 +214,19 @@ class AuthControllerTest {
     void refresh_success() throws Exception {
         // given
         String oldRefreshToken = "old-refresh-token";
+        UUID userId = UUID.randomUUID();
+
+        UserDto userDto = new UserDto(
+                userId,
+                Instant.parse("2026-10-28T00:00:00Z"),
+                "test@example.com",
+                "테스트사용자",
+                UserRole.USER,
+                false
+        );
 
         TokenRefreshResult result = new TokenRefreshResult(
+                userDto,
                 "new-access-token",
                 "new-refresh-token"
         );
@@ -224,7 +235,6 @@ class AuthControllerTest {
                 .thenReturn(result);
 
         Cookie csrfCookie = issueCsrfCookie();
-
         Cookie refreshCookie = new Cookie(
                 "refreshToken",
                 oldRefreshToken
@@ -237,6 +247,10 @@ class AuthControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.accessToken")
                         .value("new-access-token"))
+                .andExpect(jsonPath("$.userDto.id")
+                        .value(userId.toString()))
+                .andExpect(jsonPath("$.userDto.role")
+                        .value("USER"))
                 .andExpect(jsonPath("$.refreshToken").doesNotExist())
                 .andExpect(cookie().value(
                         "refreshToken",
