@@ -36,6 +36,9 @@ public enum ErrorCode {
     CLOTHES_ATTRIBUTE_DUPLICATED(HttpStatus.BAD_REQUEST, "같은 속성 정의가 중복되어 있습니다."),
     CLOTHES_IN_USE(HttpStatus.CONFLICT, "피드에서 사용 중인 의상은 삭제할 수 없습니다."),
     CLOTHES_INVALID_CURSOR(HttpStatus.BAD_REQUEST, "커서 또는 조회 개수가 올바르지 않습니다."),
+    CLOTHES_EXTRACTION_INVALID_URL(HttpStatus.BAD_REQUEST, "올바르지 않거나 접근할 수 없는 URL입니다."),
+    CLOTHES_EXTRACTION_FETCH_FAILED(HttpStatus.BAD_GATEWAY, "구매 링크의 페이지를 불러오지 못했습니다."),
+    CLOTHES_EXTRACTION_NOT_FOUND(HttpStatus.UNPROCESSABLE_CONTENT, "구매 링크에서 의상 정보를 찾지 못했습니다."),
 
     // 피드 등록
     FEED_CREATE_INVALID_REQUEST(HttpStatus.BAD_REQUEST, "피드 등록 요청이 올바르지 않습니다."),
