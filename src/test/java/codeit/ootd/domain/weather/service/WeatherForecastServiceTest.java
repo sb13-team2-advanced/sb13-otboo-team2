@@ -2,10 +2,13 @@ package codeit.ootd.domain.weather.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
+import codeit.ootd.domain.notification.enums.NotificationLevel;
+import codeit.ootd.domain.notification.event.NotificationRequestedEvent;
 import codeit.ootd.domain.weather.entity.WeatherForecast;
 import codeit.ootd.domain.weather.entity.WeatherLocation;
 import codeit.ootd.domain.weather.repository.WeatherForecastRepository;
@@ -27,6 +30,7 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.context.ApplicationEventPublisher;
 
 @ExtendWith(MockitoExtension.class)
 class WeatherForecastServiceTest {
@@ -39,6 +43,12 @@ class WeatherForecastServiceTest {
 
     @Mock
     private Clock clock;
+
+    @Mock
+    private WeatherNotificationRecipientFinder recipientFinder;
+
+    @Mock
+    private ApplicationEventPublisher eventPublisher;
 
     @Spy
     private WeatherChangeDetector weatherChangeDetector =
@@ -90,6 +100,7 @@ class WeatherForecastServiceTest {
         assertThat(savedForecast.getWindSpeed()).isEqualTo(2.5);
 
         verifyNoInteractions(weatherNotificationMessageBuilder);
+        verifyNoInteractions(recipientFinder, eventPublisher);
     }
 
     @Test
@@ -274,6 +285,7 @@ class WeatherForecastServiceTest {
 
         verify(weatherForecastRepository).save(existingForecast);
         verifyNoInteractions(weatherNotificationMessageBuilder);
+        verifyNoInteractions(recipientFinder, eventPublisher);
     }
 
     private WeatherForecast previousForecast(
@@ -310,5 +322,54 @@ class WeatherForecastServiceTest {
             null,
             new OwmForecastResponse.Wind(2.5)
         );
+    }
+
+    @Test
+    @DisplayName("날씨가 변경되면 같은 지역의 사용자별로 알림 이벤트를 발행한다")
+    void saveForecastsPublishesNotificationForEachRecipient() {
+        UUID locationId = UUID.randomUUID();
+        UUID firstUserId = UUID.randomUUID();
+        UUID secondUserId = UUID.randomUUID();
+        String cellId = "target-cell";
+
+        WeatherLocation location = mock(WeatherLocation.class);
+        when(location.getId()).thenReturn(locationId);
+        when(location.getCellId()).thenReturn(cellId);
+
+        Instant forecastAt = NOW.plusSeconds(3600);
+
+        WeatherForecast existingForecast =
+            previousForecast(locationId, forecastAt, 20.0, 800);
+
+        when(weatherForecastRepository.findByLocationIdAndForecastAt(
+            locationId, forecastAt
+        )).thenReturn(Optional.of(existingForecast));
+
+        when(clock.instant()).thenReturn(NOW);
+        when(recipientFinder.findRecipientIds(cellId))
+            .thenReturn(Set.of(firstUserId, secondUserId));
+
+        OwmForecastResponse response = new OwmForecastResponse(
+            List.of(forecastItem(forecastAt, 26.0, 500))
+        );
+
+        weatherForecastService.saveForecasts(location, response);
+
+        ArgumentCaptor<NotificationRequestedEvent> captor =
+            ArgumentCaptor.forClass(NotificationRequestedEvent.class);
+
+        verify(eventPublisher, times(2)).publishEvent(captor.capture());
+
+        List<NotificationRequestedEvent> events = captor.getAllValues();
+
+        assertThat(events)
+            .extracting(NotificationRequestedEvent::receiverId)
+            .containsExactlyInAnyOrder(firstUserId, secondUserId);
+
+        assertThat(events).allSatisfy(event -> {
+            assertThat(event.title()).isEqualTo("날씨 예보가 달라졌어요!");
+            assertThat(event.level()).isEqualTo(NotificationLevel.INFO);
+            assertThat(event.content()).contains("비가 올", "높아졌어요");
+        });
     }
 }
