@@ -27,6 +27,9 @@ import java.io.IOException;
 @EnableMethodSecurity
 public class SecurityConfig {
 
+    /**
+     * 정적 리소스와 공개 인증 API, 준비 상태 조회를 허용하고 나머지 요청에는 JWT 인증을 적용한다.
+     */
     @Bean
     public SecurityFilterChain securityFilterChain(
             HttpSecurity http,
@@ -65,6 +68,7 @@ public class SecurityConfig {
                         "/images/**"
                 ).permitAll()
 
+                .requestMatchers(HttpMethod.GET, "/actuator/health/readiness").permitAll()
                 .requestMatchers(HttpMethod.POST, "/api/users").permitAll()
                 .requestMatchers(HttpMethod.POST, "/api/auth/sign-in").permitAll()
                 .requestMatchers(HttpMethod.POST, "/api/auth/refresh").permitAll()
