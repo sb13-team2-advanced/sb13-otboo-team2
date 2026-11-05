@@ -2,6 +2,7 @@ package codeit.ootd.domain.user.controller;
 
 import codeit.ootd.domain.user.dto.request.UserCreateRequest;
 import codeit.ootd.domain.user.dto.request.UserLockUpdateRequest;
+import codeit.ootd.domain.user.dto.request.UserPasswordUpdateRequest;
 import codeit.ootd.domain.user.dto.request.UserRoleUpdateRequest;
 import codeit.ootd.domain.user.dto.response.UserDto;
 import codeit.ootd.domain.user.dto.response.UserListResponse;
@@ -15,6 +16,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.Authentication;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.*;
@@ -125,6 +127,26 @@ public class UserController {
 
         return ResponseEntity.ok(response);
     }
+
+    @PatchMapping("/{userId}/password")
+    public ResponseEntity<Void> updatePassword(
+            @PathVariable UUID userId,
+            @Valid @RequestBody UserPasswordUpdateRequest request,
+            Authentication authentication
+    ) {
+        UUID authenticatedUserId = UUID.fromString(
+                authentication.getName()
+        );
+
+        if (!authenticatedUserId.equals(userId)) {
+            return ResponseEntity.status(403).build();
+        }
+
+        userService.updatePassword(userId, request.password());
+
+        return ResponseEntity.noContent().build();
+    }
+
 
 
 
