@@ -54,7 +54,15 @@ class WeatherChangeDetectorTest {
         "500, 501, NONE",
         "600, 601, NONE",
         "500, 800, NONE",
-        "600, 804, NONE"
+        "600, 804, NONE",
+        "600, 615, MIXED",
+        "615, 600, SNOW",
+        "800, 616, MIXED",
+        "615, 616, NONE",
+        "500, 615, MIXED",
+        "616, 500, RAIN",
+        "600, 611, MIXED",
+        "613, 600, SNOW"
     })
     void detectsPrecipitationChange(
         int previousCode,
@@ -118,5 +126,29 @@ class WeatherChangeDetectorTest {
             0.0,
             2.0
         );
+    }
+
+    @ParameterizedTest
+    @DisplayName("소수점 기온 차이가 정확히 5도이면 변화를 감지한다")
+    @CsvSource({
+        "-19.9, -14.9, UP",
+        "-14.9, -19.9, DOWN",
+        "14.9, 19.9, UP",
+        "19.9, 14.9, DOWN"
+    })
+    void detectsExactFiveDegreeChangeWithDecimals(
+        double previousTemperature,
+        double newTemperature,
+        TemperatureChange expected
+    ) {
+        WeatherForecast previous = previousForecast(previousTemperature, 800);
+
+        WeatherChange change = detector.detect(
+            previous,
+            newTemperature,
+            800
+        );
+
+        assertThat(change.temperature()).isEqualTo(expected);
     }
 }

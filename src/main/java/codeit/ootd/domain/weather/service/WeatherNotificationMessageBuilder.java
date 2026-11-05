@@ -25,13 +25,11 @@ public class WeatherNotificationMessageBuilder {
                 + ". 옷차림을 확인해 보세요.";
         }
 
-        boolean hasRain = precipitationTypes.contains(
-            WeatherChangeDetector.PrecipitationType.RAIN
-        );
+        boolean hasRain = precipitationTypes.contains(PrecipitationType.RAIN)
+            || precipitationTypes.contains(PrecipitationType.MIXED);
 
-        boolean hasSnow = precipitationTypes.contains(
-            WeatherChangeDetector.PrecipitationType.SNOW
-        );
+        boolean hasSnow = precipitationTypes.contains(PrecipitationType.SNOW)
+            || precipitationTypes.contains(PrecipitationType.MIXED);
 
         String advice = hasRain && hasSnow
             ? "비와 눈에 대비"
@@ -68,6 +66,10 @@ public class WeatherNotificationMessageBuilder {
     ) {
         if (types.isEmpty()) {
             return "";
+        }
+
+        if (types.contains(PrecipitationType.MIXED)) {
+            return "비와 눈이 함께 올";
         }
 
         if (types.size() == 1) {

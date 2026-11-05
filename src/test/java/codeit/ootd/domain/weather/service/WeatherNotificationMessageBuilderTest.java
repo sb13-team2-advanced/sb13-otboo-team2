@@ -26,7 +26,10 @@ class WeatherNotificationMessageBuilderTest {
         "false, false, SNOW-RAIN, '앞으로 6시간 이내 눈이 온 뒤 비가 올 가능성이 있어요. 비와 눈에 대비하세요.'",
         "true, false, RAIN, '앞으로 6시간 이내 비가 올 가능성이 있고, 예상 기온이 크게 높아졌어요. 우산을 준비하고 옷차림도 확인해 보세요.'",
         "false, true, SNOW, '앞으로 6시간 이내 눈이 올 가능성이 있고, 예상 기온이 크게 낮아졌어요. 눈에 대비하고 옷차림도 확인해 보세요.'",
-        "true, true, SNOW-RAIN, '앞으로 6시간 이내 눈이 온 뒤 비가 올 가능성이 있고, 예상 기온이 크게 달라졌어요. 비와 눈에 대비하고 옷차림도 확인해 보세요.'"
+        "true, true, SNOW-RAIN, '앞으로 6시간 이내 눈이 온 뒤 비가 올 가능성이 있고, 예상 기온이 크게 달라졌어요. 비와 눈에 대비하고 옷차림도 확인해 보세요.'",
+        "false, false, MIXED, '앞으로 6시간 이내 비와 눈이 함께 올 가능성이 있어요. 비와 눈에 대비하세요.'",
+        "true, false, MIXED, '앞으로 6시간 이내 비와 눈이 함께 올 가능성이 있고, 예상 기온이 크게 높아졌어요. 비와 눈에 대비하고 옷차림도 확인해 보세요.'",
+        "false, false, RAIN-MIXED, '앞으로 6시간 이내 비와 눈이 함께 올 가능성이 있어요. 비와 눈에 대비하세요.'"
     })
     void buildReturnsExpectedMessage(
         boolean temperatureUp,

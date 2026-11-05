@@ -1,12 +1,13 @@
 package codeit.ootd.domain.weather.service;
 
 import codeit.ootd.domain.weather.entity.WeatherForecast;
+import java.math.BigDecimal;
 import org.springframework.stereotype.Component;
 
 @Component
 public class WeatherChangeDetector {
 
-    private static final double TEMPERATURE_THRESHOLD = 5.0;
+    private static final BigDecimal TEMPERATURE_THRESHOLD = BigDecimal.valueOf(5);
 
     public WeatherChange detect(
         WeatherForecast previous,
@@ -14,14 +15,14 @@ public class WeatherChangeDetector {
         int newWeatherCode
     ) {
 
-        double difference =
-            newTemperature - previous.getTemperature();
+        BigDecimal difference = BigDecimal.valueOf(newTemperature)
+            .subtract(BigDecimal.valueOf(previous.getTemperature()));
 
         TemperatureChange temperatureChange = TemperatureChange.NONE;
 
-        if (difference >= TEMPERATURE_THRESHOLD) {
+        if (difference.compareTo(TEMPERATURE_THRESHOLD) >= 0) {
             temperatureChange = TemperatureChange.UP;
-        } else if (difference <= -TEMPERATURE_THRESHOLD) {
+        } else if (difference.compareTo(TEMPERATURE_THRESHOLD.negate()) <= 0) {
             temperatureChange = TemperatureChange.DOWN;
         }
 
@@ -49,6 +50,12 @@ public class WeatherChangeDetector {
             return PrecipitationType.RAIN;
         }
 
+        if ((weatherCode >= 611 && weatherCode <= 613)
+            || weatherCode == 615 || weatherCode == 616
+        ) {
+            return PrecipitationType.MIXED;
+        }
+
         if (weatherCode >= 600 && weatherCode < 700) {
             return PrecipitationType.SNOW;
         }
@@ -61,7 +68,7 @@ public class WeatherChangeDetector {
     }
 
     public enum PrecipitationType {
-        NONE, RAIN, SNOW;
+        NONE, RAIN, SNOW, MIXED;
     }
 
     public record WeatherChange(
