@@ -555,4 +555,53 @@ class UserServiceImplTest {
         verify(authSessionService, never()).revokeAllSessions(any());
     }
 
+    @Test
+    @DisplayName("비밀번호 변경 시 새 비밀번호를 암호화하고 기존 세션을 무효화한다")
+    void updatePassword_success() {
+        // given
+        UUID userId = UUID.randomUUID();
+        String newPassword = "NewPassword123!";
+        String encodedPassword = "encoded-new-password";
+
+        User user = User.create(
+                "테스트사용자",
+                "test@example.com",
+                "encoded-old-password"
+        );
+
+        when(userRepository.findById(userId))
+                .thenReturn(Optional.of(user));
+
+        when(passwordEncoder.encode(newPassword))
+                .thenReturn(encodedPassword);
+
+        // when
+        userService.updatePassword(userId, newPassword);
+
+        // then
+        assertThat(user.getPassword()).isEqualTo(encodedPassword);
+
+        verify(passwordEncoder).encode(newPassword);
+        verify(authSessionService).revokeAllSessions(userId);
+    }
+
+    @Test
+    @DisplayName("존재하지 않는 사용자의 비밀번호 변경 시 예외가 발생한다")
+    void updatePassword_userNotFound_throwsException() {
+        // given
+        UUID userId = UUID.randomUUID();
+
+        when(userRepository.findById(userId))
+                .thenReturn(Optional.empty());
+
+        // when & then
+        assertThatThrownBy(() ->
+                userService.updatePassword(userId, "NewPassword123!")
+        ).isInstanceOf(UserNotFoundException.class);
+
+        verifyNoInteractions(passwordEncoder, authSessionService);
+    }
+
+
+
 }
