@@ -14,4 +14,6 @@ public interface FeedService {
     FeedDtoCursorResponse list(FeedSearchRequest request, UUID userId);
 
     FeedDto update(UUID feedId, FeedUpdateRequest request, UUID userId);
+
+    void delete(UUID feedId, UUID userId);
 }
