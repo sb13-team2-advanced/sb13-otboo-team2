@@ -1,11 +1,16 @@
 package codeit.ootd.infra.weather;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import codeit.ootd.global.exception.ErrorCode;
+import codeit.ootd.global.exception.OtbooException;
 import com.uber.h3core.util.LatLng;
 import java.io.IOException;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 
 class H3ServiceTest {
 
@@ -47,5 +52,33 @@ class H3ServiceTest {
         assertThat(center.lng).isBetween(-180.0, 180.0);
 
         assertThat(centerCellId).isEqualTo(cellId);
+    }
+
+    @ParameterizedTest
+    @CsvSource({
+        "-90.1, 127.0",
+        "90.1, 127.0",
+        "37.5, -180.1",
+        "37.5, 180.1",
+        "NaN, 127.0",
+        "37.5, NaN",
+        "Infinity, 127.0",
+        "37.5, -Infinity"
+    })
+    @DisplayName("유효하지 않은 위도 또는 경도는 날씨 좌표 오류를 발생시킨다")
+    void validateCoordinatesRejectsInvalidCoordinates(
+        double latitude,
+        double longitude
+    ) throws IOException {
+        H3Service h3Service = new H3Service();
+
+        assertThatThrownBy(
+            () -> h3Service.validateCoordinates(latitude, longitude)
+        )
+            .isInstanceOf(OtbooException.class)
+            .satisfies(exception ->
+                assertThat(((OtbooException) exception).getErrorCode())
+                    .isEqualTo(ErrorCode.WEATHER_INVALID_COORDINATES)
+            );
     }
 }

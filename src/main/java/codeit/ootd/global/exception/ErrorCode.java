@@ -61,7 +61,10 @@ public enum ErrorCode {
     FILE_UPLOAD_FAILED(HttpStatus.INTERNAL_SERVER_ERROR, "파일 저장에 실패했습니다."),
 
     // 추천
-    RECOMMENDATION_WEATHER_NOT_FOUND(HttpStatus.BAD_REQUEST, "추천할 날씨를 찾을 수 없습니다.");
+    RECOMMENDATION_WEATHER_NOT_FOUND(HttpStatus.BAD_REQUEST, "추천할 날씨를 찾을 수 없습니다."),
+
+    // 날씨
+    WEATHER_INVALID_COORDINATES(HttpStatus.BAD_REQUEST, "유효하지 않은 위도 또는 경도입니다.");
 
     private final HttpStatus status;
     private final String message;
