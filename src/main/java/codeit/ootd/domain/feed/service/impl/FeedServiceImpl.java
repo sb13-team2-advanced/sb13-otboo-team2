@@ -3,14 +3,13 @@ package codeit.ootd.domain.feed.service.impl;
 import codeit.ootd.domain.clothes.entity.Clothes;
 import codeit.ootd.domain.clothes.repository.ClothesRepository;
 import codeit.ootd.domain.feed.dto.request.FeedCreateRequest;
-import codeit.ootd.domain.feed.dto.response.AuthorDto;
-import codeit.ootd.domain.feed.dto.response.FeedDto;
-import codeit.ootd.domain.feed.dto.response.OotdDto;
-import codeit.ootd.domain.feed.dto.response.WeatherSummaryDto;
+import codeit.ootd.domain.feed.dto.request.FeedSearchRequest;
+import codeit.ootd.domain.feed.dto.response.*;
 import codeit.ootd.domain.feed.entity.Feed;
 import codeit.ootd.domain.feed.entity.FeedClothes;
 import codeit.ootd.domain.feed.mapper.FeedMapper;
 import codeit.ootd.domain.feed.repository.FeedClothesRepository;
+import codeit.ootd.domain.feed.repository.FeedQueryRepository;
 import codeit.ootd.domain.feed.repository.FeedRepository;
 import codeit.ootd.domain.feed.service.FeedResponseAssembler;
 import codeit.ootd.domain.feed.service.FeedService;
@@ -22,6 +21,9 @@ import codeit.ootd.domain.weather.mapper.WeatherDtoMapper;
 import codeit.ootd.domain.weather.repository.WeatherRepository;
 import codeit.ootd.global.exception.ErrorCode;
 import codeit.ootd.global.exception.OtbooException;
+
+import java.time.Instant;
+import java.time.format.DateTimeParseException;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -45,6 +47,7 @@ public class FeedServiceImpl implements FeedService {
     private final WeatherDtoMapper weatherDtoMapper;
     private final FeedMapper feedMapper;
     private final FeedResponseAssembler feedResponseAssembler;
+    private final FeedQueryRepository feedQueryRepository;
 
     @Override
     @Transactional
@@ -127,6 +130,101 @@ public class FeedServiceImpl implements FeedService {
                 .toList();
 
         return feedMapper.toCreateResponse(savedFeed, authorDto, ootds);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public FeedDtoCursorResponse list(
+            FeedSearchRequest request,
+            UUID userId
+    ) {
+
+        if (userId == null) {
+            throw new OtbooException(ErrorCode.AUTHENTICATION_REQUIRED);
+        }
+
+        validateSearchRequest(request);
+
+        int limit = request.limit();
+
+        List<Feed> feeds = feedQueryRepository.findList(
+                request,
+                limit + 1
+        );
+
+        long totalCount = feedQueryRepository.countList(request);
+
+        boolean hasNext = feeds.size() > limit;
+        List<Feed> page = hasNext
+                ? feeds.subList(0, limit)
+                : feeds;
+
+        String nextCursor = null;
+        UUID nextIdAfter = null;
+
+        if (hasNext) {
+            Feed last = page.get(page.size() - 1);
+
+            nextCursor = switch (request.sortBy()) {
+                case "createdAt" -> last.getCreatedAt().toString();
+                case "likeCount" -> Long.toString(last.getLikeCount());
+                default -> throw new OtbooException(
+                        ErrorCode.INVALID_SORT_FIELD
+                );
+            };
+
+            nextIdAfter = last.getId();
+        }
+
+        List<FeedDto> data = page.isEmpty()
+                ? List.of()
+                : feedResponseAssembler.toFeedDtos(page, userId);
+
+        return new FeedDtoCursorResponse(
+                data,
+                nextCursor,
+                nextIdAfter,
+                hasNext,
+                totalCount,
+                request.sortBy(),
+                request.sortDirection()
+        );
+    }
+
+    private void validateSearchRequest(FeedSearchRequest request) {
+        if (request == null
+                || request.limit() == null
+                || request.limit() <= 0
+                || request.limit() == Integer.MAX_VALUE
+                || request.sortDirection() == null) {
+            throw new OtbooException(ErrorCode.INVALID_REQUEST);
+        }
+
+        String sortBy = request.sortBy();
+
+        if (!"createdAt".equals(sortBy) && !"likeCount".equals(sortBy)) {
+            throw new OtbooException(ErrorCode.INVALID_SORT_FIELD);
+        }
+
+        String cursor = request.cursor();
+
+        if (cursor == null) {
+            return;
+        }
+
+        try {
+            if ("createdAt".equals(sortBy)) {
+                Instant.parse(cursor);
+            } else {
+                long likeCount = Long.parseLong(cursor);
+
+                if (likeCount < 0) {
+                    throw new OtbooException(ErrorCode.FEED_INVALID_CURSOR);
+                }
+            }
+        } catch (DateTimeParseException | NumberFormatException exception) {
+            throw new OtbooException(ErrorCode.FEED_INVALID_CURSOR);
+        }
     }
 
     private void validateRequest(FeedCreateRequest request) {

@@ -14,16 +14,21 @@ import codeit.ootd.domain.clothes.entity.ClothesAttributeDefinition;
 import codeit.ootd.domain.clothes.enums.ClothesType;
 import codeit.ootd.domain.clothes.repository.ClothesAttributeDefinitionRepository;
 import codeit.ootd.domain.clothes.repository.ClothesAttributeRepository;
+import codeit.ootd.domain.clothes.repository.ClothesRepository;
 import codeit.ootd.domain.feed.dto.response.AuthorDto;
 import codeit.ootd.domain.feed.dto.response.OotdDto;
 import codeit.ootd.domain.feed.mapper.FeedMapper;
 import codeit.ootd.domain.feed.mapper.OotdMapper;
+import codeit.ootd.domain.feed.repository.FeedClothesRepository;
+import codeit.ootd.domain.feed.repository.FeedLikeRepository;
 import codeit.ootd.domain.profile.entity.Profile;
 import codeit.ootd.domain.profile.repository.ProfileRepository;
 import codeit.ootd.domain.user.entity.User;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
+
+import codeit.ootd.domain.user.repository.UserRepository;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.mapstruct.factory.Mappers;
@@ -53,7 +58,11 @@ class FeedResponseAssemblerTest {
                     feedMapper,
                     clothesAttributeRepository,
                     clothesAttributeDefinitionRepository,
-                    ootdMapper
+                    ootdMapper,
+                    mock(UserRepository.class),
+                    mock(ClothesRepository.class),
+                    mock(FeedClothesRepository.class),
+                    mock(FeedLikeRepository.class)
             );
 
     @Test

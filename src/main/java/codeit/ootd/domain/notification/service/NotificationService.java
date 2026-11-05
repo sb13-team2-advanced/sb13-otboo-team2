@@ -1,5 +1,6 @@
 package codeit.ootd.domain.notification.service;
 
+import codeit.ootd.domain.notification.dto.response.NotificationDto;
 import codeit.ootd.domain.notification.entity.Notification;
 import codeit.ootd.domain.notification.enums.NotificationLevel;
 import codeit.ootd.domain.notification.repository.NotificationRepository;
@@ -16,8 +17,12 @@ public class NotificationService {
     private final NotificationRepository notificationRepository;
 
     @Transactional(propagation = Propagation.REQUIRES_NEW)
-    public void saveNotification(UUID receiverId, String title, String content,
+    public NotificationDto saveNotification(UUID receiverId, String title, String content,
             NotificationLevel level) {
-        notificationRepository.save(new Notification(receiverId, title, content, level));
+        Notification saved = notificationRepository.save(
+                new Notification(receiverId, title, content, level));
+        return new NotificationDto(
+                saved.getId(), saved.getCreatedAt(), saved.getReceiverId(),
+                saved.getTitle(), saved.getContent(), saved.getLevel());
     }
 }

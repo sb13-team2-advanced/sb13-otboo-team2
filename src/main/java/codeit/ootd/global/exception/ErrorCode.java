@@ -42,6 +42,7 @@ public enum ErrorCode {
     FEED_AUTHOR_NOT_FOUND(HttpStatus.BAD_REQUEST, "피드 작성자를 찾을 수 없습니다."),
     FEED_WEATHER_NOT_FOUND(HttpStatus.BAD_REQUEST, "피드에 사용할 날씨를 찾을 수 없습니다."),
     FEED_CLOTHES_NOT_FOUND(HttpStatus.BAD_REQUEST, "피드에 사용할 의상을 찾을 수 없습니다."),
+    FEED_INVALID_CURSOR(HttpStatus.BAD_REQUEST, "피드 조회 커서가 올바르지 않습니다."),
 
     // 프로필
     PROFILE_USER_NOT_FOUND(HttpStatus.NOT_FOUND, "프로필의 사용자를 찾을 수 없습니다."),
