@@ -10,6 +10,8 @@ import codeit.ootd.domain.feed.entity.Feed;
 import codeit.ootd.domain.feed.entity.FeedClothes;
 import codeit.ootd.domain.feed.mapper.FeedMapper;
 import codeit.ootd.domain.feed.repository.FeedClothesRepository;
+import codeit.ootd.domain.feed.repository.FeedCommentRepository;
+import codeit.ootd.domain.feed.repository.FeedLikeRepository;
 import codeit.ootd.domain.feed.repository.FeedQueryRepository;
 import codeit.ootd.domain.feed.repository.FeedRepository;
 import codeit.ootd.domain.feed.service.FeedResponseAssembler;
@@ -48,6 +50,8 @@ public class FeedServiceImpl implements FeedService {
     private final FeedMapper feedMapper;
     private final FeedResponseAssembler feedResponseAssembler;
     private final FeedQueryRepository feedQueryRepository;
+    private final FeedLikeRepository feedLikeRepository;
+    private final FeedCommentRepository feedCommentRepository;
 
     @Override
     @Transactional
@@ -222,6 +226,32 @@ public class FeedServiceImpl implements FeedService {
         return feedResponseAssembler
                 .toFeedDtos(List.of(feed), userId)
                 .get(0);
+    }
+
+    @Override
+    @Transactional
+    public void delete(UUID feedId, UUID userId) {
+        if (userId == null) {
+            throw new OtbooException(ErrorCode.AUTHENTICATION_REQUIRED);
+        }
+
+        if (feedId == null) {
+            throw new OtbooException(ErrorCode.INVALID_REQUEST);
+        }
+
+        Feed feed = feedRepository.findById(feedId)
+                .orElseThrow(
+                        () -> new OtbooException(ErrorCode.FEED_NOT_FOUND)
+                );
+
+        if (!userId.equals(feed.getAuthorId())) {
+            throw new OtbooException(ErrorCode.ACCESS_DENIED);
+        }
+
+        feedClothesRepository.deleteAllByFeedId(feedId);
+        feedLikeRepository.deleteAllByFeedId(feedId);
+        feedCommentRepository.deleteAllByFeedId(feedId);
+        feedRepository.delete(feed);
     }
 
     private void validateSearchRequest(FeedSearchRequest request) {
