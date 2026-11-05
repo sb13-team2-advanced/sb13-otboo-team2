@@ -59,6 +59,15 @@ public interface FeedMapper {
     @Mapping(target = "likedByMe", constant = "false")
     FeedDto toCreateResponse(Feed feed, AuthorDto author, List<OotdDto> ootds);
 
+    @Mapping(target = "weather", source = "feed")
+    @Mapping(target = "likedByMe", source = "likedByMe")
+    FeedDto toListResponse(
+            Feed feed,
+            AuthorDto author,
+            List<OotdDto> ootds,
+            boolean likedByMe
+    );
+
     @Mapping(target = "userId", source = "user.id")
     @Mapping(target = "name", source = "user.name")
     @Mapping(target = "profileImageUrl", source = "profileImageUrl")
