@@ -1,5 +1,7 @@
 package codeit.ootd.domain.weather.service;
 
+import codeit.ootd.domain.notification.enums.NotificationLevel;
+import codeit.ootd.domain.notification.event.NotificationRequestedEvent;
 import codeit.ootd.domain.weather.entity.WeatherForecast;
 import codeit.ootd.domain.weather.entity.WeatherLocation;
 import codeit.ootd.domain.weather.repository.WeatherForecastRepository;
@@ -12,7 +14,9 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.TreeMap;
+import java.util.UUID;
 import lombok.RequiredArgsConstructor;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -24,6 +28,11 @@ public class WeatherForecastService {
     private final WeatherChangeDetector weatherChangeDetector;
     private final WeatherNotificationMessageBuilder weatherNotificationMessageBuilder;
     private final Clock clock;
+
+    private static final String NOTIFICATION_TITLE = "날씨 예보가 달라졌어요!";
+
+    private final WeatherNotificationRecipientFinder recipientFinder;
+    private final ApplicationEventPublisher eventPublisher;
 
     @Transactional
     public void saveForecasts(
@@ -138,5 +147,18 @@ public class WeatherForecastService {
             temperatureDown,
             precipitationTypes
         );
+
+        Set<UUID> recipientIds = recipientFinder.findRecipientIds(location.getCellId());
+
+        for (UUID receiverId : recipientIds) {
+            eventPublisher.publishEvent(
+                new NotificationRequestedEvent(
+                    receiverId,
+                    NOTIFICATION_TITLE,
+                    content,
+                    NotificationLevel.INFO
+                )
+            );
+        }
     }
 }
