@@ -8,6 +8,7 @@ import codeit.ootd.domain.weather.entity.WeatherForecast;
 import codeit.ootd.domain.weather.entity.WeatherLocation;
 import codeit.ootd.domain.weather.repository.WeatherForecastRepository;
 import codeit.ootd.infra.weather.dto.OwmForecastResponse;
+import java.time.Clock;
 import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
@@ -18,6 +19,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
+import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 @ExtendWith(MockitoExtension.class)
@@ -25,6 +27,16 @@ class WeatherForecastServiceTest {
 
     @Mock
     private WeatherForecastRepository weatherForecastRepository;
+
+    @Mock
+    private Clock clock;
+
+    @Spy
+    private WeatherChangeDetector weatherChangeDetector = new WeatherChangeDetector();
+
+    @Spy
+    private WeatherNotificationMessageBuilder weatherNotificationMessageBuilder =
+        new WeatherNotificationMessageBuilder();
 
     @InjectMocks
     private WeatherForecastService weatherForecastService;
@@ -62,6 +74,9 @@ class WeatherForecastServiceTest {
         when(weatherForecastRepository
             .findByLocationIdAndForecastAt(locationId, forecastAt))
             .thenReturn(Optional.empty());
+
+        when(clock.instant())
+            .thenReturn(Instant.parse("2026-10-27T00:00:00Z"));
 
         weatherForecastService.saveForecasts(location, response);
 
@@ -129,6 +144,9 @@ class WeatherForecastServiceTest {
         when(weatherForecastRepository
             .findByLocationIdAndForecastAt(locationId, forecastAt))
             .thenReturn(Optional.of(existingForecast));
+
+        when(clock.instant())
+            .thenReturn(Instant.parse("2026-10-27T00:00:00Z"));
 
         weatherForecastService.saveForecasts(location, response);
 
