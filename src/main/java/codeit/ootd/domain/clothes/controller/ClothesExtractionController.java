@@ -18,6 +18,6 @@ public class ClothesExtractionController {
 
     @GetMapping("/extractions")
     public ResponseEntity<ClothesDto> extract(@RequestParam String url) {
-        throw new UnsupportedOperationException("not implemented");
+        return ResponseEntity.ok(extractionService.extract(url));
     }
 }

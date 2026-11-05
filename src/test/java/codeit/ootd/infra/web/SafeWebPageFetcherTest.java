@@ -60,6 +60,30 @@ class SafeWebPageFetcherTest {
     }
 
     @Test
+    void 응답_헤더의_charset으로_본문을_해석한다() throws Exception {
+        byte[] body = "<html><title>청바지</title></html>".getBytes(java.nio.charset.Charset.forName("EUC-KR"));
+        stub(response(200, "text/html; charset=EUC-KR", null, body));
+
+        assertThat(fetcher.fetch(URL)).isEqualTo("<html><title>청바지</title></html>");
+    }
+
+    @Test
+    void 알_수_없는_charset이면_UTF8로_해석한다() throws Exception {
+        byte[] body = "<html><title>청바지</title></html>".getBytes(StandardCharsets.UTF_8);
+        stub(response(200, "text/html; charset=no-such-charset", null, body));
+
+        assertThat(fetcher.fetch(URL)).isEqualTo("<html><title>청바지</title></html>");
+    }
+
+    @Test
+    void charset이_없으면_UTF8로_해석한다() throws Exception {
+        byte[] body = "<html><title>청바지</title></html>".getBytes(StandardCharsets.UTF_8);
+        stub(response(200, "text/html", null, body));
+
+        assertThat(fetcher.fetch(URL)).isEqualTo("<html><title>청바지</title></html>");
+    }
+
+    @Test
     void 짧은_시간제한과_일반적인_User_Agent로_쿠키없이_요청한다() throws Exception {
         stub(ok("<html></html>"));
 

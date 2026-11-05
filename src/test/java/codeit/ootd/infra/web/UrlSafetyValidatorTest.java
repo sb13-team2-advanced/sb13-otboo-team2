@@ -63,6 +63,8 @@ class UrlSafetyValidatorTest {
             "http://127.0.0.1/",
             "http://127.1.2.3/admin",
             "http://0.0.0.0/",
+            "http://0.1.2.3/",
+            "http://100.64.0.1/",
             "http://10.0.0.5/",
             "http://172.16.0.1/",
             "http://192.168.0.10/",
