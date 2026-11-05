@@ -3,13 +3,17 @@ package codeit.ootd.domain.weather.service;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 import codeit.ootd.domain.weather.dto.response.WeatherAPILocation;
 import codeit.ootd.domain.weather.entity.WeatherLocation;
 import codeit.ootd.domain.weather.repository.WeatherLocationRepository;
+import codeit.ootd.global.exception.ErrorCode;
+import codeit.ootd.global.exception.OtbooException;
 import codeit.ootd.infra.kakao.KakaoLocalClient;
 import codeit.ootd.infra.weather.H3Service;
 import codeit.ootd.infra.weather.dto.KakaoRegionResponse;
@@ -208,5 +212,27 @@ class WeatherLocationServiceTest {
 
         verify(kakaoLocalClient)
             .getAdministrativeRegion(latitude, longitude);
+    }
+
+    @Test
+    @DisplayName("잘못된 좌표는 카카오 API를 호출하지 않고 예외를 발생시킨다")
+    void getLocationRejectsInvalidCoordinates() {
+        double latitude = 100.0;
+        double longitude = 127.0;
+
+        doThrow(new OtbooException(ErrorCode.WEATHER_INVALID_COORDINATES))
+            .when(h3Service)
+            .validateCoordinates(latitude, longitude);
+
+        assertThatThrownBy(
+            () -> weatherLocationService.getLocation(latitude, longitude)
+        )
+            .isInstanceOf(OtbooException.class)
+            .satisfies(exception ->
+                assertThat(((OtbooException) exception).getErrorCode())
+                    .isEqualTo(ErrorCode.WEATHER_INVALID_COORDINATES)
+            );
+
+        verifyNoInteractions(kakaoLocalClient);
     }
 }
