@@ -10,6 +10,7 @@ import codeit.ootd.domain.clothes.repository.ClothesAttributeDefinitionRepositor
 import codeit.ootd.domain.clothes.service.ClothesExtractionService;
 import codeit.ootd.global.exception.ErrorCode;
 import codeit.ootd.global.exception.OtbooException;
+import codeit.ootd.infra.web.FetchedPage;
 import codeit.ootd.infra.web.WebPageFetcher;
 import java.util.List;
 import java.util.Locale;
@@ -32,8 +33,8 @@ public class ClothesExtractionServiceImpl implements ClothesExtractionService {
 
     @Override
     public ClothesDto extract(String url) {
-        String html = pageFetcher.fetch(url);
-        ParsedPage page = pageParser.parse(html, url);
+        FetchedPage fetched = pageFetcher.fetch(url);
+        ParsedPage page = pageParser.parse(fetched.html(), fetched.url());
         if (page.title() == null) {
             throw new OtbooException(ErrorCode.CLOTHES_EXTRACTION_NOT_FOUND);
         }
@@ -48,7 +49,7 @@ public class ClothesExtractionServiceImpl implements ClothesExtractionService {
      */
     private List<ClothesAttributeWithDefDto> matchAttributes(String title) {
         String lowered = title.toLowerCase(Locale.ROOT);
-        return definitionRepository.findAll().stream()
+        return definitionRepository.findAllWithSelectableValues().stream()
                 .map(definition -> toAttribute(definition, lowered))
                 .filter(java.util.Objects::nonNull)
                 .toList();

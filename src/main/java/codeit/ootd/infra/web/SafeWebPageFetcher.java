@@ -47,12 +47,12 @@ public class SafeWebPageFetcher implements WebPageFetcher {
     }
 
     @Override
-    public String fetch(String url) {
+    public FetchedPage fetch(String url) {
         URI current = urlSafetyValidator.validate(url);
         for (int redirects = 0; redirects <= MAX_REDIRECTS; redirects++) {
             HttpResponse<InputStream> response = send(current);
             if (!REDIRECT_STATUSES.contains(response.statusCode())) {
-                return readBody(response);
+                return new FetchedPage(readBody(response), current.toString());
             }
             close(response.body());
             current = urlSafetyValidator.validate(resolveLocation(current, response));

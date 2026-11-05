@@ -56,7 +56,7 @@ class SafeWebPageFetcherTest {
     void html_본문을_UTF8로_읽어_돌려준다() throws Exception {
         stub(ok("<html><title>청바지</title></html>"));
 
-        assertThat(fetcher.fetch(URL)).isEqualTo("<html><title>청바지</title></html>");
+        assertThat(fetcher.fetch(URL).html()).isEqualTo("<html><title>청바지</title></html>");
     }
 
     @Test
@@ -64,7 +64,7 @@ class SafeWebPageFetcherTest {
         byte[] body = "<html><title>청바지</title></html>".getBytes(java.nio.charset.Charset.forName("EUC-KR"));
         stub(response(200, "text/html; charset=EUC-KR", null, body));
 
-        assertThat(fetcher.fetch(URL)).isEqualTo("<html><title>청바지</title></html>");
+        assertThat(fetcher.fetch(URL).html()).isEqualTo("<html><title>청바지</title></html>");
     }
 
     @Test
@@ -72,7 +72,7 @@ class SafeWebPageFetcherTest {
         byte[] body = "<html><title>청바지</title></html>".getBytes(StandardCharsets.UTF_8);
         stub(response(200, "text/html; charset=no-such-charset", null, body));
 
-        assertThat(fetcher.fetch(URL)).isEqualTo("<html><title>청바지</title></html>");
+        assertThat(fetcher.fetch(URL).html()).isEqualTo("<html><title>청바지</title></html>");
     }
 
     @Test
@@ -80,7 +80,7 @@ class SafeWebPageFetcherTest {
         byte[] body = "<html><title>청바지</title></html>".getBytes(StandardCharsets.UTF_8);
         stub(response(200, "text/html", null, body));
 
-        assertThat(fetcher.fetch(URL)).isEqualTo("<html><title>청바지</title></html>");
+        assertThat(fetcher.fetch(URL).html()).isEqualTo("<html><title>청바지</title></html>");
     }
 
     @Test
@@ -118,10 +118,24 @@ class SafeWebPageFetcherTest {
     void 리다이렉트는_따라가고_다음_주소도_검사한다() throws Exception {
         stub(redirect(301, "https://shop.example/new"), ok("<html>새 페이지</html>"));
 
-        assertThat(fetcher.fetch(URL)).isEqualTo("<html>새 페이지</html>");
+        assertThat(fetcher.fetch(URL).html()).isEqualTo("<html>새 페이지</html>");
 
         List<HttpRequest> requests = captureRequests(2);
         assertThat(requests.get(1).uri().toString()).isEqualTo("https://shop.example/new");
+    }
+
+    @Test
+    void 리다이렉트가_없으면_요청한_주소를_최종_주소로_돌려준다() throws Exception {
+        stub(ok("<html></html>"));
+
+        assertThat(fetcher.fetch(URL).url()).isEqualTo(URL);
+    }
+
+    @Test
+    void 리다이렉트를_따라가면_최종_주소를_함께_돌려준다() throws Exception {
+        stub(redirect(301, "https://shop.example/new/path"), ok("<html></html>"));
+
+        assertThat(fetcher.fetch(URL).url()).isEqualTo("https://shop.example/new/path");
     }
 
     @Test
@@ -171,7 +185,7 @@ class SafeWebPageFetcherTest {
     void 정확히_1MB인_본문은_읽는다() throws Exception {
         stub(response(200, HTML_TYPE, null, new byte[MAX_BYTES]));
 
-        assertThat(fetcher.fetch(URL)).hasSize(MAX_BYTES);
+        assertThat(fetcher.fetch(URL).html()).hasSize(MAX_BYTES);
     }
 
     @Test
