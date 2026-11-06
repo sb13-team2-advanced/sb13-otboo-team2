@@ -41,6 +41,8 @@ import org.springframework.transaction.annotation.Transactional;
 @RequiredArgsConstructor
 public class FeedServiceImpl implements FeedService {
 
+    private static final int MAX_CONTENT_LENGTH = 1000;
+
     private final UserRepository userRepository;
     private final WeatherRepository weatherRepository;
     private final ClothesRepository clothesRepository;
@@ -208,7 +210,8 @@ public class FeedServiceImpl implements FeedService {
         if (feedId == null
                 || request == null
                 || request.content() == null
-                || request.content().isBlank()) {
+                || request.content().isBlank()
+                || request.content().length() > MAX_CONTENT_LENGTH) {
             throw new OtbooException(ErrorCode.INVALID_REQUEST);
         }
 
@@ -296,6 +299,7 @@ public class FeedServiceImpl implements FeedService {
                 || request.weatherId() == null
                 || request.content() == null
                 || request.content().isBlank()
+                || request.content().length() > MAX_CONTENT_LENGTH
                 || request.clothesIds() == null
                 || request.clothesIds().stream().anyMatch(Objects::isNull)) {
             throw new OtbooException(ErrorCode.FEED_CREATE_INVALID_REQUEST);
