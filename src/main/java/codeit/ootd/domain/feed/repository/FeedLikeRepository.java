@@ -4,6 +4,9 @@ import codeit.ootd.domain.feed.entity.FeedLike;
 import java.util.List;
 import java.util.UUID;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 
 public interface FeedLikeRepository extends JpaRepository<FeedLike, UUID> {
 
@@ -11,4 +14,8 @@ public interface FeedLikeRepository extends JpaRepository<FeedLike, UUID> {
             UUID userId,
             List<UUID> feedIds
     );
+
+    @Modifying
+    @Query("delete from FeedLike fl where fl.feedId = :feedId")
+    void deleteAllByFeedId(@Param("feedId") UUID feedId);
 }

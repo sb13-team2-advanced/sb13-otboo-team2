@@ -1,4 +1,3 @@
-
 package codeit.ootd.infra.kakao;
 
 import codeit.ootd.infra.weather.dto.KakaoRegionResponse;

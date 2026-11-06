@@ -10,6 +10,9 @@ import codeit.ootd.domain.weather.dto.response.WeatherAPILocation;
 import codeit.ootd.domain.weather.dto.response.WeatherDto;
 import codeit.ootd.domain.weather.service.WeatherLocationService;
 import codeit.ootd.domain.weather.service.WeatherQueryService;
+import codeit.ootd.global.exception.ErrorCode;
+import codeit.ootd.global.exception.GlobalExceptionHandler;
+import codeit.ootd.global.exception.OtbooException;
 import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
@@ -43,6 +46,7 @@ class WeatherControllerTest {
                     weatherQueryService
                 )
             )
+            .setControllerAdvice(new GlobalExceptionHandler())
             .setMessageConverters(
                 new JacksonJsonHttpMessageConverter(
                     JsonMapper.builder().build()
@@ -141,5 +145,22 @@ class WeatherControllerTest {
 
         verify(weatherQueryService)
             .getWeathers(latitude, longitude);
+    }
+    
+    @Test
+    @DisplayName("잘못된 위경도로 날씨를 조회하면 400 오류를 반환한다")
+    void getWeathersReturnsBadRequestForInvalidCoordinates() throws Exception {
+        double latitude = 100.0;
+        double longitude = 127.0;
+
+        when(weatherQueryService.getWeathers(latitude, longitude))
+            .thenThrow(new OtbooException(ErrorCode.WEATHER_INVALID_COORDINATES));
+
+        mockMvc.perform(get("/api/weathers")
+                .param("latitude", String.valueOf(latitude))
+                .param("longitude", String.valueOf(longitude)))
+            .andExpect(status().isBadRequest())
+            .andExpect(jsonPath("$.exceptionName").value("OtbooException"))
+            .andExpect(jsonPath("$.message").value("유효하지 않은 위도 또는 경도입니다."));
     }
 }
