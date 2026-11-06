@@ -10,6 +10,8 @@ import org.springframework.data.repository.query.Param;
 
 public interface FeedLikeRepository extends JpaRepository<FeedLike, UUID> {
 
+    boolean existsByFeedIdAndUserId(UUID feedId, UUID userId);
+
     List<FeedLike> findAllByUserIdAndFeedIdIn(
             UUID userId,
             List<UUID> feedIds
