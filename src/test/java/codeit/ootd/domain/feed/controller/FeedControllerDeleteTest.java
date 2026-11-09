@@ -1,0 +1,117 @@
+package codeit.ootd.domain.feed.controller;
+
+import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.verify;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+
+import codeit.ootd.domain.feed.service.FeedService;
+import codeit.ootd.global.exception.ErrorCode;
+import codeit.ootd.global.exception.GlobalExceptionHandler;
+import codeit.ootd.global.exception.OtbooException;
+import java.util.List;
+import java.util.UUID;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.EnumSource;
+import org.mockito.Mock;
+import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.http.converter.json.JacksonJsonHttpMessageConverter;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.security.web.method.annotation.AuthenticationPrincipalArgumentResolver;
+import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.servlet.setup.MockMvcBuilders;
+import tools.jackson.databind.json.JsonMapper;
+
+@ExtendWith(MockitoExtension.class)
+@DisplayName("피드 삭제 Controller 테스트")
+class FeedControllerDeleteTest {
+
+    @Mock
+    private FeedService feedService;
+
+    private MockMvc mockMvc;
+
+    @BeforeEach
+    void setUp() {
+        SecurityContextHolder.clearContext();
+
+        mockMvc = MockMvcBuilders
+                .standaloneSetup(new FeedController(feedService))
+                .setControllerAdvice(new GlobalExceptionHandler())
+                .setCustomArgumentResolvers(
+                        new AuthenticationPrincipalArgumentResolver()
+                )
+                .setMessageConverters(
+                        new JacksonJsonHttpMessageConverter(
+                                JsonMapper.builder().build()
+                        )
+                )
+                .build();
+    }
+
+    @AfterEach
+    void tearDown() {
+        SecurityContextHolder.clearContext();
+    }
+
+    @Test
+    @DisplayName("피드 ID와 인증된 사용자 ID를 전달하고 본문 없이 204를 반환한다")
+    void deletesFeedWithAuthenticatedUserId() throws Exception {
+        UUID feedId = UUID.randomUUID();
+        UUID userId = UUID.randomUUID();
+        authenticate(userId);
+
+        mockMvc.perform(delete("/api/feeds/{feedId}", feedId))
+                .andExpect(status().isNoContent())
+                .andExpect(content().string(""));
+
+        verify(feedService).delete(feedId, userId);
+    }
+
+    @ParameterizedTest(name = "{0}에 맞는 오류 응답을 반환한다")
+    @EnumSource(
+            value = ErrorCode.class,
+            names = {
+                    "INVALID_REQUEST",
+                    "ACCESS_DENIED",
+                    "FEED_NOT_FOUND"
+            }
+    )
+    @DisplayName("서비스 예외를 해당 상태 코드와 오류 메시지로 반환한다")
+    void returnsServiceErrorResponse(ErrorCode errorCode) throws Exception {
+        UUID feedId = UUID.randomUUID();
+        UUID userId = UUID.randomUUID();
+        authenticate(userId);
+
+        doThrow(new OtbooException(errorCode))
+                .when(feedService)
+                .delete(feedId, userId);
+
+        mockMvc.perform(delete("/api/feeds/{feedId}", feedId))
+                .andExpect(status().is(errorCode.getStatus().value()))
+                .andExpect(jsonPath("$.exceptionName")
+                        .value("OtbooException"))
+                .andExpect(jsonPath("$.message")
+                        .value(errorCode.getMessage()));
+
+        verify(feedService).delete(feedId, userId);
+    }
+
+    private void authenticate(UUID userId) {
+        SecurityContextHolder.getContext().setAuthentication(
+                new UsernamePasswordAuthenticationToken(
+                        userId,
+                        null,
+                        List.of()
+                )
+        );
+    }
+}

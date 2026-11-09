@@ -10,6 +10,8 @@ import codeit.ootd.domain.feed.entity.Feed;
 import codeit.ootd.domain.feed.entity.FeedClothes;
 import codeit.ootd.domain.feed.mapper.FeedMapper;
 import codeit.ootd.domain.feed.repository.FeedClothesRepository;
+import codeit.ootd.domain.feed.repository.FeedCommentRepository;
+import codeit.ootd.domain.feed.repository.FeedLikeRepository;
 import codeit.ootd.domain.feed.repository.FeedQueryRepository;
 import codeit.ootd.domain.feed.repository.FeedRepository;
 import codeit.ootd.domain.feed.service.FeedResponseAssembler;
@@ -39,6 +41,8 @@ import org.springframework.transaction.annotation.Transactional;
 @RequiredArgsConstructor
 public class FeedServiceImpl implements FeedService {
 
+    private static final int MAX_CONTENT_LENGTH = 1000;
+
     private final UserRepository userRepository;
     private final WeatherRepository weatherRepository;
     private final ClothesRepository clothesRepository;
@@ -48,6 +52,8 @@ public class FeedServiceImpl implements FeedService {
     private final FeedMapper feedMapper;
     private final FeedResponseAssembler feedResponseAssembler;
     private final FeedQueryRepository feedQueryRepository;
+    private final FeedLikeRepository feedLikeRepository;
+    private final FeedCommentRepository feedCommentRepository;
 
     @Override
     @Transactional
@@ -204,7 +210,8 @@ public class FeedServiceImpl implements FeedService {
         if (feedId == null
                 || request == null
                 || request.content() == null
-                || request.content().isBlank()) {
+                || request.content().isBlank()
+                || request.content().length() > MAX_CONTENT_LENGTH) {
             throw new OtbooException(ErrorCode.INVALID_REQUEST);
         }
 
@@ -222,6 +229,32 @@ public class FeedServiceImpl implements FeedService {
         return feedResponseAssembler
                 .toFeedDtos(List.of(feed), userId)
                 .get(0);
+    }
+
+    @Override
+    @Transactional
+    public void delete(UUID feedId, UUID userId) {
+        if (userId == null) {
+            throw new OtbooException(ErrorCode.AUTHENTICATION_REQUIRED);
+        }
+
+        if (feedId == null) {
+            throw new OtbooException(ErrorCode.INVALID_REQUEST);
+        }
+
+        Feed feed = feedRepository.findById(feedId)
+                .orElseThrow(
+                        () -> new OtbooException(ErrorCode.FEED_NOT_FOUND)
+                );
+
+        if (!userId.equals(feed.getAuthorId())) {
+            throw new OtbooException(ErrorCode.ACCESS_DENIED);
+        }
+
+        feedClothesRepository.deleteAllByFeedId(feedId);
+        feedLikeRepository.deleteAllByFeedId(feedId);
+        feedCommentRepository.deleteAllByFeedId(feedId);
+        feedRepository.delete(feed);
     }
 
     private void validateSearchRequest(FeedSearchRequest request) {
@@ -266,6 +299,7 @@ public class FeedServiceImpl implements FeedService {
                 || request.weatherId() == null
                 || request.content() == null
                 || request.content().isBlank()
+                || request.content().length() > MAX_CONTENT_LENGTH
                 || request.clothesIds() == null
                 || request.clothesIds().stream().anyMatch(Objects::isNull)) {
             throw new OtbooException(ErrorCode.FEED_CREATE_INVALID_REQUEST);
