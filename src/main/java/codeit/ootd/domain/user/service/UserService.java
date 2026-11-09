@@ -25,4 +25,7 @@ public interface UserService {
     UserDto updateRole(UUID userId, UserRole role);
 
     UserDto updateLock(UUID userId, boolean locked);
+
+    void updatePassword(UUID userId, String newPassword);
+
 }
