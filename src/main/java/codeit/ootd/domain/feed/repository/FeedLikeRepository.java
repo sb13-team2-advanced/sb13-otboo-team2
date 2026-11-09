@@ -18,6 +18,13 @@ public interface FeedLikeRepository extends JpaRepository<FeedLike, UUID> {
     );
 
     @Modifying
+    @Query("delete from FeedLike fl where fl.feedId = :feedId and fl.userId = :userId")
+    int deleteByFeedIdAndUserId(
+            @Param("feedId") UUID feedId,
+            @Param("userId") UUID userId
+    );
+
+    @Modifying
     @Query("delete from FeedLike fl where fl.feedId = :feedId")
     void deleteAllByFeedId(@Param("feedId") UUID feedId);
 }
