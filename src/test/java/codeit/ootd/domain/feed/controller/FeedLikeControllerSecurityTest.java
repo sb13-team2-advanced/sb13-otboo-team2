@@ -112,8 +112,63 @@ class FeedLikeControllerSecurityTest {
         verifyNoInteractions(feedLikeService);
     }
 
-    private MockHttpServletRequestBuilder postWithCsrf(
-            UUID feedId
+    @Test
+    @DisplayName("유효한 JWT가 있어도 CSRF 없이 좋아요를 취소하면 403으로 거절한다")
+    void rejectsUnlikeWithoutCsrf() throws Exception {
+        String token = validAccessToken(UUID.randomUUID());
+
+        mockMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders
+                        .delete("/api/feeds/{feedId}/like", UUID.randomUUID())
+                        .header("Authorization", "Bearer " + token))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.message").value(
+                        ErrorCode.ACCESS_DENIED.getMessage()
+                ));
+
+        verifyNoInteractions(feedLikeService);
+    }
+
+    @Test
+    @DisplayName("유효한 JWT와 CSRF로 좋아요를 취소하면 로그인 사용자 ID를 전달하고 204를 반환한다")
+    void unlikesFeedWithValidJwtAndCsrf() throws Exception {
+        UUID userId = UUID.randomUUID();
+        UUID feedId = UUID.randomUUID();
+        String token = validAccessToken(userId);
+
+        MockHttpServletRequestBuilder request =
+                org.springframework.test.web.servlet.request.MockMvcRequestBuilders
+                        .delete("/api/feeds/{feedId}/like", feedId);
+
+        mockMvc.perform(withCsrf(request)
+                        .header("Authorization", "Bearer " + token))
+                .andExpect(status().isNoContent())
+                .andExpect(content().string(""));
+
+        verify(feedLikeService).unlike(feedId, userId);
+    }
+
+    @Test
+    @DisplayName("JWT 없이 좋아요 취소를 요청하면 401로 거절한다")
+    void rejectsUnlikeWithoutJwt() throws Exception {
+        MockHttpServletRequestBuilder request =
+                org.springframework.test.web.servlet.request.MockMvcRequestBuilders
+                        .delete("/api/feeds/{feedId}/like", UUID.randomUUID());
+
+        mockMvc.perform(withCsrf(request))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.message").value(
+                        ErrorCode.AUTHENTICATION_REQUIRED.getMessage()
+                ));
+
+        verifyNoInteractions(feedLikeService);
+    }
+
+    private MockHttpServletRequestBuilder postWithCsrf(UUID feedId) throws Exception {
+        return withCsrf(post("/api/feeds/{feedId}/like", feedId));
+    }
+
+    private MockHttpServletRequestBuilder withCsrf(
+            MockHttpServletRequestBuilder request
     ) throws Exception {
         Cookie csrfCookie = mockMvc.perform(get("/api/auth/csrf-token"))
                 .andExpect(status().isOk())
@@ -124,8 +179,7 @@ class FeedLikeControllerSecurityTest {
 
         assertNotNull(csrfCookie);
 
-        return post("/api/feeds/{feedId}/like", feedId)
-                .cookie(csrfCookie)
+        return request.cookie(csrfCookie)
                 .header("X-XSRF-TOKEN", csrfCookie.getValue());
     }
 
