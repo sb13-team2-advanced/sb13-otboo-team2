@@ -16,6 +16,9 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.http.MediaType;
 import org.springframework.http.converter.json.JacksonJsonHttpMessageConverter;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.context.SecurityContext;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.validation.beanvalidation.LocalValidatorFactoryBean;
@@ -37,10 +40,10 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 
 @ExtendWith(MockitoExtension.class)
 class UserControllerTest {
-    
+
     @Mock
     private UserService userService;
-    
+
     private MockMvc mockMvc;
     private JsonMapper objectMapper;
 
@@ -200,7 +203,7 @@ class UserControllerTest {
                 .andExpect(jsonPath("$.message")
                         .value("이미 사용 중인 이메일입니다."));
     }
-    
+
     @Test
     @DisplayName("이름이 100자를 초과하면 400 Bad Request를 반환한다")
     void signup_nameTooLong_returnsBadRequest() throws Exception {
@@ -589,6 +592,65 @@ class UserControllerTest {
 
         verify(userService).updateLock(userId, true);
     }
+
+
+    @Test
+    @DisplayName("비밀번호 변경 성공 시 204를 반환한다")
+    void updatePassword_success() throws Exception {
+        // given
+        UUID userId = UUID.randomUUID();
+        String newPassword = "NewPassword123!";
+
+        SecurityContext context = SecurityContextHolder.createEmptyContext();
+        context.setAuthentication(
+                new UsernamePasswordAuthenticationToken(
+                        userId.toString(),
+                        null,
+                        List.of()
+                )
+        );
+
+        SecurityContextHolder.setContext(context);
+
+        try {
+            // when & then
+            mockMvc.perform(patch("/api/users/{userId}/password", userId)
+                            .principal(context.getAuthentication())
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content("""
+                                {
+                                  "password": "NewPassword123!"
+                                }
+                                """))
+                    .andExpect(status().isNoContent());
+
+            verify(userService).updatePassword(userId, newPassword);
+
+        } finally {
+            SecurityContextHolder.clearContext();
+        }
+    }
+
+    @Test
+    @DisplayName("변경할 비밀번호가 공백이면 400을 반환한다")
+    void updatePassword_blankPassword_returnsBadRequest() throws Exception {
+        // given
+        UUID userId = UUID.randomUUID();
+
+        // when & then
+        mockMvc.perform(patch("/api/users/{userId}/password", userId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                            {
+                              "password": " "
+                            }
+                            """))
+                .andExpect(status().isBadRequest());
+
+        verifyNoInteractions(userService);
+    }
+
+
 
 
 

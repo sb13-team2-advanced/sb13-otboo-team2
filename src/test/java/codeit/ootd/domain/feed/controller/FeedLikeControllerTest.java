@@ -104,6 +104,21 @@ class FeedLikeControllerTest {
         verify(feedLikeService).like(feedId, userId);
     }
 
+    @Test
+    @DisplayName("좋아요 취소 시 피드 ID와 인증된 사용자 ID를 전달하고 본문 없이 204를 반환한다")
+    void unlikesFeedWithAuthenticatedUserId() throws Exception {
+        UUID feedId = UUID.randomUUID();
+        UUID userId = UUID.randomUUID();
+        authenticate(userId);
+
+        mockMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders
+                        .delete("/api/feeds/{feedId}/like", feedId))
+                .andExpect(status().isNoContent())
+                .andExpect(content().string(""));
+
+        verify(feedLikeService).unlike(feedId, userId);
+    }
+
     private void authenticate(UUID userId) {
         SecurityContextHolder.getContext().setAuthentication(
                 new UsernamePasswordAuthenticationToken(

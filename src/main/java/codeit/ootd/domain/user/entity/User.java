@@ -85,5 +85,13 @@ public class User extends BaseTimeEntity {
     public void unlock() {
         this.locked = false;
     }
+
+    public void changePassword(String encodedPassword) {
+        this.password = Objects.requireNonNull(
+                encodedPassword,
+                "encodedPassword는 필수입니다."
+        );
+    }
+
 }
 
