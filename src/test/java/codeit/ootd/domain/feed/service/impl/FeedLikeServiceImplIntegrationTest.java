@@ -120,6 +120,24 @@ class FeedLikeServiceImplIntegrationTest {
         assertThat(savedLikeCount()).isEqualTo(2L);
     }
 
+    @Test
+    @DisplayName("한 사용자가 좋아요를 두 번 취소해도 다른 사용자의 좋아요와 개수는 유지된다")
+    void repeatedUnlikeKeepsOtherUsersLike() {
+        feedLikeService.like(feedId, firstUserId);
+        feedLikeService.like(feedId, secondUserId);
+
+        feedLikeService.unlike(feedId, firstUserId);
+        feedLikeService.unlike(feedId, firstUserId);
+
+        assertThat(feedLikeRepository.findAll())
+                .singleElement()
+                .satisfies(like -> {
+                    assertThat(like.getFeedId()).isEqualTo(feedId);
+                    assertThat(like.getUserId()).isEqualTo(secondUserId);
+                });
+        assertThat(savedLikeCount()).isEqualTo(1L);
+    }
+
     private void likeConcurrently(List<UUID> userIds) throws Exception {
         ExecutorService executor =
                 Executors.newFixedThreadPool(userIds.size());

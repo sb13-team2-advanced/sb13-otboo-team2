@@ -42,4 +42,24 @@ public class FeedLikeServiceImpl implements FeedLikeService {
         feedLikeRepository.save(new FeedLike(feedId, userId));
         feed.increaseLikeCount();
     }
+
+    @Override
+    @Transactional
+    public void unlike(UUID feedId, UUID userId) {
+        if (userId == null) {
+            throw new OtbooException(ErrorCode.AUTHENTICATION_REQUIRED);
+        }
+
+        if (feedId == null) {
+            throw new OtbooException(ErrorCode.INVALID_REQUEST);
+        }
+
+        Feed feed = feedRepository.findByIdForUpdate(feedId)
+                .orElseThrow(() -> new OtbooException(ErrorCode.FEED_NOT_FOUND));
+
+        int deletedCount = feedLikeRepository.deleteByFeedIdAndUserId(feedId, userId);
+        if (deletedCount > 0) {
+            feed.decreaseLikeCount();
+        }
+    }
 }
