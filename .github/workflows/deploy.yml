@@ -75,6 +75,10 @@ jobs:
           retention-days: 7
           if-no-files-found: error
 
+      - name: Validate Docker image build
+        if: github.event_name != 'push'
+        run: docker build --platform linux/amd64 --tag otboo-backend:ci .
+
   deploy:
     name: Deploy to ECS
     needs: build
