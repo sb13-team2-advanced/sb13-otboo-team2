@@ -72,4 +72,52 @@ class UserTest {
         assertThat(user.getTemporaryPassword()).isNull();
         assertThat(user.getTemporaryPasswordExpiresAt()).isNull();
     }
+
+    @Test
+    @DisplayName("임시 비밀번호는 만료 시각 이전에만 유효하다")
+    void temporaryPasswordIsValidBeforeExpiration() {
+        // given
+        User user = User.create(
+                "테스트",
+                "test@example.com",
+                "original-password"
+        );
+
+        Instant issuedAt = Instant.parse("2026-11-10T06:00:00Z");
+        Instant expiresAt = issuedAt.plusSeconds(180);
+
+        user.issueTemporaryPassword("encoded-temporary-password", expiresAt);
+
+        // when & then
+        assertThat(user.hasValidTemporaryPassword(issuedAt.plusSeconds(179)))
+                .isTrue();
+
+        assertThat(user.hasValidTemporaryPassword(expiresAt))
+                .isFalse();
+    }
+
+    @Test
+    @DisplayName("발급되지 않았거나 파기된 임시 비밀번호는 유효하지 않다")
+    void temporaryPasswordIsInvalidWhenAbsent() {
+        // given
+        User user = User.create(
+                "테스트",
+                "test@example.com",
+                "original-password"
+        );
+
+        Instant now = Instant.parse("2026-11-10T06:00:00Z");
+
+        // when & then
+        assertThat(user.hasValidTemporaryPassword(now)).isFalse();
+
+        user.issueTemporaryPassword(
+                "encoded-temporary-password",
+                now.plusSeconds(180)
+        );
+        user.clearTemporaryPassword();
+
+        assertThat(user.hasValidTemporaryPassword(now)).isFalse();
+    }
+
 }
