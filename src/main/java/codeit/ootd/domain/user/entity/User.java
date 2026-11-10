@@ -118,6 +118,15 @@ public class User extends BaseTimeEntity {
         this.temporaryPasswordExpiresAt = null;
     }
 
+    public boolean hasValidTemporaryPassword(Instant now) {
+        Objects.requireNonNull(now, "now는 필수입니다.");
+
+        return temporaryPassword != null
+                && temporaryPasswordExpiresAt != null
+                && now.isBefore(temporaryPasswordExpiresAt);
+    }
+
+
 
 }
 
