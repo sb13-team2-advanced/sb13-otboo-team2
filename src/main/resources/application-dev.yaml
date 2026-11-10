@@ -49,3 +49,9 @@ ootd:
 auth:
   cookie:
     secure: false
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics

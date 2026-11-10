@@ -4,6 +4,8 @@ import codeit.ootd.domain.weather.entity.WeatherLocation;
 import codeit.ootd.domain.weather.repository.WeatherLocationRepository;
 import codeit.ootd.domain.weather.service.WeatherForecastCollector;
 import codeit.ootd.domain.weather.service.WeatherService;
+import io.micrometer.core.instrument.MeterRegistry;
+import jakarta.annotation.PostConstruct;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
@@ -45,6 +47,20 @@ public class WeatherCollectionTasklet implements Tasklet {
     private final WeatherService weatherService;
     private final Clock clock;
     private final WeatherBatchRateLimiter weatherBatchRateLimiter;
+    private final MeterRegistry meterRegistry;
+
+    @PostConstruct
+    public void registerMetrics() {
+        meterRegistry.counter(
+            "ootd.weather.batch.cells",
+            "result", "success"
+        );
+
+        meterRegistry.counter(
+            "ootd.weather.batch.cells",
+            "result", "failure"
+        );
+    }
 
     @Override
     public RepeatStatus execute(
@@ -115,6 +131,11 @@ public class WeatherCollectionTasklet implements Tasklet {
 
                     weatherLocationRepository.save(location);
 
+                    meterRegistry.counter(
+                        "ootd.weather.batch.cells",
+                        "result", "success"
+                    ).increment();
+
                     log.info(
                         "날씨 수집 완료: cellId={}",
                         location.getCellId()
@@ -122,6 +143,11 @@ public class WeatherCollectionTasklet implements Tasklet {
 
                 } catch (Exception e) {
                     failureCount++;
+
+                    meterRegistry.counter(
+                        "ootd.weather.batch.cells",
+                        "result", "failure"
+                    ).increment();
 
                     log.error(
                         "날씨 수집 실패: cellId={}",
