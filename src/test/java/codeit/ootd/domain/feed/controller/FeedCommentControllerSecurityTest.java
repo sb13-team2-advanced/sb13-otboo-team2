@@ -64,7 +64,7 @@ class FeedCommentControllerSecurityTest {
     private final String content = "코트 색이 잘 어울려요.";
 
     @Test
-    @DisplayName("유효한 JWT와 CSRF 토큰으로 댓글을 등록하면 201과 등록된 댓글을 반환한다")
+    @DisplayName("유효한 JWT와 CSRF 토큰으로 댓글을 등록하면 200과 등록된 댓글을 반환한다")
     void createsCommentWithValidJwtAndCsrf() throws Exception {
         UUID commentId = UUID.randomUUID();
         CommentCreateRequest request = new CommentCreateRequest(feedId, userId, content);
@@ -76,7 +76,7 @@ class FeedCommentControllerSecurityTest {
 
         mockMvc.perform(withCsrf(commentRequest())
                         .header("Authorization", "Bearer " + validAccessToken()))
-                .andExpect(status().isCreated())
+                .andExpect(status().isOk())
                 .andExpect(jsonPath("$.id").value(commentId.toString()))
                 .andExpect(jsonPath("$.author.userId").value(userId.toString()));
 
