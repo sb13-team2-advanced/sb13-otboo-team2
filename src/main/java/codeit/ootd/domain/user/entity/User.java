@@ -44,6 +44,12 @@ public class User extends BaseTimeEntity {
     @Column(name = "deleted_at")
     private Instant deletedAt;
 
+    @Column(name = "temporary_password", length = 255)
+    private String temporaryPassword;
+
+    @Column(name = "temporary_password_expires_at")
+    private Instant temporaryPasswordExpiresAt;
+
     public static User create(
             String name,
             String email,
@@ -92,6 +98,26 @@ public class User extends BaseTimeEntity {
                 "encodedPassword는 필수입니다."
         );
     }
+
+    public void issueTemporaryPassword(
+            String encodedPassword,
+            Instant expiresAt
+    ) {
+        this.temporaryPassword = Objects.requireNonNull(
+                encodedPassword,
+                "encodedPassword는 필수입니다."
+        );
+        this.temporaryPasswordExpiresAt = Objects.requireNonNull(
+                expiresAt,
+                "expiresAt은 필수입니다."
+        );
+    }
+
+    public void clearTemporaryPassword() {
+        this.temporaryPassword = null;
+        this.temporaryPasswordExpiresAt = null;
+    }
+
 
 }
 
