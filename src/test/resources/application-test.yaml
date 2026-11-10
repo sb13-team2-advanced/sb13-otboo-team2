@@ -1,0 +1,29 @@
+spring:
+  datasource:
+    url: jdbc:h2:mem:ootd-test;DB_CLOSE_DELAY=-1
+    username: sa
+    password:
+    driver-class-name: org.h2.Driver
+  jpa:
+    hibernate:
+      ddl-auto: create
+  flyway:
+    enabled: false
+  docker:
+    compose:
+      enabled: false
+  batch:
+    jdbc:
+      initialize-schema: always
+
+ootd:
+  weather:
+    openweathermap:
+      api-key: test-key
+  kakao:
+    local:
+      api-key: test-key
+
+jwt:
+  secret: 'AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA='
+  access-token-expiration: 30m

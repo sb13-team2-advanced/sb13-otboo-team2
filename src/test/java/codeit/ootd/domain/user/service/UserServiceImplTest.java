@@ -1,0 +1,607 @@
+package codeit.ootd.domain.user.service;
+
+import codeit.ootd.domain.auth.service.AuthSessionService;
+import codeit.ootd.domain.user.dto.request.UserCreateRequest;
+import codeit.ootd.domain.user.dto.response.UserDto;
+import codeit.ootd.domain.user.dto.response.UserListResponse;
+import codeit.ootd.domain.user.entity.User;
+import codeit.ootd.domain.user.entity.UserRole;
+import codeit.ootd.domain.user.entity.UserStatus;
+import codeit.ootd.domain.user.exception.DuplicateEmailException;
+import codeit.ootd.domain.user.exception.UserNotFoundException;
+import codeit.ootd.domain.user.repository.UserRepository;
+import codeit.ootd.domain.user.service.impl.UserServiceImpl;
+import org.hibernate.exception.ConstraintViolationException;
+import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
+import org.mockito.InjectMocks;
+import org.mockito.Mock;
+import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.SliceImpl;
+import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.test.util.ReflectionTestUtils;
+
+import java.sql.SQLException;
+import java.util.List;
+import java.util.Optional;
+import java.util.UUID;
+
+import static org.assertj.core.api.AssertionsForClassTypes.assertThat;
+import static org.assertj.core.api.AssertionsForClassTypes.assertThatThrownBy;
+import static org.junit.jupiter.api.Assertions.assertAll;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertSame;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.BDDMockito.given;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
+import static org.mockito.Mockito.when;
+
+@ExtendWith(MockitoExtension.class)
+class UserServiceImplTest {
+
+    @Mock
+    private UserRepository userRepository;
+
+    @Mock
+    private PasswordEncoder passwordEncoder;
+
+    @Mock
+    private AuthSessionService authSessionService;
+
+    @InjectMocks
+    private UserServiceImpl userService;
+
+    @Test
+    @DisplayName("이미 가입된 이메일이면 회원가입에 실패한다")
+    void signup_duplicateEmail_throwsException() {
+
+        // given
+        UserCreateRequest request = new UserCreateRequest(
+                "테스트 사용자",
+                "test@example.com",
+                "password123!"
+        );
+
+        given(userRepository.existsByEmail(request.email()))
+                .willReturn(true);
+
+        // when & then
+        assertThrows(
+                DuplicateEmailException.class,
+                () -> userService.signup(request)
+        );
+
+        verify(userRepository, never()).saveAndFlush(any(User.class));
+        verifyNoInteractions(passwordEncoder);
+    }
+
+    @Test
+    @DisplayName("회원가입 중 이메일 UNIQUE 제약조건 위반 시 중복 이메일 예외가 발생한다")
+    void signup_emailUniqueViolation_throwsDuplicateEmailException() {
+        // given
+        UserCreateRequest request = new UserCreateRequest(
+                "테스트사용자",
+                "test@example.com",
+                "password123!"
+        );
+
+        when(passwordEncoder.encode(request.password()))
+                .thenReturn("encoded-password");
+
+        ConstraintViolationException cause =
+                new ConstraintViolationException(
+                        "이메일 UNIQUE 제약조건 위반",
+                        new SQLException(
+                                "duplicate key",
+                                "23505"
+                        ),
+                        "uk_users_email"
+                );
+
+        DataIntegrityViolationException exception =
+                new DataIntegrityViolationException(
+                        "이메일 중복",
+                        cause
+                );
+
+        when(userRepository.saveAndFlush(any(User.class)))
+                .thenThrow(exception);
+
+        // when & then
+        assertThrows(
+                DuplicateEmailException.class,
+                () -> userService.signup(request)
+        );
+        verify(userRepository).existsByEmail(request.email());
+        verify(userRepository).saveAndFlush(any(User.class));
+    }
+
+    @Test
+    @DisplayName("회원가입 성공 시 비밀번호를 암호화하고 사용자를 저장한다")
+    void signup_success() {
+        // given
+        UserCreateRequest request = new UserCreateRequest(
+                "테스트 사용자",
+                "test@example.com",
+                "password123!"
+        );
+
+        given(passwordEncoder.encode(request.password()))
+                .willReturn("encodedPassword");
+
+        when(userRepository.saveAndFlush(any(User.class)))
+                .thenAnswer(invocation -> invocation.getArgument(0));
+
+        // when
+        UserDto response = userService.signup(request);
+
+        // then
+        ArgumentCaptor<User> userCaptor = ArgumentCaptor.forClass(User.class);
+
+        verify(passwordEncoder).encode(request.password());
+        verify(userRepository).saveAndFlush(userCaptor.capture());
+
+        User savedUser = userCaptor.getValue();
+
+        assertAll(
+                () -> assertEquals(request.name(), savedUser.getName()),
+                () -> assertEquals(request.email(), savedUser.getEmail()),
+                () -> assertEquals("encodedPassword", savedUser.getPassword()),
+                () -> assertEquals(UserRole.USER, savedUser.getRole()),
+                () -> assertFalse(savedUser.isLocked()),
+                () -> assertEquals(UserStatus.ACTIVE, savedUser.getStatus()),
+                () -> assertNull(savedUser.getDeletedAt()),
+
+                // UserDto 반환값 확인
+                () -> assertEquals(savedUser.getEmail(), response.email()),
+                () -> assertEquals(savedUser.getName(), response.name()),
+                () -> assertEquals(savedUser.getRole(), response.role()),
+                () -> assertEquals(savedUser.isLocked(), response.locked())
+        );
+    }
+
+    @Test
+    @DisplayName("이메일 UNIQUE 이외의 DB 제약조건 위반은 원래 예외를 전달한다")
+    void signup_otherConstraintViolation_propagatesException() {
+        // given
+        UserCreateRequest request = new UserCreateRequest(
+                "테스트사용자",
+                "test@example.com",
+                "password123!"
+        );
+
+        when(passwordEncoder.encode(request.password()))
+                .thenReturn("encoded-password");
+
+        ConstraintViolationException cause =
+                new ConstraintViolationException(
+                        "다른 DB 제약조건 위반",
+                        new SQLException("check violation", "23514"),
+                        "chk_users_role"
+                );
+
+        DataIntegrityViolationException exception =
+                new DataIntegrityViolationException(
+                        "DB 제약조건 오류",
+                        cause
+                );
+
+        when(userRepository.saveAndFlush(any(User.class)))
+                .thenThrow(exception);
+
+        // when & then
+        DataIntegrityViolationException thrown = assertThrows(
+                DataIntegrityViolationException.class,
+                () -> userService.signup(request)
+        );
+
+        assertSame(exception, thrown);
+    }
+
+    @Test
+    @DisplayName("다른 UNIQUE 제약조건 위반은 이메일 중복 예외로 변환하지 않는다")
+    void signup_otherUniqueViolation_propagatesException() {
+        // given
+        UserCreateRequest request = new UserCreateRequest(
+                "테스트사용자",
+                "test@example.com",
+                "password123!"
+        );
+
+        when(passwordEncoder.encode(request.password()))
+                .thenReturn("encoded-password");
+
+        ConstraintViolationException cause =
+                new ConstraintViolationException(
+                        "다른 UNIQUE 제약조건 위반",
+                        new SQLException("duplicate key", "23505"),
+                        "uk_other_constraint"
+                );
+
+        DataIntegrityViolationException exception =
+                new DataIntegrityViolationException(
+                        "DB UNIQUE 제약조건 오류",
+                        cause
+                );
+
+        when(userRepository.saveAndFlush(any(User.class)))
+                .thenThrow(exception);
+
+        // when & then
+        DataIntegrityViolationException thrown = assertThrows(
+                DataIntegrityViolationException.class,
+                () -> userService.signup(request)
+        );
+
+        assertSame(exception, thrown);
+    }
+
+    @Test
+    @DisplayName("이메일 UNIQUE 제약조건 이름이어도 SQLSTATE가 다르면 원래 예외를 전달한다")
+    void signup_emailConstraintWithDifferentSqlState_propagatesException() {
+        // given
+        UserCreateRequest request = new UserCreateRequest(
+                "테스트사용자",
+                "test@example.com",
+                "password123!"
+        );
+
+        when(passwordEncoder.encode(request.password()))
+                .thenReturn("encoded-password");
+
+        ConstraintViolationException cause =
+                new ConstraintViolationException(
+                        "다른 SQLSTATE 오류",
+                        new SQLException("check violation", "23514"),
+                        "uk_users_email"
+                );
+
+        DataIntegrityViolationException exception =
+                new DataIntegrityViolationException("DB 제약조건 오류", cause);
+
+        when(userRepository.saveAndFlush(any(User.class)))
+                .thenThrow(exception);
+
+        // when & then
+        DataIntegrityViolationException thrown = assertThrows(
+                DataIntegrityViolationException.class,
+                () -> userService.signup(request)
+        );
+
+        assertSame(exception, thrown);
+    }
+
+    @Test
+    @DisplayName("사용자 목록 첫 페이지 조회 시 이메일 오름차순으로 반환한다")
+    void getUsers_firstPage_success() {
+        // given
+        User user1 = User.create("사용자A", "aaa@example.com", "encoded-password");
+        User user2 = User.create("사용자B", "bbb@example.com", "encoded-password");
+        User user3 = User.create("사용자C", "ccc@example.com", "encoded-password");
+
+        var slice = new SliceImpl<>(
+                List.of(user1, user2, user3),
+                PageRequest.of(0, 10),
+                false
+        );
+
+        when(userRepository.findUsers(
+                null, null, 10, "email", "ASCENDING",
+                null, null, null
+        )).thenReturn(slice);
+
+        when(userRepository.countUsers(null, null, null))
+                .thenReturn(3L);
+
+        // when
+        UserListResponse response = userService.getUsers(
+                null, null, 10, "email", "ASCENDING",
+                null, null, null
+        );
+
+        // then
+        assertAll(
+                () -> assertEquals(3, response.data().size()),
+                () -> assertEquals("aaa@example.com", response.data().get(0).email()),
+                () -> assertEquals("bbb@example.com", response.data().get(1).email()),
+                () -> assertEquals("ccc@example.com", response.data().get(2).email()),
+                () -> assertFalse(response.hasNext()),
+                () -> assertEquals(3L, response.totalCount()),
+                () -> assertNull(response.nextCursor()),
+                () -> assertNull(response.nextIdAfter()),
+                () -> assertEquals("email", response.sortBy()),
+                () -> assertEquals("ASCENDING", response.sortDirection())
+        );
+
+        verify(userRepository).findUsers(
+                null, null, 10, "email", "ASCENDING",
+                null, null, null
+        );
+        verify(userRepository).countUsers(null, null, null);
+    }
+
+    @Test
+    @DisplayName("다음 페이지가 존재하면 마지막 사용자의 이메일과 ID를 커서로 반환한다")
+    void getUsers_firstPage_hasNext_returnsCursor() {
+        // given
+        User user1 = User.create("사용자A", "aaa@example.com", "encoded-password");
+        User user2 = User.create("사용자B", "bbb@example.com", "encoded-password");
+
+        UUID userId1 = UUID.randomUUID();
+        UUID userId2 = UUID.randomUUID();
+
+        ReflectionTestUtils.setField(user1, "id", userId1);
+        ReflectionTestUtils.setField(user2, "id", userId2);
+
+        var slice = new SliceImpl<>(
+                List.of(user1, user2),
+                PageRequest.of(0, 2),
+                true
+        );
+
+        when(userRepository.findUsers(
+                null, null, 2, "email", "ASCENDING",
+                null, null, null
+        )).thenReturn(slice);
+
+        when(userRepository.countUsers(null, null, null))
+                .thenReturn(3L);
+
+        // when
+        UserListResponse response = userService.getUsers(
+                null, null, 2, "email", "ASCENDING",
+                null, null, null
+        );
+
+        // then
+        assertAll(
+                () -> assertEquals(2, response.data().size()),
+                () -> assertTrue(response.hasNext()),
+                () -> assertEquals(3L, response.totalCount()),
+                () -> assertEquals("bbb@example.com", response.nextCursor()),
+                () -> assertEquals(userId2, response.nextIdAfter()),
+                () -> assertEquals("email", response.sortBy()),
+                () -> assertEquals("ASCENDING", response.sortDirection())
+        );
+
+        verify(userRepository).findUsers(
+                null, null, 2, "email", "ASCENDING",
+                null, null, null
+        );
+        verify(userRepository).countUsers(null, null, null);
+    }
+
+    @Test
+    @DisplayName("사용자 목록 조회 시 QueryDSL 조회 결과와 전체 사용자 수를 반환한다")
+    void getUsers_usesCustomRepository() {
+        // given
+        User userA = User.create(
+                "사용자A", "aaa@example.com", "encoded-password"
+        );
+        User userB = User.create(
+                "사용자B", "bbb@example.com", "encoded-password"
+        );
+
+        var slice = new SliceImpl<>(
+                List.of(userA, userB),
+                PageRequest.of(0, 2),
+                true
+        );
+
+        when(userRepository.findUsers(
+                null, null, 2, "email", "ASCENDING",
+                null, null, null
+        )).thenReturn(slice);
+
+        when(userRepository.countUsers(null, null, null))
+                .thenReturn(5L);
+
+        // when
+        UserListResponse response = userService.getUsers(
+                null, null, 2, "email", "ASCENDING",
+                null, null, null
+        );
+
+        // then
+        assertAll(
+                () -> assertEquals(2, response.data().size()),
+                () -> assertEquals("aaa@example.com", response.data().get(0).email()),
+                () -> assertEquals("bbb@example.com", response.data().get(1).email()),
+                () -> assertTrue(response.hasNext()),
+                () -> assertEquals(5L, response.totalCount())
+        );
+
+        verify(userRepository).findUsers(
+                null, null, 2, "email", "ASCENDING",
+                null, null, null
+        );
+        verify(userRepository).countUsers(null, null, null);
+    }
+
+    @Test
+    @DisplayName("사용자 권한을 USER에서 ADMIN으로 변경한다")
+    void updateRole_success() {
+        // given
+        UUID userId = UUID.randomUUID();
+
+        User user = User.create(
+                "테스트사용자",
+                "test@example.com",
+                "encodedPassword"
+        );
+
+        ReflectionTestUtils.setField(user, "id", userId);
+
+        when(userRepository.findById(userId))
+                .thenReturn(Optional.of(user));
+
+        // when
+        UserDto result = userService.updateRole(userId, UserRole.ADMIN);
+
+        // then
+        assertThat(result.id()).isEqualTo(userId);
+        assertThat(result.role()).isEqualTo(UserRole.ADMIN);
+        assertThat(user.getRole()).isEqualTo(UserRole.ADMIN);
+
+        verify(userRepository).findById(userId);
+    }
+
+
+    @Test
+    @DisplayName("존재하지 않는 사용자의 권한 변경 시 예외가 발생한다")
+    void updateRole_userNotFound_throwsException() {
+        // given
+        UUID userId = UUID.randomUUID();
+
+        when(userRepository.findById(userId))
+                .thenReturn(Optional.empty());
+
+        // when & then
+        assertThatThrownBy(() ->
+                userService.updateRole(userId, UserRole.ADMIN)
+        ).isInstanceOf(UserNotFoundException.class);
+
+        verify(userRepository).findById(userId);
+    }
+
+    @Test
+    @DisplayName("사용자 권한 변경 시 모든 활성 인증 세션을 폐기한다")
+    void updateRole_revokesAllSessions() {
+        // given
+        UUID userId = UUID.randomUUID();
+
+        User user = User.create(
+                "테스트사용자",
+                "test@example.com",
+                "encodedPassword"
+        );
+
+        ReflectionTestUtils.setField(user, "id", userId);
+
+        when(userRepository.findById(userId))
+                .thenReturn(Optional.of(user));
+
+        // when
+        userService.updateRole(userId, UserRole.ADMIN);
+
+        // then
+        assertThat(user.getRole()).isEqualTo(UserRole.ADMIN);
+
+        verify(authSessionService).revokeAllSessions(userId);
+    }
+
+    @Test
+    @DisplayName("사용자 계정 잠금 시 잠금 상태를 변경하고 활성 세션을 폐기한다")
+    void updateLock_lockUser_revokesSessions() {
+        // given
+        UUID userId = UUID.randomUUID();
+
+        User user = User.create(
+                "테스트사용자",
+                "test@example.com",
+                "encodedPassword"
+        );
+
+        ReflectionTestUtils.setField(user, "id", userId);
+
+        when(userRepository.findById(userId))
+                .thenReturn(Optional.of(user));
+
+        // when
+        UserDto result = userService.updateLock(userId, true);
+
+        // then
+        assertThat(result.locked()).isTrue();
+        assertThat(user.isLocked()).isTrue();
+
+        verify(authSessionService).revokeAllSessions(userId);
+    }
+
+    @Test
+    @DisplayName("계정 잠금 해제 시 잠금 상태를 해제하고 세션 폐기는 호출하지 않는다")
+    void updateLock_unlockUser_doesNotRevokeSessions() {
+        // given
+        UUID userId = UUID.randomUUID();
+
+        User user = User.create(
+                "테스트사용자",
+                "test@example.com",
+                "encodedPassword"
+        );
+
+        user.lock();
+        ReflectionTestUtils.setField(user, "id", userId);
+
+        when(userRepository.findById(userId))
+                .thenReturn(Optional.of(user));
+
+        // when
+        UserDto result = userService.updateLock(userId, false);
+
+        // then
+        assertThat(result.locked()).isFalse();
+        assertThat(user.isLocked()).isFalse();
+
+        verify(authSessionService, never()).revokeAllSessions(any());
+    }
+
+    @Test
+    @DisplayName("비밀번호 변경 시 새 비밀번호를 암호화하고 기존 세션을 무효화한다")
+    void updatePassword_success() {
+        // given
+        UUID userId = UUID.randomUUID();
+        String newPassword = "NewPassword123!";
+        String encodedPassword = "encoded-new-password";
+
+        User user = User.create(
+                "테스트사용자",
+                "test@example.com",
+                "encoded-old-password"
+        );
+
+        when(userRepository.findById(userId))
+                .thenReturn(Optional.of(user));
+
+        when(passwordEncoder.encode(newPassword))
+                .thenReturn(encodedPassword);
+
+        // when
+        userService.updatePassword(userId, newPassword);
+
+        // then
+        assertThat(user.getPassword()).isEqualTo(encodedPassword);
+
+        verify(passwordEncoder).encode(newPassword);
+        verify(authSessionService).revokeAllSessions(userId);
+    }
+
+    @Test
+    @DisplayName("존재하지 않는 사용자의 비밀번호 변경 시 예외가 발생한다")
+    void updatePassword_userNotFound_throwsException() {
+        // given
+        UUID userId = UUID.randomUUID();
+
+        when(userRepository.findById(userId))
+                .thenReturn(Optional.empty());
+
+        // when & then
+        assertThatThrownBy(() ->
+                userService.updatePassword(userId, "NewPassword123!")
+        ).isInstanceOf(UserNotFoundException.class);
+
+        verifyNoInteractions(passwordEncoder, authSessionService);
+    }
+
+
+
+}

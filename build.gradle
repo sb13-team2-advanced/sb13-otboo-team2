@@ -1,0 +1,162 @@
+plugins {
+    id 'java'
+    id 'jacoco'
+    id 'org.springframework.boot' version '4.1.1'
+    id 'io.spring.dependency-management' version '1.1.7'
+}
+
+group = 'codeit'
+version = '0.0.1-SNAPSHOT'
+description = 'sb13-otboo-team2'
+
+java {
+    toolchain {
+        languageVersion = JavaLanguageVersion.of(17)
+    }
+}
+
+repositories {
+    mavenCentral()
+}
+
+dependencies {
+
+    // Web
+    implementation 'org.springframework.boot:spring-boot-starter-webmvc'
+
+    // 외부 API 호출용 RestClient
+    implementation 'org.springframework.boot:spring-boot-starter-restclient'
+
+    // 구매 링크 HTML 파싱 (의상 속성 추출)
+    implementation 'org.jsoup:jsoup:1.18.3'
+
+    // JPA
+    implementation 'org.springframework.boot:spring-boot-starter-data-jpa'
+
+    // DB
+    runtimeOnly 'org.postgresql:postgresql'
+
+    // QueryDSL
+    implementation 'com.querydsl:querydsl-jpa:5.0.0:jakarta'
+    annotationProcessor 'com.querydsl:querydsl-apt:5.0.0:jakarta'
+    annotationProcessor 'jakarta.annotation:jakarta.annotation-api'
+    annotationProcessor 'jakarta.persistence:jakarta.persistence-api'
+
+    // Flyway
+    implementation 'org.springframework.boot:spring-boot-starter-flyway'
+    implementation 'org.flywaydb:flyway-database-postgresql'
+
+    // MapStruct
+    implementation 'org.mapstruct:mapstruct:1.6.3'
+    annotationProcessor 'org.projectlombok:lombok-mapstruct-binding:0.2.0'
+    annotationProcessor 'org.mapstruct:mapstruct-processor:1.6.3'
+
+    // Security
+    implementation 'org.springframework.boot:spring-boot-starter-security'
+
+    // Validation
+    implementation 'org.springframework.boot:spring-boot-starter-validation'
+
+    // Lombok
+    compileOnly 'org.projectlombok:lombok'
+    annotationProcessor 'org.projectlombok:lombok'
+
+    // Docker
+    developmentOnly 'org.springframework.boot:spring-boot-docker-compose'
+
+    // Actuator
+    implementation 'org.springframework.boot:spring-boot-starter-actuator'
+
+    // Batch
+    implementation 'org.springframework.boot:spring-boot-starter-batch-jdbc'
+
+    // Swagger
+    implementation 'org.springdoc:springdoc-openapi-starter-webmvc-ui:3.1.0'
+
+    // Cache
+    implementation 'org.springframework.boot:spring-boot-starter-cache'
+    implementation 'com.github.ben-manes.caffeine:caffeine'
+    implementation 'org.springframework.boot:spring-boot-starter-data-redis'
+
+
+    // Mail
+    implementation 'org.springframework.boot:spring-boot-starter-mail'
+
+    // WebSocket
+    implementation 'org.springframework.boot:spring-boot-starter-websocket'
+
+    // H3
+    implementation 'com.uber:h3:4.5.1'
+
+    // JWT
+    implementation 'io.jsonwebtoken:jjwt-api:0.13.0'
+    runtimeOnly 'io.jsonwebtoken:jjwt-impl:0.13.0'
+    runtimeOnly 'io.jsonwebtoken:jjwt-jackson:0.13.0'
+
+
+    // Test
+    testImplementation 'org.springframework.boot:spring-boot-starter-actuator-test'
+    testImplementation 'org.springframework.boot:spring-boot-starter-batch-test'
+    testImplementation 'org.springframework.boot:spring-boot-starter-cache-test'
+    testImplementation 'org.springframework.boot:spring-boot-starter-data-jpa-test'
+    testImplementation 'org.springframework.boot:spring-boot-starter-mail-test'
+    testImplementation 'org.springframework.boot:spring-boot-starter-security-test'
+    testImplementation 'org.springframework.boot:spring-boot-starter-validation-test'
+    testImplementation 'org.springframework.boot:spring-boot-starter-webmvc-test'
+    testImplementation 'org.springframework.boot:spring-boot-starter-websocket-test'
+    testCompileOnly 'org.projectlombok:lombok'
+    testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+    testRuntimeOnly 'com.h2database:h2'
+    testAnnotationProcessor 'org.projectlombok:lombok'
+
+    // Testcontainers - PostgreSQL 통합 테스트
+    testImplementation 'org.springframework.boot:spring-boot-testcontainers'
+    testImplementation 'org.testcontainers:testcontainers-junit-jupiter'
+    testImplementation 'org.testcontainers:testcontainers-postgresql'
+}
+
+tasks.named('test', Test) {
+    useJUnitPlatform()
+    finalizedBy tasks.named('jacocoTestReport')
+}
+
+/**
+ * 모든 entity·dto 패키지를 제외하고 테스트 실행 후 HTML·XML 커버리지 보고서를 생성한다.
+ */
+jacoco {
+    toolVersion = '0.8.15'
+}
+
+/**
+ * entity·dto 패키지를 제외하고 각 패키지의 라인 커버리지를 80.1% 이상으로 검증한다.
+ */
+tasks.named('jacocoTestCoverageVerification', JacocoCoverageVerification) {
+    dependsOn tasks.named('jacocoTestReport')
+    classDirectories.setFrom(tasks.named('jacocoTestReport', JacocoReport).map { it.classDirectories })
+    violationRules {
+        rule {
+            element = 'PACKAGE'
+            limit {
+                counter = 'LINE'
+                value = 'COVEREDRATIO'
+                minimum = 0.801
+            }
+        }
+    }
+}
+
+tasks.named('check') {
+    dependsOn tasks.named('jacocoTestCoverageVerification')
+}
+
+tasks.named('jacocoTestReport', JacocoReport) {
+    dependsOn tasks.named('test')
+    classDirectories.setFrom(sourceSets.main.output.asFileTree.matching {
+        exclude '**/entity/**', '**/dto/**'
+    })
+    reports {
+        html.required = true
+        xml.required = true
+        csv.required = false
+    }
+}

@@ -1,0 +1,68 @@
+spring:
+  application:
+    name: sb13-otboo-team2
+  profiles:
+    default: dev
+  jpa:
+    open-in-view: false
+  servlet:
+    multipart:
+      max-file-size: 10MB
+      max-request-size: 10MB
+  batch:
+    job:
+      enabled: false
+    jdbc:
+      initialize-schema: never
+
+springdoc:
+  api-docs:
+    path: /v3/api-docs
+
+  swagger-ui:
+    path: /swagger-ui.html
+    operations-sorter: method
+    tags-sorter: alpha
+
+otboo:
+  storage:
+    type: local
+    local:
+      root-path: ./uploads
+      base-url: /files
+  admin:
+    name: ${ADMIN_NAME:관리자}
+    email: ${ADMIN_EMAIL:}
+    password: ${ADMIN_PASSWORD:}
+
+jwt:
+  secret: ${JWT_SECRET}
+  access-token-expiration: 30m
+
+ootd:
+  weather:
+    openweathermap:
+      api-key: ${OWM_API_KEY}
+      connect-timeout: ${OWM_CONNECT_TIMEOUT:2s}
+      read-timeout: ${OWM_READ_TIMEOUT:5s}
+    batch:
+      scheduler-enabled: ${OOTD_WEATHER_BATCH_SCHEDULER_ENABLED:false}
+      min-request-interval: ${OOTD_BATCH_MIN_REQUEST_INTERVAL:2s}
+  kakao:
+    local:
+      api-key: ${KAKAO_API_KEY}
+
+management:
+  endpoint:
+    health:
+      probes:
+        enabled: true
+      group:
+        readiness:
+          include:
+            - readinessState
+            - db
+
+auth:
+  cookie:
+    secure: true
