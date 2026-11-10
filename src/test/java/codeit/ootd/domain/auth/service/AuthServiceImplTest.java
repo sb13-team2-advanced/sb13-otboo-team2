@@ -672,6 +672,37 @@ class AuthServiceImplTest {
         verify(passwordEncoder, never()).encode(anyString());
     }
 
+    @ParameterizedTest
+    @EnumSource(
+            value = UserStatus.class,
+            names = {"DEACTIVATED", "DELETED"}
+    )
+    @DisplayName("비활성화되거나 탈퇴한 계정은 임시 비밀번호를 발급할 수 없다")
+    void resetPassword_inactiveUser(UserStatus status) {
+        // given
+        String email = "test@example.com";
+        User user = createUser(email);
+
+        if (status == UserStatus.DEACTIVATED) {
+            user.deactivate();
+        } else {
+            user.markDeleted();
+        }
+
+        when(userRepository.findByEmail(email))
+                .thenReturn(Optional.of(user));
+
+        // when & then
+        assertThrows(
+                AccountInactiveException.class,
+                () -> authService.resetPassword(email)
+        );
+
+        verifyNoInteractions(temporaryPasswordGenerator);
+        verify(passwordEncoder, never()).encode(anyString());
+    }
+
+
 
 
 
