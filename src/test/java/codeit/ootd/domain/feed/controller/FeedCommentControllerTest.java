@@ -77,7 +77,7 @@ class FeedCommentControllerTest {
                         .content("""
                                 {"feedId":"%s","authorId":"%s","content":"%s"}
                                 """.formatted(feedId, userId, content)))
-                .andExpect(status().is2xxSuccessful())
+                .andExpect(status().isOk())
                 .andExpect(jsonPath("$.id").value(commentId.toString()))
                 .andExpect(jsonPath("$.feedId").value(feedId.toString()))
                 .andExpect(jsonPath("$.author.userId").value(userId.toString()))

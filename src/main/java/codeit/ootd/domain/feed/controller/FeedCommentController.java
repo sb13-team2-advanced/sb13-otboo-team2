@@ -5,7 +5,6 @@ import codeit.ootd.domain.feed.dto.response.CommentDto;
 import codeit.ootd.domain.feed.service.FeedCommentService;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
-import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -32,6 +31,6 @@ public class FeedCommentController {
             @RequestBody CommentCreateRequest request
     ) {
         CommentDto response = feedCommentService.create(feedId, request, userId);
-        return ResponseEntity.status(HttpStatus.CREATED).body(response);
+        return ResponseEntity.ok(response);
     }
 }
