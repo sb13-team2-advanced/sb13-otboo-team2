@@ -12,6 +12,7 @@ import codeit.ootd.domain.auth.jwt.JwtProvider;
 import codeit.ootd.domain.auth.service.impl.AuthServiceImpl;
 import codeit.ootd.domain.user.entity.User;
 import codeit.ootd.domain.user.entity.UserStatus;
+import codeit.ootd.domain.user.exception.UserNotFoundException;
 import codeit.ootd.domain.user.repository.UserRepository;
 
 import codeit.ootd.global.exception.ErrorCode;
@@ -28,6 +29,8 @@ import org.mockito.junit.jupiter.MockitoExtension;
 
 import org.springframework.security.crypto.password.PasswordEncoder;
 
+import java.time.Clock;
+import java.time.Instant;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -61,6 +64,12 @@ class AuthServiceImplTest {
 
     @Mock
     private RefreshTokenService refreshTokenService;
+
+    @Mock
+    private Clock clock;
+
+    @Mock
+    private TemporaryPasswordGenerator temporaryPasswordGenerator;
 
     @Mock
     private JwtProvider jwtProvider;
@@ -578,6 +587,92 @@ class AuthServiceImplTest {
         verify(refreshTokenService).findSessionIdByToken(refreshToken);
         verify(authSessionService).revokeSession(sessionId);
     }
+
+    @Test
+    @DisplayName("임시 비밀번호를 발급하면 암호화하여 3분간 저장한다")
+    void resetPassword_success() {
+        // given
+        String email = "test@example.com";
+        String temporaryPassword = "random-temp-password";
+        String encodedPassword = "encoded-temp-password";
+
+        Instant issuedAt = Instant.parse("2026-11-10T06:00:00Z");
+
+        User user = createUser(email);
+
+        when(userRepository.findByEmail(email))
+                .thenReturn(Optional.of(user));
+
+        when(temporaryPasswordGenerator.generate())
+                .thenReturn(temporaryPassword);
+
+        when(passwordEncoder.encode(temporaryPassword))
+                .thenReturn(encodedPassword);
+
+        when(clock.instant()).thenReturn(issuedAt);
+
+        // when
+        authService.resetPassword(email);
+
+        // then
+        assertEquals(
+                encodedPassword,
+                user.getTemporaryPassword()
+        );
+
+        assertEquals(
+                issuedAt.plusSeconds(180),
+                user.getTemporaryPasswordExpiresAt()
+        );
+
+        assertEquals("encoded-password", user.getPassword());
+
+        verify(temporaryPasswordGenerator).generate();
+        verify(passwordEncoder).encode(temporaryPassword);
+    }
+
+    @Test
+    @DisplayName("존재하지 않는 이메일은 임시 비밀번호를 발급하지 않는다")
+    void resetPassword_userNotFound() {
+        // given
+        String email = "unknown@example.com";
+
+        when(userRepository.findByEmail(email))
+                .thenReturn(Optional.empty());
+
+        // when & then
+        assertThrows(
+                UserNotFoundException.class,
+                () -> authService.resetPassword(email)
+        );
+
+        verifyNoInteractions(temporaryPasswordGenerator);
+        verify(passwordEncoder, never()).encode(anyString());
+    }
+
+    @Test
+    @DisplayName("잠긴 계정은 임시 비밀번호를 발급하지 않는다")
+    void resetPassword_lockedUser() {
+        // given
+        String email = "test@example.com";
+
+        User user = createUser(email);
+        user.lock();
+
+        when(userRepository.findByEmail(email))
+                .thenReturn(Optional.of(user));
+
+        // when & then
+        assertThrows(
+                AccountLockedException.class,
+                () -> authService.resetPassword(email)
+        );
+
+        verifyNoInteractions(temporaryPasswordGenerator);
+        verify(passwordEncoder, never()).encode(anyString());
+    }
+
+
 
 
 
