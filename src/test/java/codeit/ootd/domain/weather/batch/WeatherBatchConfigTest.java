@@ -88,6 +88,6 @@ class WeatherBatchConfigTest {
 
         assertThat(jobTimer.count()).isGreaterThanOrEqualTo(1);
         assertThat(jobTimer.totalTime(java.util.concurrent.TimeUnit.MILLISECONDS))
-            .isGreaterThanOrEqualTo(0);
+            .isPositive();
     }
 }
