@@ -11,6 +11,8 @@ import codeit.ootd.domain.feed.repository.FeedCommentRepository;
 import codeit.ootd.domain.feed.repository.FeedRepository;
 import codeit.ootd.domain.feed.service.FeedCommentService;
 import codeit.ootd.domain.feed.service.FeedResponseAssembler;
+import codeit.ootd.domain.notification.enums.NotificationLevel;
+import codeit.ootd.domain.notification.event.NotificationRequestedEvent;
 import codeit.ootd.domain.profile.entity.Profile;
 import codeit.ootd.domain.profile.repository.ProfileRepository;
 import codeit.ootd.domain.user.entity.User;
@@ -26,6 +28,7 @@ import java.util.UUID;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -40,6 +43,7 @@ public class FeedCommentServiceImpl implements FeedCommentService {
     private final FeedResponseAssembler feedResponseAssembler;
     private final ProfileRepository profileRepository;
     private final FeedMapper feedMapper;
+    private final ApplicationEventPublisher eventPublisher;
 
     @Override
     @Transactional
@@ -67,6 +71,13 @@ public class FeedCommentServiceImpl implements FeedCommentService {
                 new FeedComment(feedId, userId, request.content())
         );
         feed.increaseCommentCount();
+
+        eventPublisher.publishEvent(new NotificationRequestedEvent(
+                feed.getAuthorId(),
+                "피드에 댓글이 추가되었습니다.",
+                "회원님의 피드에 새로운 댓글이 등록되었습니다.",
+                NotificationLevel.INFO
+        ));
 
         return toCommentDto(comment, feedResponseAssembler.toAuthorDto(author));
     }
