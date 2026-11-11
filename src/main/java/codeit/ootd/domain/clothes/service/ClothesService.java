@@ -10,11 +10,11 @@ import org.springframework.web.multipart.MultipartFile;
 
 public interface ClothesService {
 
-    ClothesDto create(ClothesCreateRequest request, MultipartFile image);
+    ClothesDto create(ClothesCreateRequest request, MultipartFile image, UUID userId);
 
     ClothesDtoCursorResponse list(UUID ownerId, ClothesType typeEqual, String cursor, UUID idAfter, int limit);
 
-    ClothesDto update(UUID clothesId, ClothesUpdateRequest request, MultipartFile image);
+    ClothesDto update(UUID clothesId, ClothesUpdateRequest request, MultipartFile image, UUID userId);
 
-    void delete(UUID clothesId);
+    void delete(UUID clothesId, UUID userId);
 }
