@@ -6,10 +6,13 @@ import codeit.ootd.domain.feed.dto.response.CommentDto;
 import codeit.ootd.domain.feed.dto.response.CommentDtoCursorResponse;
 import codeit.ootd.domain.feed.entity.Feed;
 import codeit.ootd.domain.feed.entity.FeedComment;
+import codeit.ootd.domain.feed.mapper.FeedMapper;
 import codeit.ootd.domain.feed.repository.FeedCommentRepository;
 import codeit.ootd.domain.feed.repository.FeedRepository;
 import codeit.ootd.domain.feed.service.FeedCommentService;
 import codeit.ootd.domain.feed.service.FeedResponseAssembler;
+import codeit.ootd.domain.profile.entity.Profile;
+import codeit.ootd.domain.profile.repository.ProfileRepository;
 import codeit.ootd.domain.user.entity.User;
 import codeit.ootd.domain.user.repository.UserRepository;
 import codeit.ootd.global.enums.SortDirection;
@@ -20,6 +23,7 @@ import java.time.format.DateTimeParseException;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.PageRequest;
@@ -34,6 +38,8 @@ public class FeedCommentServiceImpl implements FeedCommentService {
     private final FeedCommentRepository feedCommentRepository;
     private final UserRepository userRepository;
     private final FeedResponseAssembler feedResponseAssembler;
+    private final ProfileRepository profileRepository;
+    private final FeedMapper feedMapper;
 
     @Override
     @Transactional
@@ -116,8 +122,28 @@ public class FeedCommentServiceImpl implements FeedCommentService {
                 .map(FeedComment::getAuthorId)
                 .distinct()
                 .toList();
-        Map<UUID, AuthorDto> authorsById = userRepository.findAllById(authorIds).stream()
-                .collect(Collectors.toMap(User::getId, feedResponseAssembler::toAuthorDto));
+
+        Map<UUID, Profile> profilesByUserId = profileRepository
+                .findByUserIdIn(authorIds)
+                .stream()
+                .collect(Collectors.toMap(
+                        Profile::getUserId,
+                        Function.identity()
+                ));
+
+        Map<UUID, AuthorDto> authorsById = userRepository
+                .findAllById(authorIds)
+                .stream()
+                .collect(Collectors.toMap(
+                        User::getId,
+                        author -> {
+                            Profile profile = profilesByUserId.get(author.getId());
+                            String profileImageUrl = profile == null
+                                    ? null
+                                    : profile.getProfileImageUrl();
+                            return feedMapper.toAuthorDto(author, profileImageUrl);
+                        }
+                ));
 
         return comments.stream()
                 .map(comment -> {
