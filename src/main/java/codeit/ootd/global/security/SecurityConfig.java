@@ -76,7 +76,8 @@ public class SecurityConfig {
                 .requestMatchers(
                         HttpMethod.GET,
                         "/api/auth/csrf",
-                        "/api/auth/csrf-token"
+                        "/api/auth/csrf-token",
+                        "/actuator/prometheus"
                 ).permitAll()
                 .anyRequest().authenticated()
         );

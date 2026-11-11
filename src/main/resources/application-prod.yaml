@@ -28,6 +28,15 @@ logging:
     org.hibernate.orm.jdbc.batch: warn
     org.hibernate.orm.jdbc.bind: warn
 
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health, prometheus
+  metrics:
+    tags:
+      application: ${spring.application.name}
+
 ootd:
   openapi:
     server-url: ${OOTD_SERVER_URL}
