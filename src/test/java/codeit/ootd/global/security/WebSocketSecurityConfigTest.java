@@ -1,32 +1,92 @@
 package codeit.ootd.global.security;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.Mockito.*;
 
+import codeit.ootd.global.config.WebSocketConfig;
 import java.util.List;
 import java.util.UUID;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.messaging.Message;
+import org.springframework.messaging.MessageChannel;
+import org.springframework.messaging.MessageDeliveryException;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
+import org.springframework.test.context.junit.jupiter.web.SpringJUnitWebConfig;
 import org.springframework.messaging.simp.stomp.StompCommand;
 import org.springframework.messaging.simp.stomp.StompHeaderAccessor;
 import org.springframework.messaging.support.MessageBuilder;
+import org.springframework.messaging.support.MessageHeaderAccessor;
 import org.springframework.security.authentication.AnonymousAuthenticationToken;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.authorization.AuthorizationManager;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
-import org.springframework.security.messaging.access.intercept.MessageMatcherDelegatingAuthorizationManager;
+import org.springframework.security.access.AccessDeniedException;
 
+@SpringJUnitWebConfig({WebSocketConfig.class, WebSocketSecurityConfig.class})
 class WebSocketSecurityConfigTest {
 
     private static final UUID FIRST = UUID.fromString("00000000-0000-0000-0000-000000000001");
     private static final UUID SECOND = UUID.fromString("00000000-0000-0000-0000-000000000002");
     private static final String ROOM = "/sub/direct-messages_" + FIRST + "_" + SECOND;
 
-    private final AuthorizationManager<Message<?>> manager = new WebSocketSecurityConfig()
-            .messageAuthorizationManager(MessageMatcherDelegatingAuthorizationManager.builder());
+    @Autowired
+    private AuthorizationManager<Message<?>> manager;
+
+    @Autowired
+    @Qualifier("clientInboundChannel")
+    private MessageChannel inboundChannel;
+
+    @MockitoBean
+    private StompJwtAuthenticationInterceptor authenticationInterceptor;
+
+    @BeforeEach
+    void stubAuthentication() {
+        // JWT 검증은 별도 단위 테스트에서 확인하고, 여기서는 인증 이후의 채널 설정을 검증한다.
+        when(authenticationInterceptor.preSend(any(), any())).thenAnswer(invocation -> {
+            Message<?> message = invocation.getArgument(0);
+            StompHeaderAccessor accessor = MessageHeaderAccessor.getAccessor(message, StompHeaderAccessor.class);
+            if (accessor.getCommand() == StompCommand.CONNECT) {
+                accessor.setUser(user(FIRST));
+            }
+            return message;
+        });
+    }
+
+    @Test
+    @DisplayName("인증된 CONNECT는 CSRF 토큰 없이 인바운드 채널을 통과한다")
+    void connect_withoutCsrf_authenticates() {
+        StompHeaderAccessor accessor = StompHeaderAccessor.create(StompCommand.CONNECT);
+        accessor.setSessionId("csrf-free-connect-test");
+        accessor.setNativeHeader("Authorization", "Bearer valid-token");
+        accessor.setLeaveMutable(true);
+
+        assertThat(inboundChannel.send(MessageBuilder.createMessage(new byte[0], accessor.getMessageHeaders())))
+                .isTrue();
+        assertThat(accessor.getUser().getName()).isEqualTo(FIRST.toString());
+    }
+
+    @Test
+    @DisplayName("실제 인바운드 채널은 타인의 DM 구독을 계속 차단한다")
+    void inboundChannel_rejectsThirdPartySubscription() {
+        StompHeaderAccessor accessor = StompHeaderAccessor.create(StompCommand.SUBSCRIBE);
+        accessor.setSessionId("unauthorized-subscription-test");
+        accessor.setSubscriptionId("subscription-test");
+        accessor.setUser(user(UUID.randomUUID()));
+        accessor.setDestination(ROOM);
+        Message<?> message = MessageBuilder.createMessage(new byte[0], accessor.getMessageHeaders());
+
+        assertThatThrownBy(() -> inboundChannel.send(message))
+                .isInstanceOf(MessageDeliveryException.class)
+                .hasCauseInstanceOf(AccessDeniedException.class);
+    }
 
     @Test
     @DisplayName("DM의 두 참여자는 해당 대화를 구독할 수 있다")

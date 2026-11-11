@@ -21,7 +21,7 @@ public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
 
     @Override
     public void configureClientInboundChannel(ChannelRegistration registration) {
-        // Spring Security의 CSRF·권한 검사 전에 연결 사용자를 인증한다.
+        // Spring Security의 권한 검사 전에 연결 사용자를 인증한다.
         registration.interceptors(authenticationInterceptor);
     }
 
