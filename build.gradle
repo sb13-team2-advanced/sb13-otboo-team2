@@ -93,6 +93,8 @@ dependencies {
     runtimeOnly 'io.jsonwebtoken:jjwt-impl:0.13.0'
     runtimeOnly 'io.jsonwebtoken:jjwt-jackson:0.13.0'
 
+    // Prometheus
+    runtimeOnly 'io.micrometer:micrometer-registry-prometheus'
 
     // Test
     testImplementation 'org.springframework.boot:spring-boot-starter-actuator-test'

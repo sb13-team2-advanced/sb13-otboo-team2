@@ -41,6 +41,15 @@ logging:
     org.hibernate.orm.jdbc.batch: trace
     org.hibernate.orm.jdbc.bind: "off"
 
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health, info, metrics, prometheus
+  metrics:
+    tags:
+      application: ${spring.application.name}
+
 ootd:
   openapi:
     server-url: http://localhost:${server.port:8080}
@@ -49,10 +58,3 @@ ootd:
 auth:
   cookie:
     secure: false
-
-management:
-  endpoints:
-    web:
-      exposure:
-        include: health,info,metrics
-        
