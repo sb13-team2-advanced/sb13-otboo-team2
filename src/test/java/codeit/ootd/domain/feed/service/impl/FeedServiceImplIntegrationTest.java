@@ -131,7 +131,7 @@ class FeedServiceImplIntegrationTest {
     @Test
     @DisplayName("피드와 의상 연결을 저장하고 전날 기온이 없는 응답을 반환한다")
     void savesFeedAndClothes() {
-        FeedDto result = feedService.create(createRequest());
+        FeedDto result = feedService.create(createRequest(), author.getId());
 
         Feed savedFeed = feedRepository.findById(result.id())
                 .orElseThrow();
@@ -193,7 +193,7 @@ class FeedServiceImplIntegrationTest {
             throw new IllegalStateException("응답 구성 실패 테스트");
         }).when(feedResponseAssembler).toAuthorDto(any(User.class));
 
-        assertThatThrownBy(() -> feedService.create(createRequest()))
+        assertThatThrownBy(() -> feedService.create(createRequest(), author.getId()))
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessage("응답 구성 실패 테스트");
 

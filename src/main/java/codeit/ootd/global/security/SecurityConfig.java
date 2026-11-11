@@ -7,8 +7,11 @@ import codeit.ootd.global.exception.ErrorCode;
 import codeit.ootd.global.exception.ErrorResponse;
 import codeit.ootd.global.exception.OtbooException;
 import jakarta.servlet.http.HttpServletResponse;
+import java.io.IOException;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.context.annotation.Profile;
+import org.springframework.core.annotation.Order;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.MediaType;
 import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
@@ -20,13 +23,14 @@ import org.springframework.security.web.authentication.UsernamePasswordAuthentic
 import org.springframework.security.web.csrf.CookieCsrfTokenRepository;
 import tools.jackson.databind.json.JsonMapper;
 
-import java.io.IOException;
-
 @Configuration
 @EnableWebSecurity
 @EnableMethodSecurity
 public class SecurityConfig {
 
+    /**
+     * 정적 리소스와 공개 인증 API, 준비 상태 조회를 허용하고 나머지 요청에는 JWT 인증을 적용한다.
+     */
     @Bean
     public SecurityFilterChain securityFilterChain(
             HttpSecurity http,
@@ -64,7 +68,8 @@ public class SecurityConfig {
                         "/js/**",
                         "/images/**"
                 ).permitAll()
-
+                .requestMatchers(HttpMethod.GET, "/files/clothes/**").permitAll()
+                .requestMatchers(HttpMethod.GET, "/actuator/health/readiness").permitAll()
                 .requestMatchers(HttpMethod.POST, "/api/users").permitAll()
                 .requestMatchers(HttpMethod.POST, "/api/auth/sign-in").permitAll()
                 .requestMatchers(HttpMethod.POST, "/api/auth/refresh").permitAll()
@@ -132,4 +137,20 @@ public class SecurityConfig {
         );
     }
 
+    @Bean
+    @Profile("dev")
+    @Order(1)
+    public SecurityFilterChain devActuatorSecurityFilterChain(
+        HttpSecurity http
+    ) throws Exception {
+        return http
+            .securityMatcher(
+                "/actuator/metrics",
+                "/actuator/metrics/**"
+            )
+            .authorizeHttpRequests(auth -> auth
+                .anyRequest().permitAll()
+            )
+            .build();
+    }
 }

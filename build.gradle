@@ -27,6 +27,9 @@ dependencies {
     // 외부 API 호출용 RestClient
     implementation 'org.springframework.boot:spring-boot-starter-restclient'
 
+    // 구매 링크 HTML 파싱 (의상 속성 추출)
+    implementation 'org.jsoup:jsoup:1.18.3'
+
     // JPA
     implementation 'org.springframework.boot:spring-boot-starter-data-jpa'
 

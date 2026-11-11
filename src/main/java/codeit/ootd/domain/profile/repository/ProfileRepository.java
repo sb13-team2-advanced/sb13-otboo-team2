@@ -12,4 +12,6 @@ public interface ProfileRepository extends JpaRepository<Profile, UUID> {
     Optional<Profile> findByUserId(UUID userId);
 
     List<Profile> findByUserIdIn(Collection<UUID> userIds);
+
+    List<Profile> findByLatitudeIsNotNullAndLongitudeIsNotNull();
 }

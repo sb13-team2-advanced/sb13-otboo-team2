@@ -3,14 +3,16 @@ package codeit.ootd.domain.feed.service.impl;
 import codeit.ootd.domain.clothes.entity.Clothes;
 import codeit.ootd.domain.clothes.repository.ClothesRepository;
 import codeit.ootd.domain.feed.dto.request.FeedCreateRequest;
-import codeit.ootd.domain.feed.dto.response.AuthorDto;
-import codeit.ootd.domain.feed.dto.response.FeedDto;
-import codeit.ootd.domain.feed.dto.response.OotdDto;
-import codeit.ootd.domain.feed.dto.response.WeatherSummaryDto;
+import codeit.ootd.domain.feed.dto.request.FeedSearchRequest;
+import codeit.ootd.domain.feed.dto.request.FeedUpdateRequest;
+import codeit.ootd.domain.feed.dto.response.*;
 import codeit.ootd.domain.feed.entity.Feed;
 import codeit.ootd.domain.feed.entity.FeedClothes;
 import codeit.ootd.domain.feed.mapper.FeedMapper;
 import codeit.ootd.domain.feed.repository.FeedClothesRepository;
+import codeit.ootd.domain.feed.repository.FeedCommentRepository;
+import codeit.ootd.domain.feed.repository.FeedLikeRepository;
+import codeit.ootd.domain.feed.repository.FeedQueryRepository;
 import codeit.ootd.domain.feed.repository.FeedRepository;
 import codeit.ootd.domain.feed.service.FeedResponseAssembler;
 import codeit.ootd.domain.feed.service.FeedService;
@@ -22,6 +24,8 @@ import codeit.ootd.domain.weather.mapper.WeatherDtoMapper;
 import codeit.ootd.domain.weather.repository.WeatherRepository;
 import codeit.ootd.global.exception.ErrorCode;
 import codeit.ootd.global.exception.OtbooException;
+import java.time.Instant;
+import java.time.format.DateTimeParseException;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -37,6 +41,8 @@ import org.springframework.transaction.annotation.Transactional;
 @RequiredArgsConstructor
 public class FeedServiceImpl implements FeedService {
 
+    private static final int MAX_CONTENT_LENGTH = 1000;
+
     private final UserRepository userRepository;
     private final WeatherRepository weatherRepository;
     private final ClothesRepository clothesRepository;
@@ -45,13 +51,24 @@ public class FeedServiceImpl implements FeedService {
     private final WeatherDtoMapper weatherDtoMapper;
     private final FeedMapper feedMapper;
     private final FeedResponseAssembler feedResponseAssembler;
+    private final FeedQueryRepository feedQueryRepository;
+    private final FeedLikeRepository feedLikeRepository;
+    private final FeedCommentRepository feedCommentRepository;
 
     @Override
     @Transactional
-    public FeedDto create(FeedCreateRequest request) {
+    public FeedDto create(FeedCreateRequest request, UUID userId) {
+        if (userId == null) {
+            throw new OtbooException(ErrorCode.AUTHENTICATION_REQUIRED);
+        }
+
         validateRequest(request);
 
-        User author = userRepository.findById(request.authorId())
+        if (!userId.equals(request.authorId())) {
+            throw new OtbooException(ErrorCode.ACCESS_DENIED);
+        }
+
+        User author = userRepository.findById(userId)
                 .orElseThrow(
                         () -> new OtbooException(
                                 ErrorCode.FEED_AUTHOR_NOT_FOUND
@@ -74,7 +91,7 @@ public class FeedServiceImpl implements FeedService {
 
         boolean containsOthersClothes = clothes.stream()
                 .anyMatch(clothing ->
-                        !request.authorId().equals(clothing.getUserId())
+                        !userId.equals(clothing.getUserId())
                 );
 
         if (containsOthersClothes) {
@@ -121,12 +138,168 @@ public class FeedServiceImpl implements FeedService {
         return feedMapper.toCreateResponse(savedFeed, authorDto, ootds);
     }
 
+    @Override
+    @Transactional(readOnly = true)
+    public FeedDtoCursorResponse list(
+            FeedSearchRequest request,
+            UUID userId
+    ) {
+        if (userId == null) {
+            throw new OtbooException(ErrorCode.AUTHENTICATION_REQUIRED);
+        }
+
+        validateSearchRequest(request);
+
+        int limit = request.limit();
+
+        List<Feed> feeds = feedQueryRepository.findList(
+                request,
+                limit + 1
+        );
+
+        long totalCount = feedQueryRepository.countList(request);
+
+        boolean hasNext = feeds.size() > limit;
+        List<Feed> page = hasNext
+                ? feeds.subList(0, limit)
+                : feeds;
+
+        String nextCursor = null;
+        UUID nextIdAfter = null;
+
+        if (hasNext) {
+            Feed last = page.get(page.size() - 1);
+
+            nextCursor = switch (request.sortBy()) {
+                case "createdAt" -> last.getCreatedAt().toString();
+                case "likeCount" -> Long.toString(last.getLikeCount());
+                default -> throw new OtbooException(
+                        ErrorCode.INVALID_SORT_FIELD
+                );
+            };
+
+            nextIdAfter = last.getId();
+        }
+
+        List<FeedDto> data = page.isEmpty()
+                ? List.of()
+                : feedResponseAssembler.toFeedDtos(page, userId);
+
+        return new FeedDtoCursorResponse(
+                data,
+                nextCursor,
+                nextIdAfter,
+                hasNext,
+                totalCount,
+                request.sortBy(),
+                request.sortDirection()
+        );
+    }
+
+    @Override
+    @Transactional
+    public FeedDto update(
+            UUID feedId,
+            FeedUpdateRequest request,
+            UUID userId
+    ) {
+        if (userId == null) {
+            throw new OtbooException(ErrorCode.AUTHENTICATION_REQUIRED);
+        }
+
+        if (feedId == null
+                || request == null
+                || request.content() == null
+                || request.content().isBlank()
+                || request.content().length() > MAX_CONTENT_LENGTH) {
+            throw new OtbooException(ErrorCode.INVALID_REQUEST);
+        }
+
+        Feed feed = feedRepository.findById(feedId)
+                .orElseThrow(
+                        () -> new OtbooException(ErrorCode.FEED_NOT_FOUND)
+                );
+
+        if (!userId.equals(feed.getAuthorId())) {
+            throw new OtbooException(ErrorCode.ACCESS_DENIED);
+        }
+
+        feed.updateContent(request.content());
+
+        return feedResponseAssembler
+                .toFeedDtos(List.of(feed), userId)
+                .get(0);
+    }
+
+    @Override
+    @Transactional
+    public void delete(UUID feedId, UUID userId) {
+        if (userId == null) {
+            throw new OtbooException(ErrorCode.AUTHENTICATION_REQUIRED);
+        }
+
+        if (feedId == null) {
+            throw new OtbooException(ErrorCode.INVALID_REQUEST);
+        }
+
+        Feed feed = feedRepository.findById(feedId)
+                .orElseThrow(
+                        () -> new OtbooException(ErrorCode.FEED_NOT_FOUND)
+                );
+
+        if (!userId.equals(feed.getAuthorId())) {
+            throw new OtbooException(ErrorCode.ACCESS_DENIED);
+        }
+
+        feedClothesRepository.deleteAllByFeedId(feedId);
+        feedLikeRepository.deleteAllByFeedId(feedId);
+        feedCommentRepository.deleteAllByFeedId(feedId);
+        feedRepository.delete(feed);
+    }
+
+    private void validateSearchRequest(FeedSearchRequest request) {
+        if (request == null
+                || request.limit() == null
+                || request.limit() <= 0
+                || request.limit() == Integer.MAX_VALUE
+                || request.sortDirection() == null) {
+            throw new OtbooException(ErrorCode.INVALID_REQUEST);
+        }
+
+        String sortBy = request.sortBy();
+
+        if (!"createdAt".equals(sortBy) && !"likeCount".equals(sortBy)) {
+            throw new OtbooException(ErrorCode.INVALID_SORT_FIELD);
+        }
+
+        String cursor = request.cursor();
+
+        if (cursor == null) {
+            return;
+        }
+
+        try {
+            if ("createdAt".equals(sortBy)) {
+                Instant.parse(cursor);
+            } else {
+                long likeCount = Long.parseLong(cursor);
+
+                if (likeCount < 0) {
+                    throw new OtbooException(ErrorCode.FEED_INVALID_CURSOR);
+                }
+            }
+        } catch (DateTimeParseException | NumberFormatException exception) {
+            throw new OtbooException(ErrorCode.FEED_INVALID_CURSOR);
+        }
+    }
+
     private void validateRequest(FeedCreateRequest request) {
         if (request == null
                 || request.authorId() == null
                 || request.weatherId() == null
                 || request.content() == null
                 || request.content().isBlank()
+                || request.content().length() > MAX_CONTENT_LENGTH
                 || request.clothesIds() == null
                 || request.clothesIds().stream().anyMatch(Objects::isNull)) {
             throw new OtbooException(ErrorCode.FEED_CREATE_INVALID_REQUEST);

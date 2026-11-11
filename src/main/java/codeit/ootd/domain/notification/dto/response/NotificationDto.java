@@ -1,4 +1,4 @@
-package codeit.ootd.domain.notification.dto;
+package codeit.ootd.domain.notification.dto.response;
 
 import codeit.ootd.domain.notification.enums.NotificationLevel;
 import java.time.Instant;

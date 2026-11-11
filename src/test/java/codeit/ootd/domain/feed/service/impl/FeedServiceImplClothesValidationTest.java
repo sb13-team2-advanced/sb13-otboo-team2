@@ -65,7 +65,7 @@ class FeedServiceImplClothesValidationTest {
 
         OtbooException exception = assertThrows(
                 OtbooException.class,
-                () -> feedService.create(request)
+                () -> feedService.create(request, request.authorId())
         );
 
         assertThat(exception.getErrorCode())
@@ -111,7 +111,7 @@ class FeedServiceImplClothesValidationTest {
 
         OtbooException exception = assertThrows(
                 OtbooException.class,
-                () -> feedService.create(request)
+                () -> feedService.create(request, request.authorId())
         );
 
         assertThat(exception.getErrorCode())
