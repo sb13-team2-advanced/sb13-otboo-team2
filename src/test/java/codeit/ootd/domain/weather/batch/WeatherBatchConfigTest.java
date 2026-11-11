@@ -2,6 +2,7 @@ package codeit.ootd.domain.weather.batch;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.when;
 
 import codeit.ootd.domain.weather.repository.WeatherLocationRepository;
@@ -66,7 +67,8 @@ class WeatherBatchConfigTest {
     @DisplayName("날씨 Batch 실패 시 실패 상태와 실행 시간을 메트릭에 기록한다")
     void weatherCollectionJobRecordsFailureMetrics() throws Exception {
         when(weatherLocationRepository
-            .findTop20ByLastCollectedAtIsNotNullAndNextRefreshAtLessThanEqualOrderByNextRefreshAtAsc(
+            .findTop20ByResolutionAndLastCollectedAtIsNotNullAndNextRefreshAtLessThanEqualOrderByNextRefreshAtAsc(
+                eq((short) 7),
                 any(Instant.class)
             ))
             .thenThrow(new IllegalStateException("테스트용 조회 실패"));

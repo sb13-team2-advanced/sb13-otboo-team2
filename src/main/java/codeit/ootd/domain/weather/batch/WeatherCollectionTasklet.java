@@ -34,6 +34,7 @@ public class WeatherCollectionTasklet implements Tasklet {
 
     private static final ZoneId KOREA_ZONE = ZoneId.of("Asia/Seoul");
 
+    private static final short BATCH_RESOLUTION = 7;
     private static final int BATCH_SIZE = 20;
     private static final int MAX_LOCATIONS_PER_JOB = 100;
     private static final Duration MAX_JOB_DURATION = Duration.ofMinutes(5);
@@ -81,7 +82,8 @@ public class WeatherCollectionTasklet implements Tasklet {
 
             List<WeatherLocation> locations =
                 weatherLocationRepository
-                    .findTop20ByLastCollectedAtIsNotNullAndNextRefreshAtLessThanEqualOrderByNextRefreshAtAsc(
+                    .findTop20ByResolutionAndLastCollectedAtIsNotNullAndNextRefreshAtLessThanEqualOrderByNextRefreshAtAsc(
+                        BATCH_RESOLUTION,
                         clock.instant()
                     );
 

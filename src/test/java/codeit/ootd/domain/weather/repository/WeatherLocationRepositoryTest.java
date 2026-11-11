@@ -550,7 +550,7 @@ class WeatherLocationRepositoryTest {
     }
 
     @Test
-    @DisplayName("Batch는 최초 수집을 완료하고 갱신 시각이 지난 위치만 조회한다")
+    @DisplayName("Batch는 최초 수집을 완료한 R7 위치 중 갱신 시각이 지난 위치만 조회한다")
     void findOnlyCollectedLocationsDueForBatch() {
         Instant now = Instant.parse("2026-10-29T06:00:00Z");
 
@@ -585,14 +585,38 @@ class WeatherLocationRepositoryTest {
             now.plus(Duration.ofHours(1))
         );
 
-        repository.saveAllAndFlush(
-            List.of(newLocation, dueLocation, futureLocation)
+        WeatherLocation oldR8Location = new WeatherLocation(
+            "cell-batch-r8",
+            37.5900,
+            127.0000,
+            now.minus(Duration.ofHours(3))
         );
+
+        oldR8Location.completeCollection(
+            now.minus(Duration.ofHours(3)),
+            now.minus(Duration.ofHours(1))
+        );
+
+        repository.saveAllAndFlush(
+            List.of(newLocation, dueLocation, futureLocation, oldR8Location)
+        );
+
+        entityManager.createNativeQuery(
+                "UPDATE weather_location SET resolution = 8 WHERE id = :id"
+            )
+            .setParameter("id", oldR8Location.getId())
+            .executeUpdate();
 
         entityManager.clear();
 
+        WeatherLocation existingR8 = repository.findByCellId("cell-batch-r8")
+            .orElseThrow();
+
+        assertThat(existingR8.getResolution()).isEqualTo((short) 8);
+
         List<WeatherLocation> result =
-            repository.findTop20ByLastCollectedAtIsNotNullAndNextRefreshAtLessThanEqualOrderByNextRefreshAtAsc(
+            repository.findTop20ByResolutionAndLastCollectedAtIsNotNullAndNextRefreshAtLessThanEqualOrderByNextRefreshAtAsc(
+                (short) 7,
                 now
             );
 
