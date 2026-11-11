@@ -27,7 +27,9 @@ import codeit.ootd.domain.clothes.exception.ClothesNotFoundException;
 import codeit.ootd.domain.clothes.exception.ClothesOwnerNotFoundException;
 import codeit.ootd.domain.clothes.service.ClothesService;
 import codeit.ootd.global.enums.SortDirection;
+import codeit.ootd.global.exception.ErrorCode;
 import codeit.ootd.global.exception.GlobalExceptionHandler;
+import codeit.ootd.global.exception.OtbooException;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -42,6 +44,9 @@ import org.springframework.http.HttpMethod;
 import org.springframework.http.MediaType;
 import org.springframework.http.converter.json.JacksonJsonHttpMessageConverter;
 import org.springframework.mock.web.MockMultipartFile;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.security.web.method.annotation.AuthenticationPrincipalArgumentResolver;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.validation.beanvalidation.LocalValidatorFactoryBean;
@@ -61,16 +66,20 @@ class ClothesControllerTest {
     private MockMvc mockMvc;
     private JsonMapper objectMapper;
     private LocalValidatorFactoryBean validator;
+    private final UUID userId = UUID.randomUUID();
 
     @BeforeEach
     void setUp() {
         validator = new LocalValidatorFactoryBean();
         validator.afterPropertiesSet();
         objectMapper = JsonMapper.builder().build();
+        SecurityContextHolder.getContext().setAuthentication(
+                new UsernamePasswordAuthenticationToken(userId, null, List.of()));
 
         mockMvc = MockMvcBuilders
                 .standaloneSetup(new ClothesController(service))
                 .setControllerAdvice(new GlobalExceptionHandler())
+                .setCustomArgumentResolvers(new AuthenticationPrincipalArgumentResolver())
                 .setMessageConverters(new JacksonJsonHttpMessageConverter(objectMapper))
                 .setValidator(validator)
                 .build();
@@ -79,6 +88,7 @@ class ClothesControllerTest {
     @AfterEach
     void tearDown() {
         validator.close();
+        SecurityContextHolder.clearContext();
     }
 
     // ---------- 등록 ----------
@@ -88,7 +98,7 @@ class ClothesControllerTest {
         UUID ownerId = UUID.randomUUID();
         UUID definitionId = UUID.randomUUID();
         ClothesDto dto = dto(ownerId, definitionId);
-        given(service.create(any(), any())).willReturn(dto);
+        given(service.create(any(), any(), any())).willReturn(dto);
         ClothesCreateRequest body = new ClothesCreateRequest(ownerId, "셔츠", ClothesType.TOP,
                 List.of(new ClothesAttributeRequest(definitionId, "검정")));
         MockMultipartFile image = new MockMultipartFile("image", "a.png", "image/png", new byte[] {1});
@@ -107,7 +117,7 @@ class ClothesControllerTest {
 
         ArgumentCaptor<ClothesCreateRequest> requestCaptor = ArgumentCaptor.forClass(ClothesCreateRequest.class);
         ArgumentCaptor<MultipartFile> imageCaptor = ArgumentCaptor.forClass(MultipartFile.class);
-        verify(service).create(requestCaptor.capture(), imageCaptor.capture());
+        verify(service).create(requestCaptor.capture(), imageCaptor.capture(), eq(userId));
         assertThat(requestCaptor.getValue()).isEqualTo(body);
         assertThat(imageCaptor.getValue().getOriginalFilename()).isEqualTo("a.png");
     }
@@ -115,13 +125,13 @@ class ClothesControllerTest {
     @Test
     void 이미지_없이도_등록할_수_있다() throws Exception {
         UUID ownerId = UUID.randomUUID();
-        given(service.create(any(), any())).willReturn(dto(ownerId, UUID.randomUUID()));
+        given(service.create(any(), any(), any())).willReturn(dto(ownerId, UUID.randomUUID()));
 
         mockMvc.perform(multipart(URL).file(jsonPart(
                         new ClothesCreateRequest(ownerId, "셔츠", ClothesType.TOP, null))))
                 .andExpect(status().isCreated());
 
-        verify(service).create(any(), isNull());
+        verify(service).create(any(), isNull(), eq(userId));
     }
 
     @Test
@@ -186,7 +196,7 @@ class ClothesControllerTest {
 
     @Test
     void 소유자가_없으면_404와_메시지를_반환한다() throws Exception {
-        given(service.create(any(), any())).willThrow(new ClothesOwnerNotFoundException());
+        given(service.create(any(), any(), any())).willThrow(new ClothesOwnerNotFoundException());
 
         mockMvc.perform(multipart(URL).file(jsonPart(
                         new ClothesCreateRequest(UUID.randomUUID(), "셔츠", ClothesType.TOP, null))))
@@ -197,7 +207,7 @@ class ClothesControllerTest {
 
     @Test
     void 파일이_너무_크면_413과_메시지를_반환한다() throws Exception {
-        given(service.create(any(), any())).willThrow(new MaxUploadSizeExceededException(10));
+        given(service.create(any(), any(), any())).willThrow(new MaxUploadSizeExceededException(10));
 
         mockMvc.perform(multipart(URL).file(jsonPart(
                         new ClothesCreateRequest(UUID.randomUUID(), "셔츠", ClothesType.TOP, null))))
@@ -279,7 +289,7 @@ class ClothesControllerTest {
     @Test
     void 일부_필드만_보내도_수정되고_보내지_않은_값은_null로_전달된다() throws Exception {
         UUID clothesId = UUID.randomUUID();
-        given(service.update(eq(clothesId), any(), any())).willReturn(dto(UUID.randomUUID(), UUID.randomUUID()));
+        given(service.update(eq(clothesId), any(), any(), any())).willReturn(dto(UUID.randomUUID(), UUID.randomUUID()));
 
         mockMvc.perform(multipart(HttpMethod.PATCH, URL + "/{id}", clothesId)
                         .file(jsonPart(Map.of("name", "새 이름"))))
@@ -287,7 +297,7 @@ class ClothesControllerTest {
                 .andExpect(jsonPath("$.name").value("셔츠"));
 
         ArgumentCaptor<ClothesUpdateRequest> captor = ArgumentCaptor.forClass(ClothesUpdateRequest.class);
-        verify(service).update(eq(clothesId), captor.capture(), isNull());
+        verify(service).update(eq(clothesId), captor.capture(), isNull(), eq(userId));
         assertThat(captor.getValue()).isEqualTo(new ClothesUpdateRequest("새 이름", null, null));
     }
 
@@ -304,7 +314,7 @@ class ClothesControllerTest {
 
     @Test
     void 수정할_의상이_없으면_404와_메시지를_반환한다() throws Exception {
-        given(service.update(any(), any(), any())).willThrow(new ClothesNotFoundException());
+        given(service.update(any(), any(), any(), any())).willThrow(new ClothesNotFoundException());
 
         mockMvc.perform(multipart(HttpMethod.PATCH, URL + "/{id}", UUID.randomUUID())
                         .file(jsonPart(Map.of("name", "새 이름"))))
@@ -322,12 +332,12 @@ class ClothesControllerTest {
         mockMvc.perform(delete(URL + "/{id}", clothesId))
                 .andExpect(status().isNoContent());
 
-        verify(service).delete(clothesId);
+        verify(service).delete(clothesId, userId);
     }
 
     @Test
     void 삭제할_의상이_없으면_404를_반환한다() throws Exception {
-        doThrow(new ClothesNotFoundException()).when(service).delete(any());
+        doThrow(new ClothesNotFoundException()).when(service).delete(any(), any());
 
         mockMvc.perform(delete(URL + "/{id}", UUID.randomUUID()))
                 .andExpect(status().isNotFound())
@@ -336,7 +346,7 @@ class ClothesControllerTest {
 
     @Test
     void 피드에서_사용_중이면_409와_메시지를_반환한다() throws Exception {
-        doThrow(new ClothesInUseException()).when(service).delete(any());
+        doThrow(new ClothesInUseException()).when(service).delete(any(), any());
 
         mockMvc.perform(delete(URL + "/{id}", UUID.randomUUID()))
                 .andExpect(status().isConflict())
@@ -351,6 +361,40 @@ class ClothesControllerTest {
                 .andExpect(jsonPath("$.message").value(INVALID_REQUEST));
 
         verifyNoInteractions(service);
+    }
+
+    // ---------- 소유자 검증 ----------
+
+    @Test
+    void 소유자가_아니면_등록이_403과_메시지를_반환한다() throws Exception {
+        given(service.create(any(), any(), any())).willThrow(new OtbooException(ErrorCode.ACCESS_DENIED));
+
+        mockMvc.perform(multipart(URL).file(jsonPart(
+                        new ClothesCreateRequest(UUID.randomUUID(), "셔츠", ClothesType.TOP, null))))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.exceptionName").value("OtbooException"))
+                .andExpect(jsonPath("$.message").value(ErrorCode.ACCESS_DENIED.getMessage()));
+    }
+
+    @Test
+    void 소유자가_아니면_수정이_403과_메시지를_반환한다() throws Exception {
+        given(service.update(any(), any(), any(), any())).willThrow(new OtbooException(ErrorCode.ACCESS_DENIED));
+
+        mockMvc.perform(multipart(HttpMethod.PATCH, URL + "/{id}", UUID.randomUUID())
+                        .file(jsonPart(Map.of("name", "새 이름"))))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.exceptionName").value("OtbooException"))
+                .andExpect(jsonPath("$.message").value(ErrorCode.ACCESS_DENIED.getMessage()));
+    }
+
+    @Test
+    void 소유자가_아니면_삭제가_403과_메시지를_반환한다() throws Exception {
+        doThrow(new OtbooException(ErrorCode.ACCESS_DENIED)).when(service).delete(any(), any());
+
+        mockMvc.perform(delete(URL + "/{id}", UUID.randomUUID()))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.exceptionName").value("OtbooException"))
+                .andExpect(jsonPath("$.message").value(ErrorCode.ACCESS_DENIED.getMessage()));
     }
 
     // ---------- 준비 ----------
