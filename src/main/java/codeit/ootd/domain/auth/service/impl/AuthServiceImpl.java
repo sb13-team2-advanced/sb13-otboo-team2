@@ -12,9 +12,11 @@ import codeit.ootd.domain.auth.jwt.JwtProvider;
 import codeit.ootd.domain.auth.service.AuthService;
 import codeit.ootd.domain.auth.service.AuthSessionService;
 import codeit.ootd.domain.auth.service.RefreshTokenService;
+import codeit.ootd.domain.auth.service.TemporaryPasswordGenerator;
 import codeit.ootd.domain.user.dto.response.UserDto;
 import codeit.ootd.domain.user.entity.User;
 import codeit.ootd.domain.user.entity.UserStatus;
+import codeit.ootd.domain.user.exception.UserNotFoundException;
 import codeit.ootd.domain.user.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -22,6 +24,8 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.Clock;
+import java.time.Duration;
 import java.util.UUID;
 
 @RequiredArgsConstructor
@@ -34,6 +38,8 @@ public class AuthServiceImpl implements AuthService {
     private final AuthSessionService authSessionService;
     private final RefreshTokenService refreshTokenService;
     private final JwtProvider jwtProvider;
+    private final TemporaryPasswordGenerator temporaryPasswordGenerator;
+    private final Clock clock;
 
     @Override
     public User authenticate(String email, String password) {
@@ -134,4 +140,30 @@ public class AuthServiceImpl implements AuthService {
             log.debug("로그아웃 요청: 이미 유효하지 않은 토큰 또는 인증 세션");
         }
     }
+
+    @Override
+    @Transactional
+    public void resetPassword(String email) {
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(UserNotFoundException::new);
+
+        if (user.isLocked()) {
+            throw new AccountLockedException();
+        }
+
+        if (user.getStatus() != UserStatus.ACTIVE) {
+            throw new AccountInactiveException();
+        }
+
+        String temporaryPassword = temporaryPasswordGenerator.generate();
+        String encodedPassword = passwordEncoder.encode(temporaryPassword);
+
+        user.issueTemporaryPassword(
+                encodedPassword,
+                clock.instant().plus(Duration.ofMinutes(3))
+        );
+
+        log.info("임시 비밀번호 발급 정보 저장 완료: userId={}", user.getId());
+    }
+
 }
