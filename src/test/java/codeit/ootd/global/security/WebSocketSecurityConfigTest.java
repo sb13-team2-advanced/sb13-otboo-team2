@@ -113,7 +113,9 @@ class WebSocketSecurityConfigTest {
     @ParameterizedTest(name = "{displayName} [{index}]")
     @DisplayName("잘못된 DM 경로와 허용하지 않은 경로는 구독할 수 없다")
     @ValueSource(strings = {
-            "/sub/direct-messages_invalid_invalid", "/sub/other"
+            "/sub/direct-messages_invalid_invalid", "/sub/other",
+            "/sub/direct-messages_00000000-0000-0000-0000-000000000001",
+            "/sub/direct-messages_1-1-1-1-1_2-2-2-2-2"
     })
     void malformedOrOtherSubscription_isDenied(String destination) {
         assertThat(allowed(user(FIRST), StompCommand.SUBSCRIBE, destination)).isFalse();
