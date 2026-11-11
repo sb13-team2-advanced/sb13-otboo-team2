@@ -24,6 +24,8 @@ import codeit.ootd.domain.clothes.repository.ClothesRepository;
 import codeit.ootd.domain.clothes.service.ClothesService;
 import codeit.ootd.domain.user.repository.UserRepository;
 import codeit.ootd.global.enums.SortDirection;
+import codeit.ootd.global.exception.ErrorCode;
+import codeit.ootd.global.exception.OtbooException;
 import codeit.ootd.infra.storage.FileStorage;
 import codeit.ootd.infra.storage.TransactionalFileCleaner;
 import java.time.Instant;
@@ -64,7 +66,9 @@ public class ClothesServiceImpl implements ClothesService {
 
     @Override
     @Transactional
-    public ClothesDto create(ClothesCreateRequest request, MultipartFile image) {
+    public ClothesDto create(ClothesCreateRequest request, MultipartFile image, UUID userId) {
+        requireOwner(request.ownerId(), userId);
+
         if (!userRepository.existsById(request.ownerId())) {
             throw new ClothesOwnerNotFoundException();
         }
@@ -117,8 +121,10 @@ public class ClothesServiceImpl implements ClothesService {
 
     @Override
     @Transactional
-    public ClothesDto update(UUID clothesId, ClothesUpdateRequest request, MultipartFile image) {
+    public ClothesDto update(UUID clothesId, ClothesUpdateRequest request, MultipartFile image, UUID userId) {
         Clothes clothes = clothesRepository.findById(clothesId).orElseThrow(ClothesNotFoundException::new);
+        // 이미지 업로드와 변경이 일어나기 전에 소유자인지 먼저 확인한다.
+        requireOwner(clothes.getUserId(), userId);
 
         List<ClothesAttributeRequest> attributes = request.attributes();
         if (attributes != null) {
@@ -150,8 +156,9 @@ public class ClothesServiceImpl implements ClothesService {
 
     @Override
     @Transactional
-    public void delete(UUID clothesId) {
+    public void delete(UUID clothesId, UUID userId) {
         Clothes clothes = clothesRepository.findById(clothesId).orElseThrow(ClothesNotFoundException::new);
+        requireOwner(clothes.getUserId(), userId);
 
         if (clothesRepository.existsInFeed(clothesId)) {
             throw new ClothesInUseException();
@@ -276,6 +283,15 @@ public class ClothesServiceImpl implements ClothesService {
             return Instant.parse(cursor);
         } catch (DateTimeParseException e) {
             throw new ClothesInvalidCursorException();
+        }
+    }
+
+    /**
+     * 요청한 사용자가 의상의 소유자가 아니면 접근을 거절한다. 인증 정보가 없는 경우도 거절한다.
+     */
+    private void requireOwner(UUID ownerId, UUID userId) {
+        if (userId == null || !userId.equals(ownerId)) {
+            throw new OtbooException(ErrorCode.ACCESS_DENIED);
         }
     }
 

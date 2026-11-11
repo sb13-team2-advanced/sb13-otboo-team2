@@ -17,7 +17,9 @@ import codeit.ootd.global.exception.OtbooException;
 import codeit.ootd.infra.kakao.KakaoLocalClient;
 import codeit.ootd.infra.weather.H3Service;
 import codeit.ootd.infra.weather.dto.KakaoRegionResponse;
+import com.uber.h3core.H3Core;
 import com.uber.h3core.util.LatLng;
+import java.io.IOException;
 import java.time.Instant;
 import java.util.Optional;
 import org.junit.jupiter.api.DisplayName;
@@ -234,5 +236,68 @@ class WeatherLocationServiceTest {
             );
 
         verifyNoInteractions(kakaoLocalClient);
+    }
+
+    @Test
+    @DisplayName("기존 R8 셀이 존재해도 R7 셀을 신규 생성한다")
+    void findOrCreateCreatesR7LocationWhenR8Exists() throws IOException {
+        double latitude = 37.5665;
+        double longitude = 126.9780;
+
+        H3Service realH3Service = new H3Service();
+        H3Core h3Core = H3Core.newInstance();
+
+        String r8CellId = h3Core.latLngToCellAddress(
+            latitude,
+            longitude,
+            8
+        );
+
+        String r7CellId = realH3Service.toCellId(
+            latitude,
+            longitude
+        );
+
+        WeatherLocation existingR8 = new WeatherLocation(
+            r8CellId,
+            latitude,
+            longitude,
+            Instant.now()
+        );
+
+        when(weatherLocationRepository.findByCellId(any(String.class)))
+            .thenAnswer(invocation -> {
+                String cellId = invocation.getArgument(0);
+
+                if (cellId.equals(r8CellId)) {
+                    return Optional.of(existingR8);
+                }
+
+                return Optional.empty();
+            });
+
+        when(weatherLocationRepository.saveAndFlush(any(WeatherLocation.class)))
+            .thenAnswer(invocation -> invocation.getArgument(0));
+
+        WeatherLocationService service = new WeatherLocationService(
+            realH3Service,
+            weatherLocationRepository,
+            kakaoLocalClient
+        );
+
+        WeatherLocation result = service.findOrCreate(
+            latitude,
+            longitude
+        );
+
+        assertThat(result.getCellId()).isEqualTo(r7CellId);
+        assertThat(result.getCellId()).isNotEqualTo(r8CellId);
+        assertThat(result.getResolution()).isEqualTo((short) 7);
+        assertThat(result.getLastCollectedAt()).isNull();
+
+        verify(weatherLocationRepository).findByCellId(r7CellId);
+        verify(weatherLocationRepository, never()).findByCellId(r8CellId);
+        verify(weatherLocationRepository)
+            .saveAndFlush(any(WeatherLocation.class));
     }
 }

@@ -7,8 +7,11 @@ import codeit.ootd.global.exception.ErrorCode;
 import codeit.ootd.global.exception.ErrorResponse;
 import codeit.ootd.global.exception.OtbooException;
 import jakarta.servlet.http.HttpServletResponse;
+import java.io.IOException;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.context.annotation.Profile;
+import org.springframework.core.annotation.Order;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.MediaType;
 import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
@@ -19,8 +22,6 @@ import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 import org.springframework.security.web.csrf.CookieCsrfTokenRepository;
 import tools.jackson.databind.json.JsonMapper;
-
-import java.io.IOException;
 
 @Configuration
 @EnableWebSecurity
@@ -137,4 +138,20 @@ public class SecurityConfig {
         );
     }
 
+    @Bean
+    @Profile("dev")
+    @Order(1)
+    public SecurityFilterChain devActuatorSecurityFilterChain(
+        HttpSecurity http
+    ) throws Exception {
+        return http
+            .securityMatcher(
+                "/actuator/metrics",
+                "/actuator/metrics/**"
+            )
+            .authorizeHttpRequests(auth -> auth
+                .anyRequest().permitAll()
+            )
+            .build();
+    }
 }

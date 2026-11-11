@@ -12,6 +12,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
@@ -33,8 +34,9 @@ public class ClothesController {
     @PostMapping(consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public ResponseEntity<ClothesDto> create(
             @Valid @RequestPart("request") ClothesCreateRequest request,
-            @RequestPart(value = "image", required = false) MultipartFile image) {
-        return ResponseEntity.status(HttpStatus.CREATED).body(clothesService.create(request, image));
+            @RequestPart(value = "image", required = false) MultipartFile image,
+            @AuthenticationPrincipal UUID userId) {
+        return ResponseEntity.status(HttpStatus.CREATED).body(clothesService.create(request, image, userId));
     }
 
     @GetMapping
@@ -51,13 +53,16 @@ public class ClothesController {
     public ResponseEntity<ClothesDto> update(
             @PathVariable UUID clothesId,
             @Valid @RequestPart("request") ClothesUpdateRequest request,
-            @RequestPart(value = "image", required = false) MultipartFile image) {
-        return ResponseEntity.ok(clothesService.update(clothesId, request, image));
+            @RequestPart(value = "image", required = false) MultipartFile image,
+            @AuthenticationPrincipal UUID userId) {
+        return ResponseEntity.ok(clothesService.update(clothesId, request, image, userId));
     }
 
     @DeleteMapping("/{clothesId}")
-    public ResponseEntity<Void> delete(@PathVariable UUID clothesId) {
-        clothesService.delete(clothesId);
+    public ResponseEntity<Void> delete(
+            @PathVariable UUID clothesId,
+            @AuthenticationPrincipal UUID userId) {
+        clothesService.delete(clothesId, userId);
         return ResponseEntity.noContent().build();
     }
 }

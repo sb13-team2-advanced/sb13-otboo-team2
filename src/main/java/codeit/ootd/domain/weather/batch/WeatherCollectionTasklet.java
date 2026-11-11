@@ -4,6 +4,8 @@ import codeit.ootd.domain.weather.entity.WeatherLocation;
 import codeit.ootd.domain.weather.repository.WeatherLocationRepository;
 import codeit.ootd.domain.weather.service.WeatherForecastCollector;
 import codeit.ootd.domain.weather.service.WeatherService;
+import io.micrometer.core.instrument.MeterRegistry;
+import jakarta.annotation.PostConstruct;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
@@ -32,6 +34,7 @@ public class WeatherCollectionTasklet implements Tasklet {
 
     private static final ZoneId KOREA_ZONE = ZoneId.of("Asia/Seoul");
 
+    private static final short BATCH_RESOLUTION = 7;
     private static final int BATCH_SIZE = 20;
     private static final int MAX_LOCATIONS_PER_JOB = 100;
     private static final Duration MAX_JOB_DURATION = Duration.ofMinutes(5);
@@ -45,6 +48,20 @@ public class WeatherCollectionTasklet implements Tasklet {
     private final WeatherService weatherService;
     private final Clock clock;
     private final WeatherBatchRateLimiter weatherBatchRateLimiter;
+    private final MeterRegistry meterRegistry;
+
+    @PostConstruct
+    public void registerMetrics() {
+        meterRegistry.counter(
+            "ootd.weather.batch.cells",
+            "result", "success"
+        );
+
+        meterRegistry.counter(
+            "ootd.weather.batch.cells",
+            "result", "failure"
+        );
+    }
 
     @Override
     public RepeatStatus execute(
@@ -65,7 +82,8 @@ public class WeatherCollectionTasklet implements Tasklet {
 
             List<WeatherLocation> locations =
                 weatherLocationRepository
-                    .findTop20ByLastCollectedAtIsNotNullAndNextRefreshAtLessThanEqualOrderByNextRefreshAtAsc(
+                    .findTop20ByResolutionAndLastCollectedAtIsNotNullAndNextRefreshAtLessThanEqualOrderByNextRefreshAtAsc(
+                        BATCH_RESOLUTION,
                         clock.instant()
                     );
 
@@ -115,6 +133,11 @@ public class WeatherCollectionTasklet implements Tasklet {
 
                     weatherLocationRepository.save(location);
 
+                    meterRegistry.counter(
+                        "ootd.weather.batch.cells",
+                        "result", "success"
+                    ).increment();
+
                     log.info(
                         "날씨 수집 완료: cellId={}",
                         location.getCellId()
@@ -122,6 +145,11 @@ public class WeatherCollectionTasklet implements Tasklet {
 
                 } catch (Exception e) {
                     failureCount++;
+
+                    meterRegistry.counter(
+                        "ootd.weather.batch.cells",
+                        "result", "failure"
+                    ).increment();
 
                     log.error(
                         "날씨 수집 실패: cellId={}",
