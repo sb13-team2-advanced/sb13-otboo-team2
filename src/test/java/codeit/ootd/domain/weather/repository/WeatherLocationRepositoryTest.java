@@ -592,7 +592,8 @@ class WeatherLocationRepositoryTest {
         entityManager.clear();
 
         List<WeatherLocation> result =
-            repository.findTop20ByLastCollectedAtIsNotNullAndNextRefreshAtLessThanEqualOrderByNextRefreshAtAsc(
+            repository.findTop20ByResolutionAndLastCollectedAtIsNotNullAndNextRefreshAtLessThanEqualOrderByNextRefreshAtAsc(
+                (short) 7,
                 now
             );
 

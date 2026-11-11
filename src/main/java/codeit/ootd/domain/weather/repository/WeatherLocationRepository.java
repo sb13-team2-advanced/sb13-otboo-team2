@@ -74,7 +74,8 @@ public interface WeatherLocationRepository
         @Param("retryAt") Instant retryAt
     );
 
-    List<WeatherLocation> findTop20ByLastCollectedAtIsNotNullAndNextRefreshAtLessThanEqualOrderByNextRefreshAtAsc(
+    List<WeatherLocation> findTop20ByResolutionAndLastCollectedAtIsNotNullAndNextRefreshAtLessThanEqualOrderByNextRefreshAtAsc(
+        short resolution,
         Instant now
     );
 }

@@ -42,7 +42,6 @@ import org.springframework.web.client.HttpServerErrorException;
 import org.springframework.web.client.ResourceAccessException;
 
 @ExtendWith(MockitoExtension.class)
-@DisplayName("날씨 수집 Batch Tasklet 테스트")
 class WeatherCollectionTaskletTest {
 
     @Mock
@@ -94,7 +93,8 @@ class WeatherCollectionTaskletTest {
     void executeCollectsAndAggregatesWeather() {
 
         when(weatherLocationRepository
-            .findTop20ByLastCollectedAtIsNotNullAndNextRefreshAtLessThanEqualOrderByNextRefreshAtAsc(
+            .findTop20ByResolutionAndLastCollectedAtIsNotNullAndNextRefreshAtLessThanEqualOrderByNextRefreshAtAsc(
+                eq((short) 7),
                 any(Instant.class)
             ))
             .thenReturn(List.of(location));
@@ -105,7 +105,8 @@ class WeatherCollectionTaskletTest {
         );
 
         verify(weatherLocationRepository)
-            .findTop20ByLastCollectedAtIsNotNullAndNextRefreshAtLessThanEqualOrderByNextRefreshAtAsc(
+            .findTop20ByResolutionAndLastCollectedAtIsNotNullAndNextRefreshAtLessThanEqualOrderByNextRefreshAtAsc(
+                eq((short) 7),
                 any(Instant.class)
             );
 
@@ -137,7 +138,8 @@ class WeatherCollectionTaskletTest {
         WeatherLocation secondLocation = mock(WeatherLocation.class);
 
         when(weatherLocationRepository
-            .findTop20ByLastCollectedAtIsNotNullAndNextRefreshAtLessThanEqualOrderByNextRefreshAtAsc(
+            .findTop20ByResolutionAndLastCollectedAtIsNotNullAndNextRefreshAtLessThanEqualOrderByNextRefreshAtAsc(
+                eq((short) 7),
                 any(Instant.class)
             ))
             .thenReturn(List.of(location, secondLocation));
@@ -188,7 +190,8 @@ class WeatherCollectionTaskletTest {
     void executeSucceedsAfterRetries() {
 
         when(weatherLocationRepository
-            .findTop20ByLastCollectedAtIsNotNullAndNextRefreshAtLessThanEqualOrderByNextRefreshAtAsc(
+            .findTop20ByResolutionAndLastCollectedAtIsNotNullAndNextRefreshAtLessThanEqualOrderByNextRefreshAtAsc(
+                eq((short) 7),
                 any(Instant.class)
             ))
             .thenReturn(List.of(location));
@@ -236,7 +239,8 @@ class WeatherCollectionTaskletTest {
     void executeSkipsCollectionWhenNoLocationsAreDue() {
 
         when(weatherLocationRepository
-            .findTop20ByLastCollectedAtIsNotNullAndNextRefreshAtLessThanEqualOrderByNextRefreshAtAsc(
+            .findTop20ByResolutionAndLastCollectedAtIsNotNullAndNextRefreshAtLessThanEqualOrderByNextRefreshAtAsc(
+                eq((short) 7),
                 any(Instant.class)
             ))
             .thenReturn(List.of());
@@ -247,7 +251,8 @@ class WeatherCollectionTaskletTest {
         );
 
         verify(weatherLocationRepository)
-            .findTop20ByLastCollectedAtIsNotNullAndNextRefreshAtLessThanEqualOrderByNextRefreshAtAsc(
+            .findTop20ByResolutionAndLastCollectedAtIsNotNullAndNextRefreshAtLessThanEqualOrderByNextRefreshAtAsc(
+                eq((short) 7),
                 any(Instant.class)
             );
 
@@ -277,7 +282,8 @@ class WeatherCollectionTaskletTest {
         when(lastLocation.getId()).thenReturn(UUID.randomUUID());
 
         when(weatherLocationRepository
-            .findTop20ByLastCollectedAtIsNotNullAndNextRefreshAtLessThanEqualOrderByNextRefreshAtAsc(
+            .findTop20ByResolutionAndLastCollectedAtIsNotNullAndNextRefreshAtLessThanEqualOrderByNextRefreshAtAsc(
+                eq((short) 7),
                 any(Instant.class)
             ))
             .thenReturn(firstTwenty)
@@ -289,7 +295,8 @@ class WeatherCollectionTaskletTest {
         );
 
         verify(weatherLocationRepository, times(2))
-            .findTop20ByLastCollectedAtIsNotNullAndNextRefreshAtLessThanEqualOrderByNextRefreshAtAsc(
+            .findTop20ByResolutionAndLastCollectedAtIsNotNullAndNextRefreshAtLessThanEqualOrderByNextRefreshAtAsc(
+                eq((short) 7),
                 any(Instant.class)
             );
 
@@ -330,7 +337,8 @@ class WeatherCollectionTaskletTest {
         }
 
         when(weatherLocationRepository
-            .findTop20ByLastCollectedAtIsNotNullAndNextRefreshAtLessThanEqualOrderByNextRefreshAtAsc(
+            .findTop20ByResolutionAndLastCollectedAtIsNotNullAndNextRefreshAtLessThanEqualOrderByNextRefreshAtAsc(
+                eq((short) 7),
                 any(Instant.class)
             ))
             .thenReturn(pages.get(0))
@@ -345,7 +353,8 @@ class WeatherCollectionTaskletTest {
         );
 
         verify(weatherLocationRepository, times(5))
-            .findTop20ByLastCollectedAtIsNotNullAndNextRefreshAtLessThanEqualOrderByNextRefreshAtAsc(
+            .findTop20ByResolutionAndLastCollectedAtIsNotNullAndNextRefreshAtLessThanEqualOrderByNextRefreshAtAsc(
+                eq((short) 7),
                 any(Instant.class)
             );
 
@@ -374,7 +383,8 @@ class WeatherCollectionTaskletTest {
         WeatherLocation secondLocation = mock(WeatherLocation.class);
 
         when(weatherLocationRepository
-            .findTop20ByLastCollectedAtIsNotNullAndNextRefreshAtLessThanEqualOrderByNextRefreshAtAsc(
+            .findTop20ByResolutionAndLastCollectedAtIsNotNullAndNextRefreshAtLessThanEqualOrderByNextRefreshAtAsc(
+                eq((short) 7),
                 any(Instant.class)
             ))
             .thenReturn(List.of(location, secondLocation));
@@ -421,7 +431,8 @@ class WeatherCollectionTaskletTest {
         WeatherLocation secondLocation = mock(WeatherLocation.class);
 
         when(weatherLocationRepository
-            .findTop20ByLastCollectedAtIsNotNullAndNextRefreshAtLessThanEqualOrderByNextRefreshAtAsc(
+            .findTop20ByResolutionAndLastCollectedAtIsNotNullAndNextRefreshAtLessThanEqualOrderByNextRefreshAtAsc(
+                eq((short) 7),
                 any(Instant.class)
             ))
             .thenReturn(List.of(location, secondLocation));
@@ -456,7 +467,8 @@ class WeatherCollectionTaskletTest {
     void executeStopsBatchOnUnauthorizedError() {
 
         when(weatherLocationRepository
-            .findTop20ByLastCollectedAtIsNotNullAndNextRefreshAtLessThanEqualOrderByNextRefreshAtAsc(
+            .findTop20ByResolutionAndLastCollectedAtIsNotNullAndNextRefreshAtLessThanEqualOrderByNextRefreshAtAsc(
+                eq((short) 7),
                 any(Instant.class)
             ))
             .thenReturn(List.of(location));
@@ -483,13 +495,13 @@ class WeatherCollectionTaskletTest {
         );
     }
 
-
     @Test
     @DisplayName("OWM 403 오류가 발생하면 재시도 없이 Batch를 중단한다")
     void executeStopsBatchOnForbiddenError() {
 
         when(weatherLocationRepository
-            .findTop20ByLastCollectedAtIsNotNullAndNextRefreshAtLessThanEqualOrderByNextRefreshAtAsc(
+            .findTop20ByResolutionAndLastCollectedAtIsNotNullAndNextRefreshAtLessThanEqualOrderByNextRefreshAtAsc(
+                eq((short) 7),
                 any(Instant.class)
             ))
             .thenReturn(List.of(location));
@@ -521,7 +533,8 @@ class WeatherCollectionTaskletTest {
     void executeRetriesOnTimeout() {
 
         when(weatherLocationRepository
-            .findTop20ByLastCollectedAtIsNotNullAndNextRefreshAtLessThanEqualOrderByNextRefreshAtAsc(
+            .findTop20ByResolutionAndLastCollectedAtIsNotNullAndNextRefreshAtLessThanEqualOrderByNextRefreshAtAsc(
+                eq((short) 7),
                 any(Instant.class)
             ))
             .thenReturn(List.of(location));
@@ -554,7 +567,8 @@ class WeatherCollectionTaskletTest {
     void executeDoesNotRetryUnexpectedFailure() {
 
         when(weatherLocationRepository
-            .findTop20ByLastCollectedAtIsNotNullAndNextRefreshAtLessThanEqualOrderByNextRefreshAtAsc(
+            .findTop20ByResolutionAndLastCollectedAtIsNotNullAndNextRefreshAtLessThanEqualOrderByNextRefreshAtAsc(
+                eq((short) 7),
                 any(Instant.class)
             ))
             .thenReturn(List.of(location));
@@ -587,7 +601,8 @@ class WeatherCollectionTaskletTest {
         WeatherLocation failedLocation = mock(WeatherLocation.class);
 
         when(weatherLocationRepository
-            .findTop20ByLastCollectedAtIsNotNullAndNextRefreshAtLessThanEqualOrderByNextRefreshAtAsc(
+            .findTop20ByResolutionAndLastCollectedAtIsNotNullAndNextRefreshAtLessThanEqualOrderByNextRefreshAtAsc(
+                eq((short) 7),
                 any(Instant.class)
             ))
             .thenReturn(List.of(location, failedLocation));
