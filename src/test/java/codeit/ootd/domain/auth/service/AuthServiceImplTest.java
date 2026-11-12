@@ -16,6 +16,7 @@ import codeit.ootd.domain.user.exception.UserNotFoundException;
 import codeit.ootd.domain.user.repository.UserRepository;
 
 import codeit.ootd.global.exception.ErrorCode;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -31,6 +32,7 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 
 import java.time.Clock;
 import java.time.Instant;
+import java.time.ZoneOffset;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -66,16 +68,30 @@ class AuthServiceImplTest {
     private RefreshTokenService refreshTokenService;
 
     @Mock
-    private Clock clock;
-
-    @Mock
     private TemporaryPasswordGenerator temporaryPasswordGenerator;
 
     @Mock
     private JwtProvider jwtProvider;
 
-    @InjectMocks
+    private final Clock clock = Clock.fixed(
+            Instant.parse("2026-11-12T00:00:00Z"),
+            ZoneOffset.UTC
+    );
+
     private AuthServiceImpl authService;
+
+    @BeforeEach
+    void setUp() {
+        authService = new AuthServiceImpl(
+                userRepository,
+                passwordEncoder,
+                authSessionService,
+                refreshTokenService,
+                jwtProvider,
+                temporaryPasswordGenerator,
+                clock
+        );
+    }
 
     @Test
     @DisplayName("이메일과 비밀번호가 일치하면 인증에 성공한다")
@@ -596,7 +612,7 @@ class AuthServiceImplTest {
         String temporaryPassword = "random-temp-password";
         String encodedPassword = "encoded-temp-password";
 
-        Instant issuedAt = Instant.parse("2026-11-10T06:00:00Z");
+        Instant issuedAt = Instant.parse("2026-11-12T00:00:00Z");
 
         User user = createUser(email);
 
@@ -608,8 +624,6 @@ class AuthServiceImplTest {
 
         when(passwordEncoder.encode(temporaryPassword))
                 .thenReturn(encodedPassword);
-
-        when(clock.instant()).thenReturn(issuedAt);
 
         // when
         authService.resetPassword(email);
@@ -702,7 +716,121 @@ class AuthServiceImplTest {
         verify(passwordEncoder, never()).encode(anyString());
     }
 
+    @Test
+    @DisplayName("유효한 임시 비밀번호로 인증에 성공한다")
+    void authenticate_temporaryPassword_success() {
+        // given
+        String email = "test@example.com";
+        String temporaryPassword = "temporary123!";
+        String encodedTemporaryPassword = "encoded-temporary-password";
 
+        Instant now = Instant.parse("2026-11-12T00:00:00Z");
+
+        User user = createUser(email);
+        user.issueTemporaryPassword(
+                encodedTemporaryPassword,
+                now.plusSeconds(180)
+        );
+
+        when(userRepository.findByEmail(email))
+                .thenReturn(Optional.of(user));
+
+        when(passwordEncoder.matches(
+                temporaryPassword,
+                user.getPassword()
+        )).thenReturn(false);
+
+        when(passwordEncoder.matches(
+                temporaryPassword,
+                encodedTemporaryPassword
+        )).thenReturn(true);
+
+        // when
+        User result = authService.authenticate(email, temporaryPassword);
+
+        // then
+        assertSame(user, result);
+    }
+
+    @Test
+    @DisplayName("만료된 임시 비밀번호로 인증할 수 없다")
+    void authenticate_temporaryPassword_expired() {
+        // given
+        String email = "test@example.com";
+        String temporaryPassword = "temporary123!";
+        String encodedTemporaryPassword = "encoded-temporary-password";
+
+        Instant now = Instant.parse("2026-11-12T00:00:00Z");
+
+        User user = createUser(email);
+        user.issueTemporaryPassword(encodedTemporaryPassword, now);
+
+        when(userRepository.findByEmail(email))
+                .thenReturn(Optional.of(user));
+
+        when(passwordEncoder.matches(
+                temporaryPassword,
+                user.getPassword()
+        )).thenReturn(false);
+
+        // when & then
+        assertThrows(
+                InvalidCredentialsException.class,
+                () -> authService.authenticate(email, temporaryPassword)
+        );
+
+        // 만료된 임시 비밀번호는 비교하지 않는다.
+        verify(passwordEncoder, never()).matches(
+                temporaryPassword,
+                encodedTemporaryPassword
+        );
+    }
+
+    @Test
+    @DisplayName("유효기간 내에도 임시 비밀번호가 일치하지 않으면 인증에 실패한다")
+    void authenticate_temporaryPassword_wrongPassword() {
+        // given
+        String email = "test@example.com";
+        String wrongPassword = "wrong-temporary-password";
+        String encodedTemporaryPassword = "encoded-temporary-password";
+
+        Instant now = Instant.parse("2026-11-12T00:00:00Z");
+
+        User user = createUser(email);
+        user.issueTemporaryPassword(
+                encodedTemporaryPassword,
+                now.plusSeconds(180)
+        );
+
+        when(userRepository.findByEmail(email))
+                .thenReturn(Optional.of(user));
+
+        when(passwordEncoder.matches(
+                wrongPassword,
+                user.getPassword()
+        )).thenReturn(false);
+
+        when(passwordEncoder.matches(
+                wrongPassword,
+                encodedTemporaryPassword
+        )).thenReturn(false);
+
+        // when & then
+        assertThrows(
+                InvalidCredentialsException.class,
+                () -> authService.authenticate(email, wrongPassword)
+        );
+    }
+
+    public static int countA(String text) {
+        int a = 0 ;
+        for (int i = 0; i < text.length(); i++) {
+            if (text.charAt(i) == 'a') {
+                a++;
+            }
+        }
+        return a;
+    }
 
 
 

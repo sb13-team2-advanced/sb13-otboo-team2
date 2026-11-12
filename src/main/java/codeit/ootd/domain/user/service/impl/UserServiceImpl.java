@@ -190,7 +190,9 @@ public class UserServiceImpl implements UserService {
                 .orElseThrow(UserNotFoundException::new);
 
         String encodedPassword = passwordEncoder.encode(newPassword);
+
         user.changePassword(encodedPassword);
+        user.clearTemporaryPassword();
 
         authSessionService.revokeAllSessions(userId);
 
