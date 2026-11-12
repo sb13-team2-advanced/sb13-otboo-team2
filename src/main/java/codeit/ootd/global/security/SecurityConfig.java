@@ -20,6 +20,7 @@ import org.springframework.security.config.annotation.web.configuration.EnableWe
 import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
+import org.springframework.security.web.context.RequestAttributeSecurityContextRepository;
 import org.springframework.security.web.csrf.CookieCsrfTokenRepository;
 import tools.jackson.databind.json.JsonMapper;
 
@@ -56,6 +57,10 @@ public class SecurityConfig {
         // 기존 API 접근 권한 설정
         http.sessionManagement(session -> session
                 .sessionCreationPolicy(SessionCreationPolicy.STATELESS)
+        );
+
+        http.securityContext(context -> context
+                .securityContextRepository(new RequestAttributeSecurityContextRepository())
         );
 
         http.authorizeHttpRequests(auth -> auth
