@@ -5,6 +5,7 @@ import static org.assertj.core.api.Assertions.tuple;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 import codeit.ootd.domain.clothes.entity.Clothes;
@@ -19,6 +20,7 @@ import codeit.ootd.domain.feed.mapper.FeedMapper;
 import codeit.ootd.domain.feed.repository.FeedClothesRepository;
 import codeit.ootd.domain.feed.repository.FeedRepository;
 import codeit.ootd.domain.feed.service.FeedResponseAssembler;
+import codeit.ootd.domain.follow.repository.FollowRepository;
 import codeit.ootd.domain.user.entity.User;
 import codeit.ootd.domain.user.repository.UserRepository;
 import codeit.ootd.domain.weather.dto.response.WeatherDto;
@@ -40,6 +42,7 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.test.util.ReflectionTestUtils;
 
 @ExtendWith(MockitoExtension.class)
@@ -66,6 +69,12 @@ class FeedServiceImplCreateTest {
 
     @Mock
     private FeedResponseAssembler feedResponseAssembler;
+
+    @Mock
+    private FollowRepository followRepository;
+
+    @Mock
+    private ApplicationEventPublisher eventPublisher;
 
     @Spy
     private FeedMapper feedMapper = Mappers.getMapper(FeedMapper.class);
@@ -164,6 +173,9 @@ class FeedServiceImplCreateTest {
         when(feedResponseAssembler.toOotdDto(secondClothes))
                 .thenReturn(secondOotd);
 
+        when(followRepository.findFollowerIdsByFolloweeId(authorId))
+                .thenReturn(List.of());
+
         FeedDto result = feedService.create(request, request.authorId());
 
         verify(weatherDtoMapper).toDto(weather, previousWeather, null);
@@ -206,5 +218,8 @@ class FeedServiceImplCreateTest {
         assertThat(result.likeCount()).isZero();
         assertThat(result.commentCount()).isZero();
         assertThat(result.likedByMe()).isFalse();
+
+        verify(followRepository).findFollowerIdsByFolloweeId(authorId);
+        verifyNoInteractions(eventPublisher);
     }
 }
