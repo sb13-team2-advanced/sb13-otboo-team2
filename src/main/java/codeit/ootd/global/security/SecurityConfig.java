@@ -42,6 +42,7 @@ public class SecurityConfig {
     ) throws Exception {
 
         http.csrf(csrf -> csrf
+                .ignoringRequestMatchers("/ws", "/ws/**")
                 .csrfTokenRepository(
                         CookieCsrfTokenRepository.withHttpOnlyFalse()
                 )
@@ -73,6 +74,7 @@ public class SecurityConfig {
                         "/js/**",
                         "/images/**"
                 ).permitAll()
+                .requestMatchers("/ws", "/ws/**").permitAll()
                 .requestMatchers(HttpMethod.GET, "/files/clothes/**").permitAll()
                 .requestMatchers(HttpMethod.GET, "/actuator/health/readiness").permitAll()
                 .requestMatchers(HttpMethod.POST, "/api/users").permitAll()
