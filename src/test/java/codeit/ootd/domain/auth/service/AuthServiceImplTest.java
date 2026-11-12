@@ -28,6 +28,7 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import org.springframework.mail.MailSendException;
 import org.springframework.security.crypto.password.PasswordEncoder;
 
 import java.time.Clock;
@@ -73,6 +74,9 @@ class AuthServiceImplTest {
     @Mock
     private JwtProvider jwtProvider;
 
+    @Mock
+    private TemporaryPasswordMailSender temporaryPasswordMailSender;
+
     private final Clock clock = Clock.fixed(
             Instant.parse("2026-11-12T00:00:00Z"),
             ZoneOffset.UTC
@@ -89,7 +93,8 @@ class AuthServiceImplTest {
                 refreshTokenService,
                 jwtProvider,
                 temporaryPasswordGenerator,
-                clock
+                clock,
+                temporaryPasswordMailSender
         );
     }
 
@@ -821,6 +826,36 @@ class AuthServiceImplTest {
                 () -> authService.authenticate(email, wrongPassword)
         );
     }
+
+    @Test
+    @DisplayName("임시 비밀번호 이메일 발송에 실패하면 예외를 전파한다")
+    void resetPassword_mailSendFailed() {
+        // given
+        String email = "test@example.com";
+        String temporaryPassword = "temporary123!";
+
+        User user = createUser(email);
+
+        when(userRepository.findByEmail(email))
+                .thenReturn(Optional.of(user));
+
+        when(temporaryPasswordGenerator.generate())
+                .thenReturn(temporaryPassword);
+
+        when(passwordEncoder.encode(temporaryPassword))
+                .thenReturn("encoded-temporary-password");
+
+        doThrow(new MailSendException("메일 발송 실패"))
+                .when(temporaryPasswordMailSender)
+                .send(email, temporaryPassword);
+
+        // when & then
+        assertThrows(
+                MailSendException.class,
+                () -> authService.resetPassword(email)
+        );
+    }
+
 
     public static int countA(String text) {
         int a = 0 ;

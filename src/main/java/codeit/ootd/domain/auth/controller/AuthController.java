@@ -1,6 +1,7 @@
 package codeit.ootd.domain.auth.controller;
 
 
+import codeit.ootd.domain.auth.dto.request.ResetPasswordRequest;
 import codeit.ootd.domain.auth.dto.request.SignInRequest;
 import codeit.ootd.domain.auth.dto.response.SignInResponse;
 import codeit.ootd.domain.auth.dto.response.SignInResult;
@@ -19,6 +20,7 @@ import org.springframework.web.bind.annotation.CookieValue;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.ModelAttribute;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -52,6 +54,16 @@ public class AuthController {
                 .header(HttpHeaders.SET_COOKIE, refreshTokenCookie.toString())
                 .body(SignInResponse.from(result));
     }
+
+    @PostMapping("/reset-password")
+    public ResponseEntity<Void> resetPassword(
+            @Valid @RequestBody ResetPasswordRequest request
+    ) {
+        authService.resetPassword(request.email());
+
+        return ResponseEntity.noContent().build();
+    }
+
 
     @GetMapping({"/csrf-token", "/csrf"})
     public Map<String, String> csrf(CsrfToken csrfToken) {

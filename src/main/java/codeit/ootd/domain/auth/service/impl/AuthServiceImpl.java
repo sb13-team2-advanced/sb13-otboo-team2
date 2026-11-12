@@ -13,6 +13,7 @@ import codeit.ootd.domain.auth.service.AuthService;
 import codeit.ootd.domain.auth.service.AuthSessionService;
 import codeit.ootd.domain.auth.service.RefreshTokenService;
 import codeit.ootd.domain.auth.service.TemporaryPasswordGenerator;
+import codeit.ootd.domain.auth.service.TemporaryPasswordMailSender;
 import codeit.ootd.domain.user.dto.response.UserDto;
 import codeit.ootd.domain.user.entity.User;
 import codeit.ootd.domain.user.entity.UserStatus;
@@ -40,6 +41,7 @@ public class AuthServiceImpl implements AuthService {
     private final JwtProvider jwtProvider;
     private final TemporaryPasswordGenerator temporaryPasswordGenerator;
     private final Clock clock;
+    private final TemporaryPasswordMailSender temporaryPasswordMailSender;
 
     @Override
     public User authenticate(String email, String password) {
@@ -176,7 +178,10 @@ public class AuthServiceImpl implements AuthService {
                 clock.instant().plus(Duration.ofMinutes(3))
         );
 
-        log.info("임시 비밀번호 발급 정보 저장 완료: userId={}", user.getId());
+        temporaryPasswordMailSender.send(email, temporaryPassword);
+
+        log.info("임시 비밀번호 발급 및 이메일 발송 처리 완료: userId={}", user.getId());
     }
+
 
 }
