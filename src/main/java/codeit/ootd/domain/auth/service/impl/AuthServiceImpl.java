@@ -47,9 +47,22 @@ public class AuthServiceImpl implements AuthService {
         User user = userRepository.findByEmail(email)
                 .orElseThrow(InvalidCredentialsException::new);
 
-        if (!passwordEncoder.matches(password, user.getPassword())) {
-            throw new InvalidCredentialsException();
+        boolean matchesOriginalPassword =
+                passwordEncoder.matches(password, user.getPassword());
+
+        if (!matchesOriginalPassword) {
+            boolean validTemporaryPassword =
+                    user.hasValidTemporaryPassword(clock.instant());
+
+            if (!validTemporaryPassword
+                    || !passwordEncoder.matches(
+                    password,
+                    user.getTemporaryPassword()
+            )) {
+                throw new InvalidCredentialsException();
+            }
         }
+
 
         if (user.isLocked()) {
             throw new AccountLockedException();

@@ -16,6 +16,7 @@ import codeit.ootd.domain.user.exception.UserNotFoundException;
 import codeit.ootd.domain.user.repository.UserRepository;
 
 import codeit.ootd.global.exception.ErrorCode;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -31,6 +32,7 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 
 import java.time.Clock;
 import java.time.Instant;
+import java.time.ZoneOffset;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -66,16 +68,30 @@ class AuthServiceImplTest {
     private RefreshTokenService refreshTokenService;
 
     @Mock
-    private Clock clock;
-
-    @Mock
     private TemporaryPasswordGenerator temporaryPasswordGenerator;
 
     @Mock
     private JwtProvider jwtProvider;
 
-    @InjectMocks
+    private final Clock clock = Clock.fixed(
+            Instant.parse("2026-11-12T00:00:00Z"),
+            ZoneOffset.UTC
+    );
+
     private AuthServiceImpl authService;
+
+    @BeforeEach
+    void setUp() {
+        authService = new AuthServiceImpl(
+                userRepository,
+                passwordEncoder,
+                authSessionService,
+                refreshTokenService,
+                jwtProvider,
+                temporaryPasswordGenerator,
+                clock
+        );
+    }
 
     @Test
     @DisplayName("이메일과 비밀번호가 일치하면 인증에 성공한다")
@@ -596,7 +612,7 @@ class AuthServiceImplTest {
         String temporaryPassword = "random-temp-password";
         String encodedPassword = "encoded-temp-password";
 
-        Instant issuedAt = Instant.parse("2026-11-10T06:00:00Z");
+        Instant issuedAt = Instant.parse("2026-11-12T00:00:00Z");
 
         User user = createUser(email);
 
@@ -608,8 +624,6 @@ class AuthServiceImplTest {
 
         when(passwordEncoder.encode(temporaryPassword))
                 .thenReturn(encodedPassword);
-
-        when(clock.instant()).thenReturn(issuedAt);
 
         // when
         authService.resetPassword(email);
@@ -731,8 +745,6 @@ class AuthServiceImplTest {
                 encodedTemporaryPassword
         )).thenReturn(true);
 
-        when(clock.instant()).thenReturn(now);
-
         // when
         User result = authService.authenticate(email, temporaryPassword);
 
@@ -760,8 +772,6 @@ class AuthServiceImplTest {
                 temporaryPassword,
                 user.getPassword()
         )).thenReturn(false);
-
-        when(clock.instant()).thenReturn(now);
 
         // when & then
         assertThrows(
@@ -804,8 +814,6 @@ class AuthServiceImplTest {
                 wrongPassword,
                 encodedTemporaryPassword
         )).thenReturn(false);
-
-        when(clock.instant()).thenReturn(now);
 
         // when & then
         assertThrows(
