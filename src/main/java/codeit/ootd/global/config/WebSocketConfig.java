@@ -1,6 +1,8 @@
 package codeit.ootd.global.config;
 
 import codeit.ootd.global.security.StompJwtAuthenticationInterceptor;
+import codeit.ootd.global.security.AuthSessionWebSocketHandlerDecorator;
+import codeit.ootd.global.security.AuthSessionWebSocketRegistry;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.core.Ordered;
@@ -10,6 +12,7 @@ import org.springframework.messaging.simp.config.MessageBrokerRegistry;
 import org.springframework.web.socket.config.annotation.EnableWebSocketMessageBroker;
 import org.springframework.web.socket.config.annotation.StompEndpointRegistry;
 import org.springframework.web.socket.config.annotation.WebSocketMessageBrokerConfigurer;
+import org.springframework.web.socket.config.annotation.WebSocketTransportRegistration;
 
 @Configuration
 @EnableWebSocketMessageBroker
@@ -18,6 +21,13 @@ import org.springframework.web.socket.config.annotation.WebSocketMessageBrokerCo
 public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
 
     private final StompJwtAuthenticationInterceptor authenticationInterceptor;
+    private final AuthSessionWebSocketRegistry sessions;
+
+    @Override
+    public void configureWebSocketTransport(WebSocketTransportRegistration registration) {
+        registration.addDecoratorFactory(handler ->
+                new AuthSessionWebSocketHandlerDecorator(handler, sessions));
+    }
 
     @Override
     public void configureClientInboundChannel(ChannelRegistration registration) {

@@ -27,30 +27,67 @@ import org.springframework.messaging.simp.stomp.StompHeaderAccessor;
 @RequiredArgsConstructor
 public class StompJwtAuthenticationInterceptor implements ChannelInterceptor {
 
+    private static final String ACCESS_TOKEN_ATTRIBUTE =
+            StompJwtAuthenticationInterceptor.class.getName() + ".accessToken";
+
     private final JwtProvider jwtProvider;
     private final AuthSessionService authSessionService;
     private final UserRepository userRepository;
+    private final AuthSessionWebSocketRegistry webSocketSessions;
 
     @Override
     public Message<?> preSend(Message<?> message, MessageChannel channel) {
         StompHeaderAccessor accessor = MessageHeaderAccessor.getAccessor(
                 message, StompHeaderAccessor.class
         );
-        if (accessor == null || accessor.getCommand() != StompCommand.CONNECT) {
+        if (accessor == null) {
             return message;
         }
 
+        if (accessor.getCommand() == StompCommand.CONNECT) {
+            String token = getConnectToken(accessor);
+            if (accessor.getSessionAttributes() == null || accessor.getSessionId() == null) {
+                throw new BadCredentialsException("STOMP 세션 정보가 없습니다.");
+            }
+            var authentication = authenticate(token, accessor.getSessionId());
+            accessor.setUser(authentication);
+            accessor.getSessionAttributes().put(ACCESS_TOKEN_ATTRIBUTE, token);
+        } else if (accessor.getCommand() == StompCommand.SEND
+                || accessor.getCommand() == StompCommand.SUBSCRIBE) {
+            // 후속 메시지의 헤더로 인증을 바꾸지 않고, CONNECT에서 검증한 토큰을 재검증한다.
+            Object token = accessor.getSessionAttributes() == null ? null
+                    : accessor.getSessionAttributes().get(ACCESS_TOKEN_ATTRIBUTE);
+            if (!(token instanceof String accessToken) || accessor.getUser() == null) {
+                throw new BadCredentialsException("인증된 STOMP 연결이 필요합니다.");
+            }
+            var authentication = authenticate(accessToken, null);
+            if (!authentication.getName().equals(accessor.getUser().getName())) {
+                throw new BadCredentialsException("STOMP 연결 사용자가 일치하지 않습니다.");
+            }
+        }
+
+        return message;
+    }
+
+    private String getConnectToken(StompHeaderAccessor accessor) {
         String authorization = accessor.getFirstNativeHeader("Authorization");
         if (authorization == null || !authorization.startsWith("Bearer ")
                 || authorization.substring(7).isBlank()) {
             throw new BadCredentialsException("STOMP 연결에 액세스 토큰이 필요합니다.");
         }
+        return authorization.substring(7);
+    }
 
+    private UsernamePasswordAuthenticationToken authenticate(String token, String webSocketSessionId) {
         try {
-            Claims claims = jwtProvider.parseAccessToken(authorization.substring(7));
+            Claims claims = jwtProvider.parseAccessToken(token);
             UUID userId = UUID.fromString(claims.getSubject());
             UUID sessionId = UUID.fromString(claims.get("sessionId", String.class));
 
+            // 폐기 이벤트와 CONNECT가 겹쳐도 놓치지 않도록, 연결을 등록한 뒤 DB 상태를 확인한다.
+            if (webSocketSessionId != null) {
+                webSocketSessions.bind(webSocketSessionId, sessionId);
+            }
             AuthSession session = authSessionService.getActiveSession(sessionId);
             if (!userId.equals(session.getUserId())) {
                 throw new BadCredentialsException("인증 세션의 사용자가 일치하지 않습니다.");
@@ -62,15 +99,13 @@ public class StompJwtAuthenticationInterceptor implements ChannelInterceptor {
                 throw new BadCredentialsException("활성 계정만 연결할 수 있습니다.");
             }
 
-            accessor.setUser(new UsernamePasswordAuthenticationToken(
+            return new UsernamePasswordAuthenticationToken(
                     userId,
                     null,
                     List.of(new SimpleGrantedAuthority("ROLE_" + user.getRole().name()))
-            ));
+            );
         } catch (JwtException | IllegalArgumentException | NullPointerException | OtbooException e) {
             throw new BadCredentialsException("유효하지 않은 STOMP 인증 정보입니다.", e);
         }
-
-        return message;
     }
 }

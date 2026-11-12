@@ -47,6 +47,9 @@ class WebSocketSecurityConfigTest {
     @MockitoBean
     private StompJwtAuthenticationInterceptor authenticationInterceptor;
 
+    @MockitoBean
+    private AuthSessionWebSocketRegistry sessions;
+
     @BeforeEach
     void stubAuthentication() {
         // JWT 검증은 별도 단위 테스트에서 확인하고, 여기서는 인증 이후의 채널 설정을 검증한다.

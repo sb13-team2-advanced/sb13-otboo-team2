@@ -14,6 +14,7 @@ import codeit.ootd.domain.user.entity.UserStatus;
 import codeit.ootd.domain.user.repository.UserRepository;
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.JwtException;
+import java.util.HashMap;
 import java.util.Optional;
 import java.util.UUID;
 import org.junit.jupiter.api.DisplayName;
@@ -21,6 +22,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.NullSource;
+import org.junit.jupiter.params.provider.EnumSource;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
@@ -38,6 +40,7 @@ class StompJwtAuthenticationInterceptorTest {
     @Mock JwtProvider jwtProvider;
     @Mock AuthSessionService authSessionService;
     @Mock UserRepository userRepository;
+    @Mock AuthSessionWebSocketRegistry webSocketSessions;
     @InjectMocks StompJwtAuthenticationInterceptor interceptor;
 
     private final UUID userId = UUID.randomUUID();
@@ -83,6 +86,10 @@ class StompJwtAuthenticationInterceptorTest {
         stubClaims();
         when(authSessionService.getActiveSession(sessionId)).thenThrow(new InvalidAuthSessionException());
         assertRejected(connect("Bearer valid"));
+        // 등록 후 활성 상태를 확인해야 CONNECT와 폐기가 겹쳐도 연결이 남지 않는다.
+        var order = inOrder(webSocketSessions, authSessionService);
+        order.verify(webSocketSessions).bind("websocket-session", sessionId);
+        order.verify(authSessionService).getActiveSession(sessionId);
         verifyNoInteractions(userRepository);
     }
 
@@ -123,13 +130,70 @@ class StompJwtAuthenticationInterceptorTest {
     }
 
     @Test
-    @DisplayName("SEND의 인증 헤더로 연결 사용자를 다시 인증하지 않는다")
-    void nonConnect_doesNotReauthenticateFromNativeHeaders() {
+    @DisplayName("CONNECT 없이 후속 메시지의 인증 헤더만 보내면 거부한다")
+    void nonConnect_rejectsWithoutConnectedSession() {
         StompHeaderAccessor accessor = StompHeaderAccessor.create(StompCommand.SEND);
         accessor.setNativeHeader("Authorization", "Bearer valid");
-        Message<?> message = message(accessor);
-        assertThat(interceptor.preSend(message, null)).isSameAs(message);
+        assertRejected(accessor);
         verifyNoInteractions(jwtProvider, authSessionService, userRepository);
+    }
+
+    @Test
+    @DisplayName("후속 메시지는 헤더의 새 토큰 대신 연결 당시 토큰과 세션을 재검증한다")
+    void nonConnect_revalidatesConnectedToken() {
+        StompHeaderAccessor connected = connected();
+        StompHeaderAccessor accessor = subsequent(connected, StompCommand.SEND);
+        accessor.setNativeHeader("Authorization", "Bearer another-token");
+        Message<?> message = message(accessor);
+
+        assertThat(interceptor.preSend(message, null)).isSameAs(message);
+
+        assertThat(accessor.getUser()).isSameAs(connected.getUser());
+        verify(jwtProvider, times(2)).parseAccessToken("valid");
+        verify(jwtProvider, never()).parseAccessToken("another-token");
+    }
+
+    @ParameterizedTest
+    @EnumSource(value = StompCommand.class, names = {"SEND", "SUBSCRIBE"})
+    @DisplayName("연결 이후 로그아웃 등으로 인증 세션이 폐기되면 후속 메시지를 거부한다")
+    void nonConnect_rejectsRevokedSession(StompCommand command) {
+        StompHeaderAccessor connected = connected();
+        when(authSessionService.getActiveSession(sessionId))
+                .thenThrow(new InvalidAuthSessionException());
+
+        assertSubsequentRejected(connected, command);
+    }
+
+    @Test
+    @DisplayName("연결 이후 JWT가 만료되면 후속 메시지를 거부한다")
+    void nonConnect_rejectsExpiredToken() {
+        StompHeaderAccessor connected = connected();
+        when(jwtProvider.parseAccessToken("valid")).thenThrow(new JwtException("expired"));
+
+        assertSubsequentRejected(connected, StompCommand.SEND);
+    }
+
+    private StompHeaderAccessor connected() {
+        stubClaims();
+        stubSession(userId);
+        User user = stubUser();
+        when(user.getStatus()).thenReturn(UserStatus.ACTIVE);
+        when(user.getRole()).thenReturn(UserRole.USER);
+        StompHeaderAccessor accessor = connect("Bearer valid");
+        interceptor.preSend(message(accessor), null);
+        return accessor;
+    }
+
+    private StompHeaderAccessor subsequent(StompHeaderAccessor connected, StompCommand command) {
+        StompHeaderAccessor accessor = StompHeaderAccessor.create(command);
+        accessor.setSessionAttributes(connected.getSessionAttributes());
+        accessor.setUser(connected.getUser());
+        return accessor;
+    }
+
+    private void assertSubsequentRejected(StompHeaderAccessor connected, StompCommand command) {
+        assertThatThrownBy(() -> interceptor.preSend(message(subsequent(connected, command)), null))
+                .isInstanceOf(BadCredentialsException.class);
     }
 
     private void assertRejected(StompHeaderAccessor accessor) {
@@ -140,6 +204,8 @@ class StompJwtAuthenticationInterceptorTest {
 
     private StompHeaderAccessor connect(String header) {
         StompHeaderAccessor accessor = StompHeaderAccessor.create(StompCommand.CONNECT);
+        accessor.setSessionId("websocket-session");
+        accessor.setSessionAttributes(new HashMap<>());
         accessor.setNativeHeader("Authorization", header);
         return accessor;
     }
