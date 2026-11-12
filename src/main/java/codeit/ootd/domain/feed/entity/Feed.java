@@ -71,4 +71,18 @@ public class Feed extends BaseTimeEntity {
     public void updateContent(@NonNull String content) {
         this.content = content;
     }
+
+    public void increaseLikeCount() {
+        this.likeCount++;
+    }
+
+    public void decreaseLikeCount() {
+        if (this.likeCount > 0) {
+            this.likeCount--;
+        }
+    }
+
+    public void increaseCommentCount() {
+        this.commentCount++;
+    }
 }

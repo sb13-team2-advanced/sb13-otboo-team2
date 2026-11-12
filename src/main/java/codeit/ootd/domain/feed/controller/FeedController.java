@@ -2,6 +2,7 @@ package codeit.ootd.domain.feed.controller;
 
 import codeit.ootd.domain.feed.dto.request.FeedCreateRequest;
 import codeit.ootd.domain.feed.dto.request.FeedSearchRequest;
+import codeit.ootd.domain.feed.dto.request.FeedUpdateRequest;
 import codeit.ootd.domain.feed.dto.response.FeedDto;
 import codeit.ootd.domain.feed.dto.response.FeedDtoCursorResponse;
 import codeit.ootd.domain.feed.service.FeedService;
@@ -11,8 +12,11 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.ModelAttribute;
+import org.springframework.web.bind.annotation.PatchMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -43,5 +47,29 @@ public class FeedController {
         FeedDtoCursorResponse response = feedService.list(request, userId);
 
         return ResponseEntity.ok(response);
+    }
+
+    @PatchMapping(
+            value = "/{feedId}",
+            consumes = MediaType.APPLICATION_JSON_VALUE
+    )
+    public ResponseEntity<FeedDto> update(
+            @PathVariable UUID feedId,
+            @AuthenticationPrincipal UUID userId,
+            @RequestBody FeedUpdateRequest request
+    ) {
+        FeedDto response = feedService.update(feedId, request, userId);
+
+        return ResponseEntity.ok(response);
+    }
+
+    @DeleteMapping("/{feedId}")
+    public ResponseEntity<Void> delete(
+            @PathVariable UUID feedId,
+            @AuthenticationPrincipal UUID userId
+    ) {
+        feedService.delete(feedId, userId);
+
+        return ResponseEntity.noContent().build();
     }
 }

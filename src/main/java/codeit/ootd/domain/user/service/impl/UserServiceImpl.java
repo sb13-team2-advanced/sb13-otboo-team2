@@ -183,6 +183,21 @@ public class UserServiceImpl implements UserService {
         return UserDto.from(user);
     }
 
+    @Override
+    @Transactional
+    public void updatePassword(UUID userId, String newPassword) {
+        User user = userRepository.findById(userId)
+                .orElseThrow(UserNotFoundException::new);
+
+        String encodedPassword = passwordEncoder.encode(newPassword);
+        user.changePassword(encodedPassword);
+
+        authSessionService.revokeAllSessions(userId);
+
+        log.info("사용자 비밀번호 변경 완료: userId={}", userId);
+    }
+
+
 
 
 }

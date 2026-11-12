@@ -1,11 +1,17 @@
 package codeit.ootd.infra.weather;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import codeit.ootd.global.exception.ErrorCode;
+import codeit.ootd.global.exception.OtbooException;
+import com.uber.h3core.H3Core;
 import com.uber.h3core.util.LatLng;
 import java.io.IOException;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 
 class H3ServiceTest {
 
@@ -47,5 +53,49 @@ class H3ServiceTest {
         assertThat(center.lng).isBetween(-180.0, 180.0);
 
         assertThat(centerCellId).isEqualTo(cellId);
+    }
+
+    @ParameterizedTest
+    @CsvSource({
+        "-90.1, 127.0",
+        "90.1, 127.0",
+        "37.5, -180.1",
+        "37.5, 180.1",
+        "NaN, 127.0",
+        "37.5, NaN",
+        "Infinity, 127.0",
+        "37.5, -Infinity"
+    })
+    @DisplayName("유효하지 않은 위도 또는 경도는 날씨 좌표 오류를 발생시킨다")
+    void validateCoordinatesRejectsInvalidCoordinates(
+        double latitude,
+        double longitude
+    ) throws IOException {
+        H3Service h3Service = new H3Service();
+
+        assertThatThrownBy(
+            () -> h3Service.validateCoordinates(latitude, longitude)
+        )
+            .isInstanceOf(OtbooException.class)
+            .satisfies(exception ->
+                assertThat(((OtbooException) exception).getErrorCode())
+                    .isEqualTo(ErrorCode.WEATHER_INVALID_COORDINATES)
+            );
+    }
+
+    @Test
+    @DisplayName("위경도를 H3 Resolution 7 셀로 변환한다")
+    void toCellIdUsesResolutionSeven() throws IOException {
+        H3Service h3Service = new H3Service();
+        H3Core h3Core = H3Core.newInstance();
+
+        double latitude = 37.5665;
+        double longitude = 126.9780;
+
+        String cellId = h3Service.toCellId(latitude, longitude);
+
+        assertThat(cellId).isEqualTo(
+            h3Core.latLngToCellAddress(latitude, longitude, 7)
+        );
     }
 }

@@ -1,0 +1,49 @@
+package codeit.ootd.domain.feed.controller;
+
+import codeit.ootd.domain.feed.dto.request.CommentCreateRequest;
+import codeit.ootd.domain.feed.dto.response.CommentDto;
+import codeit.ootd.domain.feed.dto.response.CommentDtoCursorResponse;
+import codeit.ootd.domain.feed.service.FeedCommentService;
+import java.util.UUID;
+import lombok.RequiredArgsConstructor;
+import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RestController;
+
+@RestController
+@RequestMapping("/api/feeds")
+@RequiredArgsConstructor
+public class FeedCommentController {
+
+    private final FeedCommentService feedCommentService;
+
+    @PostMapping(
+            value = "/{feedId}/comments",
+            consumes = MediaType.APPLICATION_JSON_VALUE
+    )
+    public ResponseEntity<CommentDto> create(
+            @PathVariable UUID feedId,
+            @AuthenticationPrincipal UUID userId,
+            @RequestBody CommentCreateRequest request
+    ) {
+        CommentDto response = feedCommentService.create(feedId, request, userId);
+        return ResponseEntity.ok(response);
+    }
+
+    @GetMapping("/{feedId}/comments")
+    public ResponseEntity<CommentDtoCursorResponse> list(
+            @PathVariable UUID feedId,
+            @RequestParam(required = false) String cursor,
+            @RequestParam(required = false) UUID idAfter,
+            @RequestParam int limit
+    ) {
+        return ResponseEntity.ok(feedCommentService.list(feedId, cursor, idAfter, limit));
+    }
+}

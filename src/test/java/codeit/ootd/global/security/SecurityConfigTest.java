@@ -26,6 +26,7 @@ import org.springframework.web.bind.annotation.RestController;
 import java.util.Optional;
 import java.util.UUID;
 
+import static org.assertj.core.api.AssertionsForClassTypes.assertThat;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.mockito.Mockito.*;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -211,6 +212,40 @@ class SecurityConfigTest {
                 );
     }
 
+    @Test
+    @DisplayName("의상 이미지 조회는 JWT 인증 없이 접근할 수 있다")
+    void clothesImage_withoutAuthentication_shouldNotReturn401() throws Exception {
+        mockMvc.perform(get("/files/clothes/test.jpeg"))
+                .andExpect(result -> {
+                    int status = result.getResponse().getStatus();
+
+                    assertThat(status)
+                            .as("의상 이미지 조회는 인증 오류가 발생하면 안 된다")
+                            .isNotEqualTo(401)
+                            .isNotEqualTo(403);
+                });
+    }
+
+    @Test
+    @DisplayName("보호된 API는 인증 없이 접근하면 401을 반환한다")
+    void protectedApi_withoutAuthentication_shouldReturn401() throws Exception {
+        mockMvc.perform(get("/api/security-test/protected"))
+                .andExpect(status().isUnauthorized());
+    }
+
+    @RestController
+    static class TestController {
+
+        @GetMapping("/files/clothes/test.jpeg")
+        ResponseEntity<Void> image() {
+            return ResponseEntity.ok().build();
+        }
+
+        @GetMapping("/api/security-test/protected")
+        ResponseEntity<Void> protectedApi() {
+            return ResponseEntity.ok().build();
+        }
+    }
 
     /**
      * JWT 인증·인가 통합 테스트를 위한 전용 Controller 설정.

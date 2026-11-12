@@ -3,17 +3,23 @@ package codeit.ootd.domain.weather.service;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 import codeit.ootd.domain.weather.dto.response.WeatherAPILocation;
 import codeit.ootd.domain.weather.entity.WeatherLocation;
 import codeit.ootd.domain.weather.repository.WeatherLocationRepository;
+import codeit.ootd.global.exception.ErrorCode;
+import codeit.ootd.global.exception.OtbooException;
 import codeit.ootd.infra.kakao.KakaoLocalClient;
 import codeit.ootd.infra.weather.H3Service;
 import codeit.ootd.infra.weather.dto.KakaoRegionResponse;
+import com.uber.h3core.H3Core;
 import com.uber.h3core.util.LatLng;
+import java.io.IOException;
 import java.time.Instant;
 import java.util.Optional;
 import org.junit.jupiter.api.DisplayName;
@@ -208,5 +214,90 @@ class WeatherLocationServiceTest {
 
         verify(kakaoLocalClient)
             .getAdministrativeRegion(latitude, longitude);
+    }
+
+    @Test
+    @DisplayName("잘못된 좌표는 카카오 API를 호출하지 않고 예외를 발생시킨다")
+    void getLocationRejectsInvalidCoordinates() {
+        double latitude = 100.0;
+        double longitude = 127.0;
+
+        doThrow(new OtbooException(ErrorCode.WEATHER_INVALID_COORDINATES))
+            .when(h3Service)
+            .validateCoordinates(latitude, longitude);
+
+        assertThatThrownBy(
+            () -> weatherLocationService.getLocation(latitude, longitude)
+        )
+            .isInstanceOf(OtbooException.class)
+            .satisfies(exception ->
+                assertThat(((OtbooException) exception).getErrorCode())
+                    .isEqualTo(ErrorCode.WEATHER_INVALID_COORDINATES)
+            );
+
+        verifyNoInteractions(kakaoLocalClient);
+    }
+
+    @Test
+    @DisplayName("기존 R8 셀이 존재해도 R7 셀을 신규 생성한다")
+    void findOrCreateCreatesR7LocationWhenR8Exists() throws IOException {
+        double latitude = 37.5665;
+        double longitude = 126.9780;
+
+        H3Service realH3Service = new H3Service();
+        H3Core h3Core = H3Core.newInstance();
+
+        String r8CellId = h3Core.latLngToCellAddress(
+            latitude,
+            longitude,
+            8
+        );
+
+        String r7CellId = realH3Service.toCellId(
+            latitude,
+            longitude
+        );
+
+        WeatherLocation existingR8 = new WeatherLocation(
+            r8CellId,
+            latitude,
+            longitude,
+            Instant.now()
+        );
+
+        when(weatherLocationRepository.findByCellId(any(String.class)))
+            .thenAnswer(invocation -> {
+                String cellId = invocation.getArgument(0);
+
+                if (cellId.equals(r8CellId)) {
+                    return Optional.of(existingR8);
+                }
+
+                return Optional.empty();
+            });
+
+        when(weatherLocationRepository.saveAndFlush(any(WeatherLocation.class)))
+            .thenAnswer(invocation -> invocation.getArgument(0));
+
+        WeatherLocationService service = new WeatherLocationService(
+            realH3Service,
+            weatherLocationRepository,
+            kakaoLocalClient
+        );
+
+        WeatherLocation result = service.findOrCreate(
+            latitude,
+            longitude
+        );
+
+        assertThat(result.getCellId()).isEqualTo(r7CellId);
+        assertThat(result.getCellId()).isNotEqualTo(r8CellId);
+        assertThat(result.getResolution()).isEqualTo((short) 7);
+        assertThat(result.getLastCollectedAt()).isNull();
+
+        verify(weatherLocationRepository).findByCellId(r7CellId);
+        verify(weatherLocationRepository, never()).findByCellId(r8CellId);
+        verify(weatherLocationRepository)
+            .saveAndFlush(any(WeatherLocation.class));
     }
 }
