@@ -26,6 +26,7 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.test.util.ReflectionTestUtils;
 
 import java.sql.SQLException;
+import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -601,6 +602,45 @@ class UserServiceImplTest {
 
         verifyNoInteractions(passwordEncoder, authSessionService);
     }
+
+    @Test
+    @DisplayName("비밀번호 변경 시 임시 비밀번호를 파기한다")
+    void updatePassword_clearsTemporaryPassword() {
+        // given
+        UUID userId = UUID.randomUUID();
+        String newPassword = "newPassword123!";
+        String encodedPassword = "encoded-new-password";
+
+        User user = User.create(
+                "테스트 사용자",
+                "test@example.com",
+                "encoded-old-password"
+        );
+
+        user.issueTemporaryPassword(
+                "encoded-temporary-password",
+                Instant.parse("2026-11-12T00:03:00Z")
+        );
+
+        when(userRepository.findById(userId))
+                .thenReturn(Optional.of(user));
+
+        when(passwordEncoder.encode(newPassword))
+                .thenReturn(encodedPassword);
+
+        // when
+        userService.updatePassword(userId, newPassword);
+
+        // then
+        assertThat(user.getPassword())
+                .isEqualTo(encodedPassword);
+
+        assertThat(user.getTemporaryPassword()).isNull();
+        assertThat(user.getTemporaryPasswordExpiresAt()).isNull();
+
+        verify(authSessionService).revokeAllSessions(userId);
+    }
+
 
 
 
