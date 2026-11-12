@@ -11,6 +11,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
+import org.mockito.InOrder;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.http.HttpHeaders;
@@ -29,6 +30,7 @@ import java.util.UUID;
 import static org.hamcrest.Matchers.containsString;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
@@ -52,6 +54,9 @@ class AuthControllerTest {
 
     @MockitoBean
     private AuthService authService;
+
+    @MockitoBean
+    private PasswordResetRateLimiter passwordResetRateLimiter;
 
     @Test
     @DisplayName("익명 사용자에게 CSRF 토큰과 XSRF-TOKEN 쿠키를 발급한다")
@@ -453,6 +458,36 @@ class AuthControllerTest {
         assertNotNull(csrfCookie);
 
         return csrfCookie;
+    }
+
+    @Test
+    @DisplayName("비밀번호 초기화 요청 시 발급 전에 요청 횟수를 검사한다")
+    void resetPassword_checksRateLimitBeforeIssuing() throws Exception {
+        // given
+        String email = "test@example.com";
+        Cookie csrfCookie = issueCsrfCookie();
+
+        // when
+        mockMvc.perform(post("/api/auth/reset-password")
+                        .cookie(csrfCookie)
+                        .header("X-XSRF-TOKEN", csrfCookie.getValue())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                            {"email":"test@example.com"}
+                            """))
+                .andExpect(status().isNoContent());
+
+        // then
+        InOrder inOrder = inOrder(
+                passwordResetRateLimiter,
+                authService
+        );
+
+        inOrder.verify(passwordResetRateLimiter)
+                .check(email, "127.0.0.1");
+
+        inOrder.verify(authService)
+                .resetPassword(email);
     }
 
 
