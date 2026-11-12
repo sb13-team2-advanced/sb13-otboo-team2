@@ -94,7 +94,7 @@ class AuthServiceImplTest {
                 jwtProvider,
                 temporaryPasswordGenerator,
                 clock,
-                temporaryPasswordGenerator
+                temporaryPasswordMailSender
         );
     }
 
