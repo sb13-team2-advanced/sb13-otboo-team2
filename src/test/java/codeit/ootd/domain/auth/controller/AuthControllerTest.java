@@ -9,9 +9,12 @@ import codeit.ootd.domain.user.entity.UserRole;
 import jakarta.servlet.http.Cookie;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseCookie;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -33,6 +36,7 @@ import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.cookie;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -383,6 +387,59 @@ class AuthControllerTest {
 
         verify(authService, never()).signOut(anyString());
     }
+
+    @Test
+    @DisplayName("익명 사용자가 임시 비밀번호 발급을 요청하면 204를 반환한다")
+    void resetPassword_anonymousUser_success() throws Exception {
+        // given
+        Cookie csrfCookie = issueCsrfCookie();
+
+        // when & then
+        mockMvc.perform(post("/api/auth/reset-password")
+                        .cookie(csrfCookie)
+                        .header("X-XSRF-TOKEN", csrfCookie.getValue())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                            {"email":"test@example.com"}
+                            """))
+                .andExpect(status().isNoContent())
+                .andExpect(content().string(""));
+
+        verify(authService).resetPassword("test@example.com");
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"", "invalid-email"})
+    @DisplayName("임시 비밀번호 발급 요청의 이메일이 유효하지 않으면 400을 반환한다")
+    void resetPassword_invalidEmail_badRequest(String email) throws Exception {
+        // given
+        Cookie csrfCookie = issueCsrfCookie();
+
+        // when & then
+        mockMvc.perform(post("/api/auth/reset-password")
+                        .cookie(csrfCookie)
+                        .header("X-XSRF-TOKEN", csrfCookie.getValue())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"email\":\"" + email + "\"}"))
+                .andExpect(status().isBadRequest());
+
+        verify(authService, never()).resetPassword(anyString());
+    }
+
+    @Test
+    @DisplayName("CSRF 토큰이 없으면 임시 비밀번호 발급 요청을 거부한다")
+    void resetPassword_withoutCsrf_forbidden() throws Exception {
+        // when & then
+        mockMvc.perform(post("/api/auth/reset-password")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                            {"email":"test@example.com"}
+                            """))
+                .andExpect(status().isForbidden());
+
+        verify(authService, never()).resetPassword(anyString());
+    }
+
 
 
     private Cookie issueCsrfCookie() throws Exception {
