@@ -4,6 +4,7 @@ import codeit.ootd.domain.user.entity.User;
 import codeit.ootd.domain.user.entity.UserRole;
 import codeit.ootd.domain.user.entity.UserStatus;
 import codeit.ootd.domain.user.repository.UserRepository;
+import codeit.ootd.global.util.EmailNormalizer;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.ApplicationArguments;
@@ -35,7 +36,7 @@ public class AdminInitializer implements ApplicationRunner {
         this.userRepository = userRepository;
         this.passwordEncoder = passwordEncoder;
         this.adminName = adminName;
-        this.adminEmail = adminEmail;
+        this.adminEmail = EmailNormalizer.normalize(adminEmail);
         this.adminPassword = adminPassword;
     }
 
@@ -45,13 +46,16 @@ public class AdminInitializer implements ApplicationRunner {
     }
 
     public void initialize() {
-        if (adminEmail.isBlank() || adminPassword.isBlank()) {
+        if (adminEmail.isBlank()
+                || adminEmail.chars().anyMatch(Character::isWhitespace)
+                || adminPassword.isBlank()) {
             throw new IllegalStateException(
-                    "초기 관리자 이메일과 비밀번호 설정이 필요합니다."
+                    "초기 관리자 이메일과 비밀번호 설정을 확인해 주세요."
             );
         }
 
-        Optional<User> existingUser = userRepository.findByEmail(adminEmail);
+        Optional<User> existingUser =
+                userRepository.findByEmailIgnoreCase(adminEmail);
 
         if (existingUser.isPresent()) {
             User user = existingUser.get();

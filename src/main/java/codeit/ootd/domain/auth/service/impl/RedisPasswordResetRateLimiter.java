@@ -2,6 +2,7 @@ package codeit.ootd.domain.auth.service.impl;
 
 import codeit.ootd.domain.auth.exception.PasswordResetRateLimitExceededException;
 import codeit.ootd.domain.auth.service.PasswordResetRateLimiter;
+import codeit.ootd.global.util.EmailNormalizer;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.data.redis.core.script.DefaultRedisScript;
@@ -53,8 +54,8 @@ public class RedisPasswordResetRateLimiter
 
     @Override
     public void check(String email, String ipAddress) {
-        String normalizedEmail =
-                email.trim().toLowerCase(Locale.ROOT);
+
+        String normalizedEmail = EmailNormalizer.normalize(email);
 
         String emailKey =
                 "password-reset:{limit}:email:" + hash(normalizedEmail);

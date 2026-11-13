@@ -417,6 +417,13 @@ class AuthControllerTest {
 
     @ParameterizedTest
     @ValueSource(strings = {"", "invalid-email"})
+    @ValueSource(strings = {
+            "",
+            "invalid-email",
+            " test@example.com",
+            "test@example.com ",
+            "test @example.com"
+    })
     @DisplayName("임시 비밀번호 발급 요청의 이메일이 유효하지 않으면 400을 반환한다")
     void resetPassword_invalidEmail_badRequest(String email) throws Exception {
         // given
@@ -514,6 +521,28 @@ class AuthControllerTest {
                 .andExpect(status().isTooManyRequests());
 
         verify(authService, never()).resetPassword(anyString());
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {
+            " test@example.com",
+            "test@example.com ",
+            "test @example.com"
+    })
+    @DisplayName("로그인 이메일에 공백이 포함되면 400을 반환한다")
+    void signIn_emailWithWhitespace_badRequest(String email) throws Exception {
+        // given
+        Cookie csrfCookie = issueCsrfCookie();
+
+        // when & then
+        mockMvc.perform(multipart("/api/auth/sign-in")
+                        .cookie(csrfCookie)
+                        .header("X-XSRF-TOKEN", csrfCookie.getValue())
+                        .param("username", email)
+                        .param("password", "password123!"))
+                .andExpect(status().isBadRequest());
+
+        verifyNoInteractions(authService);
     }
 
 
