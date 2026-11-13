@@ -5,10 +5,15 @@ import codeit.ootd.domain.auth.service.impl.RedisPasswordResetRateLimiter;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.data.redis.core.StringRedisTemplate;
+import org.springframework.data.redis.core.script.RedisScript;
 
-import static org.assertj.core.api.Assertions.assertThatCode;
+import static org.assertj.core.api.AssertionsForClassTypes.assertThatCode;
 import static org.assertj.core.api.AssertionsForClassTypes.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyList;
 
 class RedisPasswordResetRateLimiterTest {
 
@@ -18,46 +23,68 @@ class RedisPasswordResetRateLimiterTest {
     private final RedisPasswordResetRateLimiter rateLimiter =
             new RedisPasswordResetRateLimiter(redisTemplate);
 
+
     @Test
-    @DisplayName("첫 번째 비밀번호 초기화 요청은 허용한다")
-    void check_firstRequest_allowed() {
+    @DisplayName("Redis가 요청 제한 결과를 반환하면 예외가 발생한다")
+    void check_rateLimitExceeded() {
         // given
-        String email = "test@example.com";
-        String ipAddress = "127.0.0.1";
+        when(redisTemplate.execute(
+                any(RedisScript.class),
+                anyList(),
+                anyString(),
+                anyString(),
+                anyString()
+        )).thenReturn(0L);
 
         // when & then
-        assertThatCode(() -> rateLimiter.check(email, ipAddress))
-                .doesNotThrowAnyException();
-    }
-
-    @Test
-    @DisplayName("동일 이메일로 3분 이내 재요청하면 차단한다")
-    void check_sameEmail_rateLimitExceeded() {
-        // given
-        String email = "test@example.com";
-
-        // when
-        rateLimiter.check(email, "127.0.0.1");
-
-        // then
-        assertThatThrownBy(() -> rateLimiter.check(email, "127.0.0.2"))
-                .isInstanceOf(PasswordResetRateLimitExceededException.class);
-    }
-
-    @Test
-    @DisplayName("동일 IP에서 10분 이내 6번째 요청은 차단한다")
-    void check_sameIp_rateLimitExceeded() {
-        // given
-        String ipAddress = "127.0.0.1";
-
-        // when
-        for (int i = 0; i < 5; i++) {
-            rateLimiter.check("user" + i + "@example.com", ipAddress);
-        }
-
-        // then
         assertThatThrownBy(() ->
-                rateLimiter.check("user5@example.com", ipAddress)
-        ).isInstanceOf(PasswordResetRateLimitExceededException.class);
+                rateLimiter.check("test@example.com", "127.0.0.1")
+        ).isInstanceOf(
+                PasswordResetRateLimitExceededException.class
+        );
     }
+
+    @Test
+    @DisplayName("Redis 실행 결과가 없으면 요청을 허용하지 않는다")
+    void check_redisResultNull() {
+        // given
+        when(redisTemplate.execute(
+                any(RedisScript.class),
+                anyList(),
+                anyString(),
+                anyString(),
+                anyString()
+        )).thenReturn(null);
+
+        // when & then
+        assertThatThrownBy(() ->
+                rateLimiter.check("test@example.com", "127.0.0.1")
+        ).isInstanceOf(IllegalStateException.class);
+    }
+
+    @Test
+    @DisplayName("Redis가 요청을 허용하면 정상적으로 처리한다")
+    void check_firstRequest_allowed() {
+        // given
+        when(redisTemplate.execute(
+                any(RedisScript.class),
+                anyList(),
+                anyString(),
+                anyString(),
+                anyString()
+        )).thenReturn(1L);
+
+        // when & then
+        assertThatCode(() ->
+                rateLimiter.check("test@example.com", "127.0.0.1")
+        ).doesNotThrowAnyException();
+    }
+
+
+
+
+
+
+
+
 }

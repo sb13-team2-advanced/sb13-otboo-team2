@@ -3,7 +3,9 @@ package codeit.ootd.domain.auth.controller;
 import codeit.ootd.domain.auth.dto.response.SignInResult;
 import codeit.ootd.domain.auth.dto.response.TokenRefreshResult;
 import codeit.ootd.domain.auth.exception.InvalidRefreshTokenException;
+import codeit.ootd.domain.auth.exception.PasswordResetRateLimitExceededException;
 import codeit.ootd.domain.auth.service.AuthService;
+import codeit.ootd.domain.auth.service.PasswordResetRateLimiter;
 import codeit.ootd.domain.user.dto.response.UserDto;
 import codeit.ootd.domain.user.entity.UserRole;
 import jakarta.servlet.http.Cookie;
@@ -16,20 +18,20 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
-import org.springframework.http.ResponseCookie;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
 
-import java.time.Duration;
 import java.time.Instant;
 import java.util.UUID;
 
 import static org.hamcrest.Matchers.containsString;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -489,6 +491,31 @@ class AuthControllerTest {
         inOrder.verify(authService)
                 .resetPassword(email);
     }
+
+    @Test
+    @DisplayName("비밀번호 초기화 요청 제한 초과 시 429를 반환하고 발급하지 않는다")
+    void resetPassword_rateLimitExceeded_returns429() throws Exception {
+        // given
+        String email = "test@example.com";
+        Cookie csrfCookie = issueCsrfCookie();
+
+        doThrow(new PasswordResetRateLimitExceededException())
+                .when(passwordResetRateLimiter)
+                .check(eq(email), anyString());
+
+        // when & then
+        mockMvc.perform(post("/api/auth/reset-password")
+                        .cookie(csrfCookie)
+                        .header("X-XSRF-TOKEN", csrfCookie.getValue())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                            {"email":"test@example.com"}
+                            """))
+                .andExpect(status().isTooManyRequests());
+
+        verify(authService, never()).resetPassword(anyString());
+    }
+
 
 
 }
