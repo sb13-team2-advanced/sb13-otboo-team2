@@ -73,7 +73,7 @@ class UserServiceImplTest {
                 "password123!"
         );
 
-        given(userRepository.existsByEmail(request.email()))
+        given(userRepository.existsByEmailIgnoreCase(request.email()))
                 .willReturn(true);
 
         // when & then
@@ -123,7 +123,7 @@ class UserServiceImplTest {
                 DuplicateEmailException.class,
                 () -> userService.signup(request)
         );
-        verify(userRepository).existsByEmail(request.email());
+        verify(userRepository).existsByEmailIgnoreCase(request.email());
         verify(userRepository).saveAndFlush(any(User.class));
     }
 
@@ -639,6 +639,104 @@ class UserServiceImplTest {
         assertThat(user.getTemporaryPasswordExpiresAt()).isNull();
 
         verify(authSessionService).revokeAllSessions(userId);
+    }
+
+    @Test
+    @DisplayName("대문자 이메일로 회원가입하면 소문자로 정규화하여 저장한다")
+    void signup_uppercaseEmail_savesNormalizedEmail() {
+        // given
+        UserCreateRequest request = new UserCreateRequest(
+                "테스트 사용자",
+                "TEST@Example.com",
+                "password123!"
+        );
+
+        given(passwordEncoder.encode(request.password()))
+                .willReturn("encoded-password");
+
+        given(userRepository.saveAndFlush(any(User.class)))
+                .willAnswer(invocation -> invocation.getArgument(0));
+
+        // when
+        UserDto result = userService.signup(request);
+
+        // then
+        verify(userRepository)
+                .existsByEmailIgnoreCase("test@example.com");
+
+        ArgumentCaptor<User> captor =
+                ArgumentCaptor.forClass(User.class);
+
+        verify(userRepository).saveAndFlush(captor.capture());
+
+        assertEquals("test@example.com", captor.getValue().getEmail());
+        assertEquals("test@example.com", result.email());
+    }
+
+    @Test
+    @DisplayName("대소문자만 다른 이메일도 중복 가입을 차단한다")
+    void signup_uppercaseDuplicateEmail_throwsException() {
+        // given
+        UserCreateRequest request = new UserCreateRequest(
+                "테스트 사용자",
+                "TEST@Example.com",
+                "password123!"
+        );
+
+        given(userRepository.existsByEmailIgnoreCase("test@example.com"))
+                .willReturn(true);
+
+        // when & then
+        assertThrows(
+                DuplicateEmailException.class,
+                () -> userService.signup(request)
+        );
+
+        verify(userRepository)
+                .existsByEmailIgnoreCase("test@example.com");
+
+        verify(userRepository, never())
+                .saveAndFlush(any(User.class));
+
+        verifyNoInteractions(passwordEncoder);
+    }
+
+    @Test
+    @DisplayName("소문자 이메일 UNIQUE 인덱스 위반 시 중복 이메일 예외가 발생한다")
+    void signup_lowercaseEmailUniqueViolation_throwsDuplicateEmailException() {
+        // given
+        UserCreateRequest request = new UserCreateRequest(
+                "테스트사용자",
+                "TEST@Example.com",
+                "password123!"
+        );
+
+        when(passwordEncoder.encode(request.password()))
+                .thenReturn("encoded-password");
+
+        ConstraintViolationException cause =
+                new ConstraintViolationException(
+                        "소문자 이메일 UNIQUE 인덱스 위반",
+                        new SQLException("duplicate key", "23505"),
+                        "uk_users_email_lower"
+                );
+
+        DataIntegrityViolationException exception =
+                new DataIntegrityViolationException("이메일 중복", cause);
+
+        when(userRepository.saveAndFlush(any(User.class)))
+                .thenThrow(exception);
+
+        // when & then
+        assertThrows(
+                DuplicateEmailException.class,
+                () -> userService.signup(request)
+        );
+
+        verify(userRepository)
+                .existsByEmailIgnoreCase("test@example.com");
+
+        verify(userRepository).saveAndFlush(any(User.class));
     }
 
 

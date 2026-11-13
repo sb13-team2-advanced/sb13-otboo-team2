@@ -10,6 +10,7 @@ import codeit.ootd.domain.user.exception.DuplicateEmailException;
 import codeit.ootd.domain.user.exception.UserNotFoundException;
 import codeit.ootd.domain.user.repository.UserRepository;
 import codeit.ootd.domain.user.service.UserService;
+import codeit.ootd.global.util.EmailNormalizer;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.hibernate.exception.ConstraintViolationException;
@@ -39,7 +40,9 @@ public class UserServiceImpl implements UserService {
     @Transactional
     public UserDto signup(UserCreateRequest request) {
 
-        if (userRepository.existsByEmail(request.email())) {
+        String normalizedEmail = EmailNormalizer.normalize(request.email());
+
+        if (userRepository.existsByEmailIgnoreCase(normalizedEmail)) {
             log.debug("회원가입 실패: 이메일 중복");
             throw new DuplicateEmailException();
         }
@@ -48,7 +51,7 @@ public class UserServiceImpl implements UserService {
 
         User user = User.create(
                 request.name(),
-                request.email(),
+                normalizedEmail,
                 encodedPassword
         );
 
@@ -74,10 +77,17 @@ public class UserServiceImpl implements UserService {
         Throwable cause = throwable;
 
         while (cause != null) {
-            if (cause instanceof ConstraintViolationException exception
-                    && "uk_users_email".equalsIgnoreCase(exception.getConstraintName())
-                    && "23505".equals(exception.getSQLState())) {
-                return true;
+            if (cause instanceof ConstraintViolationException exception) {
+                String constraintName = exception.getConstraintName();
+
+                boolean isEmailConstraint =
+                        "uk_users_email".equalsIgnoreCase(constraintName)
+                                || "uk_users_email_lower".equalsIgnoreCase(constraintName);
+
+                if (isEmailConstraint
+                        && "23505".equals(exception.getSQLState())) {
+                    return true;
+                }
             }
 
             cause = cause.getCause();

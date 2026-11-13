@@ -3,7 +3,9 @@ package codeit.ootd.domain.auth.controller;
 import codeit.ootd.domain.auth.dto.response.SignInResult;
 import codeit.ootd.domain.auth.dto.response.TokenRefreshResult;
 import codeit.ootd.domain.auth.exception.InvalidRefreshTokenException;
+import codeit.ootd.domain.auth.exception.PasswordResetRateLimitExceededException;
 import codeit.ootd.domain.auth.service.AuthService;
+import codeit.ootd.domain.auth.service.PasswordResetRateLimiter;
 import codeit.ootd.domain.user.dto.response.UserDto;
 import codeit.ootd.domain.user.entity.UserRole;
 import jakarta.servlet.http.Cookie;
@@ -11,24 +13,26 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
+import org.mockito.InOrder;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
-import org.springframework.http.ResponseCookie;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
 
-import java.time.Duration;
 import java.time.Instant;
 import java.util.UUID;
 
 import static org.hamcrest.Matchers.containsString;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
@@ -52,6 +56,9 @@ class AuthControllerTest {
 
     @MockitoBean
     private AuthService authService;
+
+    @MockitoBean
+    private PasswordResetRateLimiter passwordResetRateLimiter;
 
     @Test
     @DisplayName("익명 사용자에게 CSRF 토큰과 XSRF-TOKEN 쿠키를 발급한다")
@@ -410,6 +417,13 @@ class AuthControllerTest {
 
     @ParameterizedTest
     @ValueSource(strings = {"", "invalid-email"})
+    @ValueSource(strings = {
+            "",
+            "invalid-email",
+            " test@example.com",
+            "test@example.com ",
+            "test @example.com"
+    })
     @DisplayName("임시 비밀번호 발급 요청의 이메일이 유효하지 않으면 400을 반환한다")
     void resetPassword_invalidEmail_badRequest(String email) throws Exception {
         // given
@@ -454,6 +468,83 @@ class AuthControllerTest {
 
         return csrfCookie;
     }
+
+    @Test
+    @DisplayName("비밀번호 초기화 요청 시 발급 전에 요청 횟수를 검사한다")
+    void resetPassword_checksRateLimitBeforeIssuing() throws Exception {
+        // given
+        String email = "test@example.com";
+        Cookie csrfCookie = issueCsrfCookie();
+
+        // when
+        mockMvc.perform(post("/api/auth/reset-password")
+                        .cookie(csrfCookie)
+                        .header("X-XSRF-TOKEN", csrfCookie.getValue())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                            {"email":"test@example.com"}
+                            """))
+                .andExpect(status().isNoContent());
+
+        // then
+        InOrder inOrder = inOrder(
+                passwordResetRateLimiter,
+                authService
+        );
+
+        inOrder.verify(passwordResetRateLimiter)
+                .check(email, "127.0.0.1");
+
+        inOrder.verify(authService)
+                .resetPassword(email);
+    }
+
+    @Test
+    @DisplayName("비밀번호 초기화 요청 제한 초과 시 429를 반환하고 발급하지 않는다")
+    void resetPassword_rateLimitExceeded_returns429() throws Exception {
+        // given
+        String email = "test@example.com";
+        Cookie csrfCookie = issueCsrfCookie();
+
+        doThrow(new PasswordResetRateLimitExceededException())
+                .when(passwordResetRateLimiter)
+                .check(eq(email), anyString());
+
+        // when & then
+        mockMvc.perform(post("/api/auth/reset-password")
+                        .cookie(csrfCookie)
+                        .header("X-XSRF-TOKEN", csrfCookie.getValue())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                            {"email":"test@example.com"}
+                            """))
+                .andExpect(status().isTooManyRequests());
+
+        verify(authService, never()).resetPassword(anyString());
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {
+            " test@example.com",
+            "test@example.com ",
+            "test @example.com"
+    })
+    @DisplayName("로그인 이메일에 공백이 포함되면 400을 반환한다")
+    void signIn_emailWithWhitespace_badRequest(String email) throws Exception {
+        // given
+        Cookie csrfCookie = issueCsrfCookie();
+
+        // when & then
+        mockMvc.perform(multipart("/api/auth/sign-in")
+                        .cookie(csrfCookie)
+                        .header("X-XSRF-TOKEN", csrfCookie.getValue())
+                        .param("username", email)
+                        .param("password", "password123!"))
+                .andExpect(status().isBadRequest());
+
+        verifyNoInteractions(authService);
+    }
+
 
 
 }
