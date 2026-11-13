@@ -14,6 +14,7 @@ import codeit.ootd.domain.directmessage.repository.DirectMessageRepository;
 import codeit.ootd.domain.user.entity.User;
 import codeit.ootd.domain.user.repository.UserRepository;
 import codeit.ootd.global.exception.OtbooException;
+import codeit.ootd.global.exception.ErrorCode;
 import codeit.ootd.global.config.JpaAuditingConfig;
 import java.util.List;
 import java.util.UUID;
@@ -105,22 +106,46 @@ class DirectMessageSendIntegrationTest {
 
     @Test
     void rejectsForgedSender() {
-        assertRejected(request(receiver, sender, "forged"), sender.getId());
+        assertRejected(request(receiver, sender, "forged"), sender.getId(), ErrorCode.ACCESS_DENIED);
     }
 
     @Test
     void rejectsMissingReceiver() {
-        assertRejected(new DirectMessageSendRequest(sender.getId(), UUID.randomUUID(), "hello"), sender.getId());
+        assertRejected(new DirectMessageSendRequest(sender.getId(), UUID.randomUUID(), "hello"),
+                sender.getId(), ErrorCode.USER_NOT_FOUND);
+    }
+
+    @Test
+    void rejectsUnauthenticatedSender() {
+        assertRejected(request(sender, receiver, "hello"), null, ErrorCode.AUTHENTICATION_REQUIRED);
     }
 
     @Test
     void rejectsBlankContent() {
-        assertRejected(request(sender, receiver, " \n\t"), sender.getId());
+        assertRejected(request(sender, receiver, " \n\t"), sender.getId(), ErrorCode.INVALID_REQUEST);
     }
 
-    private void assertRejected(DirectMessageSendRequest request, UUID userId) {
+    @Test
+    void rejectsLockedSender() {
+        sender.lock();
+        users.saveAndFlush(sender);
+        assertRejected(request(sender, receiver, "hello"), sender.getId(), ErrorCode.ACCOUNT_LOCKED);
+    }
+
+    @ParameterizedTest
+    @ValueSource(booleans = {false, true})
+    void rejectsInactiveParticipant(boolean inactiveSender) {
+        User inactive = inactiveSender ? sender : receiver;
+        inactive.deactivate();
+        users.saveAndFlush(inactive);
+        assertRejected(request(sender, receiver, "hello"), sender.getId(), ErrorCode.ACCOUNT_INACTIVE);
+    }
+
+    private void assertRejected(DirectMessageSendRequest request, UUID userId, ErrorCode errorCode) {
         long count = messages.count();
-        assertThatThrownBy(() -> service.send(request, userId)).isInstanceOf(OtbooException.class);
+        assertThatThrownBy(() -> service.send(request, userId))
+                .isInstanceOfSatisfying(OtbooException.class,
+                        exception -> assertThat(exception.getErrorCode()).isEqualTo(errorCode));
         assertThat(messages.count()).isEqualTo(count);
         verifyNoInteractions(messagingTemplate);
     }
