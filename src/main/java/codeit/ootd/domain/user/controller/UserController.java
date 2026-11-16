@@ -9,6 +9,8 @@ import codeit.ootd.domain.user.dto.response.UserListResponse;
 import codeit.ootd.domain.user.entity.UserRole;
 import codeit.ootd.domain.user.exception.InvalidUserQueryException;
 import codeit.ootd.domain.user.service.UserService;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Min;
 import lombok.RequiredArgsConstructor;
@@ -32,11 +34,13 @@ import java.util.UUID;
 @RestController
 @RequestMapping("/api/users")
 @RequiredArgsConstructor
+@Tag(name = "프로필 관리", description = "프로필 관련 API")
 public class UserController {
 
     private final UserService userService;
 
     @PostMapping
+    @Operation(summary = "사용자 등록(회원가입)")
     public ResponseEntity<UserDto> signup(
             @Valid @RequestBody UserCreateRequest request
     ) {
@@ -46,6 +50,7 @@ public class UserController {
     }
 
     @GetMapping
+    @Operation(summary = "계정 목록 조회")
     public ResponseEntity<UserListResponse> getUsers(
             @RequestParam(required = false) String cursor,
             @RequestParam(required = false) UUID idAfter,
@@ -102,6 +107,7 @@ public class UserController {
 
     @PreAuthorize("hasRole('ADMIN')")
     @PatchMapping("/{userId}/role")
+    @Operation(summary = "권한 수정")
     public ResponseEntity<UserDto> updateRole(
             @PathVariable UUID userId,
             @Valid @RequestBody UserRoleUpdateRequest request
@@ -116,6 +122,7 @@ public class UserController {
 
     @PreAuthorize("hasRole('ADMIN')")
     @PatchMapping("/{userId}/lock")
+    @Operation(summary = "계정 잠금 상태 변경")
     public ResponseEntity<UserDto> updateLock(
             @PathVariable UUID userId,
             @Valid @RequestBody UserLockUpdateRequest request
@@ -129,6 +136,7 @@ public class UserController {
     }
 
     @PatchMapping("/{userId}/password")
+    @Operation(summary = "비밀번호 변경")
     public ResponseEntity<Void> updatePassword(
             @PathVariable UUID userId,
             @Valid @RequestBody UserPasswordUpdateRequest request,

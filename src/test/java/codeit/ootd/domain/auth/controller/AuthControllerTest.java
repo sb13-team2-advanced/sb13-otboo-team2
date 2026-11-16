@@ -61,11 +61,11 @@ class AuthControllerTest {
     private PasswordResetRateLimiter passwordResetRateLimiter;
 
     @Test
-    @DisplayName("익명 사용자에게 CSRF 토큰과 XSRF-TOKEN 쿠키를 발급한다")
+    @DisplayName("익명 사용자에게 CSRF 토큰 쿠키를 발급하고 204를 반환한다")
     void csrf_anonymousUser_success() throws Exception {
-        mockMvc.perform(get("/api/auth/csrf"))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.token").isNotEmpty())
+        mockMvc.perform(get("/api/auth/csrf-token"))
+                .andExpect(status().isNoContent())
+                .andExpect(content().string(""))
                 .andExpect(cookie().exists("XSRF-TOKEN"))
                 .andExpect(cookie().httpOnly("XSRF-TOKEN", false));
     }
@@ -453,8 +453,6 @@ class AuthControllerTest {
 
         verify(authService, never()).resetPassword(anyString());
     }
-
-
 
     private Cookie issueCsrfCookie() throws Exception {
         MvcResult result = mockMvc.perform(get("/api/auth/csrf-token"))
