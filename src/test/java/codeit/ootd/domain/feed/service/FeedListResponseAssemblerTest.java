@@ -25,7 +25,6 @@ import codeit.ootd.domain.profile.repository.ProfileRepository;
 import codeit.ootd.domain.user.entity.User;
 import codeit.ootd.domain.user.repository.UserRepository;
 import java.util.List;
-import java.util.Optional;
 import java.util.UUID;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -116,8 +115,8 @@ class FeedListResponseAssemblerTest {
 
         given(userRepository.findAllById(List.of(authorId)))
                 .willReturn(List.of(author));
-        given(profileRepository.findByUserId(authorId))
-                .willReturn(Optional.empty());
+        given(profileRepository.findByUserIdIn(List.of(authorId)))
+                .willReturn(List.of());
 
         // 조회 순서와 관계없이 displayOrder에 따라 셔츠, 바지로 반환해야 한다.
         given(feedClothesRepository.findAllByFeedIdIn(List.of(feedId)))
