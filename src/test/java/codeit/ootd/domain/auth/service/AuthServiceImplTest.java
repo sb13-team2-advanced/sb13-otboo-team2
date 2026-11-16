@@ -108,7 +108,7 @@ class AuthServiceImplTest {
 
         User user = createUser(email);
 
-        when(userRepository.findByEmail(email))
+        when(userRepository.findByEmailIgnoreCase(email))
                 .thenReturn(Optional.of(user));
 
         when(passwordEncoder.matches(
@@ -125,7 +125,7 @@ class AuthServiceImplTest {
         // then
         assertSame(user, result);
 
-        verify(userRepository).findByEmail(email);
+        verify(userRepository).findByEmailIgnoreCase(email);
         verify(passwordEncoder).matches(
                 rawPassword,
                 encodedPassword
@@ -139,7 +139,7 @@ class AuthServiceImplTest {
         String email = "unknown@example.com";
         String password = "password123!";
 
-        when(userRepository.findByEmail(email))
+        when(userRepository.findByEmailIgnoreCase(email))
                 .thenReturn(Optional.empty());
 
         // when & then
@@ -160,7 +160,7 @@ class AuthServiceImplTest {
 
         User user = createUser(email);
 
-        when(userRepository.findByEmail(email))
+        when(userRepository.findByEmailIgnoreCase(email))
                 .thenReturn(Optional.of(user));
 
         when(passwordEncoder.matches(password, user.getPassword()))
@@ -188,7 +188,7 @@ class AuthServiceImplTest {
         User user = createUser(email);
         user.lock();
 
-        when(userRepository.findByEmail(email))
+        when(userRepository.findByEmailIgnoreCase(email))
                 .thenReturn(Optional.of(user));
 
         when(passwordEncoder.matches(password, user.getPassword()))
@@ -220,7 +220,7 @@ class AuthServiceImplTest {
             user.markDeleted();
         }
 
-        when(userRepository.findByEmail(email))
+        when(userRepository.findByEmailIgnoreCase(email))
                 .thenReturn(Optional.of(user));
 
         when(passwordEncoder.matches(password, user.getPassword()))
@@ -250,7 +250,7 @@ class AuthServiceImplTest {
         when(user.isLocked()).thenReturn(false);
         when(user.getStatus()).thenReturn(UserStatus.ACTIVE);
 
-        when(userRepository.findByEmail(email))
+        when(userRepository.findByEmailIgnoreCase(email))
                 .thenReturn(Optional.of(user));
 
         when(passwordEncoder.matches(password, "encoded-password"))
@@ -297,7 +297,7 @@ class AuthServiceImplTest {
 
         User user = createUser(email);
 
-        when(userRepository.findByEmail(email))
+        when(userRepository.findByEmailIgnoreCase(email))
                 .thenReturn(Optional.of(user));
 
         when(passwordEncoder.matches(password, user.getPassword()))
@@ -621,7 +621,7 @@ class AuthServiceImplTest {
 
         User user = createUser(email);
 
-        when(userRepository.findByEmail(email))
+        when(userRepository.findByEmailIgnoreCase(email))
                 .thenReturn(Optional.of(user));
 
         when(temporaryPasswordGenerator.generate())
@@ -656,7 +656,7 @@ class AuthServiceImplTest {
         // given
         String email = "unknown@example.com";
 
-        when(userRepository.findByEmail(email))
+        when(userRepository.findByEmailIgnoreCase(email))
                 .thenReturn(Optional.empty());
 
         // when & then
@@ -678,7 +678,7 @@ class AuthServiceImplTest {
         User user = createUser(email);
         user.lock();
 
-        when(userRepository.findByEmail(email))
+        when(userRepository.findByEmailIgnoreCase(email))
                 .thenReturn(Optional.of(user));
 
         // when & then
@@ -708,7 +708,7 @@ class AuthServiceImplTest {
             user.markDeleted();
         }
 
-        when(userRepository.findByEmail(email))
+        when(userRepository.findByEmailIgnoreCase(email))
                 .thenReturn(Optional.of(user));
 
         // when & then
@@ -737,7 +737,7 @@ class AuthServiceImplTest {
                 now.plusSeconds(180)
         );
 
-        when(userRepository.findByEmail(email))
+        when(userRepository.findByEmailIgnoreCase(email))
                 .thenReturn(Optional.of(user));
 
         when(passwordEncoder.matches(
@@ -770,7 +770,7 @@ class AuthServiceImplTest {
         User user = createUser(email);
         user.issueTemporaryPassword(encodedTemporaryPassword, now);
 
-        when(userRepository.findByEmail(email))
+        when(userRepository.findByEmailIgnoreCase(email))
                 .thenReturn(Optional.of(user));
 
         when(passwordEncoder.matches(
@@ -807,7 +807,7 @@ class AuthServiceImplTest {
                 now.plusSeconds(180)
         );
 
-        when(userRepository.findByEmail(email))
+        when(userRepository.findByEmailIgnoreCase(email))
                 .thenReturn(Optional.of(user));
 
         when(passwordEncoder.matches(
@@ -836,7 +836,7 @@ class AuthServiceImplTest {
 
         User user = createUser(email);
 
-        when(userRepository.findByEmail(email))
+        when(userRepository.findByEmailIgnoreCase(email))
                 .thenReturn(Optional.of(user));
 
         when(temporaryPasswordGenerator.generate())
@@ -856,18 +856,57 @@ class AuthServiceImplTest {
         );
     }
 
+    @Test
+    @DisplayName("대문자 이메일로 로그인해도 소문자로 정규화하여 조회한다")
+    void authenticate_uppercaseEmail_normalizesEmail() {
+        // given
+        String email = "TEST@Example.com";
+        String normalizedEmail = "test@example.com";
+        String password = "password123!";
 
-    public static int countA(String text) {
-        int a = 0 ;
-        for (int i = 0; i < text.length(); i++) {
-            if (text.charAt(i) == 'a') {
-                a++;
-            }
-        }
-        return a;
+        User user = createUser(normalizedEmail);
+
+        when(userRepository.findByEmailIgnoreCase(normalizedEmail))
+                .thenReturn(Optional.of(user));
+
+        when(passwordEncoder.matches(password, user.getPassword()))
+                .thenReturn(true);
+
+        // when
+        User result = authService.authenticate(email, password);
+
+        // then
+        assertSame(user, result);
+        verify(userRepository).findByEmailIgnoreCase(normalizedEmail);
     }
 
+    @Test
+    @DisplayName("대문자 이메일로 비밀번호 초기화 시 소문자로 조회하고 등록된 이메일로 발송한다")
+    void resetPassword_uppercaseEmail_normalizesEmail() {
+        // given
+        String email = "TEST@Example.com";
+        String normalizedEmail = "test@example.com";
+        String temporaryPassword = "temporary123!";
 
+        User user = createUser(normalizedEmail);
+
+        when(userRepository.findByEmailIgnoreCase(normalizedEmail))
+                .thenReturn(Optional.of(user));
+
+        when(temporaryPasswordGenerator.generate())
+                .thenReturn(temporaryPassword);
+
+        when(passwordEncoder.encode(temporaryPassword))
+                .thenReturn("encoded-temporary-password");
+
+        // when
+        authService.resetPassword(email);
+
+        // then
+        verify(userRepository).findByEmailIgnoreCase(normalizedEmail);
+        verify(temporaryPasswordMailSender)
+                .send(normalizedEmail, temporaryPassword);
+    }
 
 
 }

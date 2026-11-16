@@ -19,6 +19,7 @@ import codeit.ootd.domain.user.entity.User;
 import codeit.ootd.domain.user.entity.UserStatus;
 import codeit.ootd.domain.user.exception.UserNotFoundException;
 import codeit.ootd.domain.user.repository.UserRepository;
+import codeit.ootd.global.util.EmailNormalizer;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -46,7 +47,9 @@ public class AuthServiceImpl implements AuthService {
     @Override
     public User authenticate(String email, String password) {
 
-        User user = userRepository.findByEmail(email)
+        String normalizedEmail = EmailNormalizer.normalize(email);
+
+        User user = userRepository.findByEmailIgnoreCase(normalizedEmail)
                 .orElseThrow(InvalidCredentialsException::new);
 
         boolean matchesOriginalPassword =
@@ -159,7 +162,9 @@ public class AuthServiceImpl implements AuthService {
     @Override
     @Transactional
     public void resetPassword(String email) {
-        User user = userRepository.findByEmail(email)
+        String normalizedEmail = EmailNormalizer.normalize(email);
+
+        User user = userRepository.findByEmailIgnoreCase(normalizedEmail)
                 .orElseThrow(UserNotFoundException::new);
 
         if (user.isLocked()) {
@@ -178,7 +183,7 @@ public class AuthServiceImpl implements AuthService {
                 clock.instant().plus(Duration.ofMinutes(3))
         );
 
-        temporaryPasswordMailSender.send(email, temporaryPassword);
+        temporaryPasswordMailSender.send(user.getEmail(), temporaryPassword);
 
         log.info("임시 비밀번호 발급 및 이메일 발송 처리 완료: userId={}", user.getId());
     }

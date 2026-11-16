@@ -1,6 +1,5 @@
 package codeit.ootd.domain.auth.controller;
 
-
 import codeit.ootd.domain.auth.dto.request.ResetPasswordRequest;
 import codeit.ootd.domain.auth.dto.request.SignInRequest;
 import codeit.ootd.domain.auth.dto.response.SignInResponse;
@@ -8,6 +7,8 @@ import codeit.ootd.domain.auth.dto.response.SignInResult;
 import codeit.ootd.domain.auth.dto.response.TokenRefreshResponse;
 import codeit.ootd.domain.auth.dto.response.TokenRefreshResult;
 import codeit.ootd.domain.auth.service.AuthService;
+import codeit.ootd.domain.auth.service.PasswordResetRateLimiter;
+import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
@@ -33,6 +34,7 @@ import java.util.Map;
 public class AuthController {
 
     private final AuthService authService;
+    private final PasswordResetRateLimiter passwordResetRateLimiter;
 
     @Value("${auth.cookie.secure:true}")
     private boolean cookieSecure;
@@ -57,8 +59,14 @@ public class AuthController {
 
     @PostMapping("/reset-password")
     public ResponseEntity<Void> resetPassword(
-            @Valid @RequestBody ResetPasswordRequest request
+            @Valid @RequestBody ResetPasswordRequest request,
+            HttpServletRequest httpRequest
     ) {
+        passwordResetRateLimiter.check(
+                request.email(),
+                httpRequest.getRemoteAddr()
+        );
+
         authService.resetPassword(request.email());
 
         return ResponseEntity.noContent().build();
