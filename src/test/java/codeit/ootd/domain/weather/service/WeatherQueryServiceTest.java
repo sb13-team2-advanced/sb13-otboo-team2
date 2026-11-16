@@ -56,7 +56,7 @@ class WeatherQueryServiceTest {
     private WeatherQueryService weatherQueryService;
 
     @Test
-    @DisplayName("getWeathers는 최초 수집 권한을 확보한 뒤 예보를 수집하고 6일간 집계한다")
+    @DisplayName("최초 수집 시 Forecast5와 One Call을 수집하고 6일간 집계한다")
     void getWeathersCollectsInitialWeather() {
         double latitude = 37.5665;
         double longitude = 126.9780;
@@ -97,6 +97,7 @@ class WeatherQueryServiceTest {
         );
 
         verify(weatherForecastCollector).collectForecasts(location);
+        verify(weatherForecastCollector).collectHistoricalForecasts(location);
 
         LocalDate today = LocalDate.of(2026, 10, 28);
 
@@ -118,7 +119,81 @@ class WeatherQueryServiceTest {
     }
 
     @Test
-    @DisplayName("getWeathers는 기존 수집 위치에서 최초 수집을 실행하지 않는다")
+    @DisplayName("One Call 수집에 실패해도 Forecast5 데이터로 일별 집계를 완료한다")
+    void getWeathersContinuesWhenOneCallFails() {
+        double latitude = 37.5665;
+        double longitude = 126.9780;
+        UUID locationId = UUID.randomUUID();
+        Instant now = Instant.parse("2026-11-13T09:00:00Z");
+
+        Clock fixedClock = Clock.fixed(
+            now,
+            ZoneId.of("Asia/Seoul")
+        );
+
+        when(weatherLocationService.findOrCreate(latitude, longitude))
+            .thenReturn(location);
+        when(location.getLastCollectedAt()).thenReturn(null);
+        when(location.getNextRefreshAt()).thenReturn(now);
+        when(location.getId()).thenReturn(locationId);
+        when(clock.instant()).thenReturn(now);
+        when(clock.withZone(ZoneId.of("Asia/Seoul")))
+            .thenReturn(fixedClock);
+
+        when(weatherLocationRepository.reserveInitialCollection(
+            eq(locationId),
+            eq(now),
+            eq(now.plus(Duration.ofMinutes(5))),
+            any(UUID.class)
+        )).thenReturn(1);
+
+        doThrow(new IllegalStateException("One Call 호출 제한 초과"))
+            .when(weatherForecastCollector)
+            .collectHistoricalForecasts(location);
+
+        weatherQueryService.getWeathers(latitude, longitude);
+
+        verify(weatherForecastCollector).collectForecasts(location);
+        verify(weatherForecastCollector).collectHistoricalForecasts(location);
+
+        LocalDate today = LocalDate.of(2026, 11, 13);
+
+        for (int day = 0; day < 6; day++) {
+            verify(weatherService).calculateAndSaveDailyWeather(
+                location,
+                today.plusDays(day)
+            );
+        }
+
+        ArgumentCaptor<UUID> tokenCaptor =
+            ArgumentCaptor.forClass(UUID.class);
+
+        verify(weatherLocationRepository).reserveInitialCollection(
+            eq(locationId),
+            eq(now),
+            eq(now.plus(Duration.ofMinutes(5))),
+            tokenCaptor.capture()
+        );
+
+        verify(weatherLocationRepository).completeInitialCollection(
+            locationId,
+            tokenCaptor.getValue(),
+            now,
+            now.plus(Duration.ofHours(2))
+        );
+
+        verify(weatherLocationRepository, never())
+            .scheduleInitialCollectionRetry(
+                any(UUID.class),
+                any(UUID.class),
+                any(Instant.class)
+            );
+
+        verify(weatherService).getWeathers(latitude, longitude);
+    }
+
+    @Test
+    @DisplayName("기존 수집 위치에서는 최초 수집을 다시 실행하지 않는다")
     void getWeathersSkipsInitialCollection() {
         double latitude = 37.5665;
         double longitude = 126.9780;
@@ -139,7 +214,7 @@ class WeatherQueryServiceTest {
     }
 
     @Test
-    @DisplayName("getWeathers는 최초 수집 실패 시 10분 뒤 재시도를 예약한다")
+    @DisplayName("Forecast5 최초 수집에 실패하면 10분 뒤 재시도를 예약한다")
     void getWeathersSchedulesRetryWhenCollectionFails() {
         double latitude = 37.5665;
         double longitude = 126.9780;
@@ -193,12 +268,15 @@ class WeatherQueryServiceTest {
             now.plus(Duration.ofMinutes(10))
         );
 
+        verify(weatherForecastCollector, never())
+            .collectHistoricalForecasts(location);
+
         verify(weatherService, never())
             .getWeathers(latitude, longitude);
     }
 
     @Test
-    @DisplayName("getWeathers는 재시도 대기 중 예보를 다시 수집하지 않는다")
+    @DisplayName("재시도 예정 시각 전에는 날씨를 다시 수집하지 않는다")
     void getWeathersSkipsCollectionBeforeRetryTime() {
         double latitude = 37.5665;
         double longitude = 126.9780;
@@ -222,7 +300,7 @@ class WeatherQueryServiceTest {
     }
 
     @Test
-    @DisplayName("getWeathers는 다른 요청이 수집 권한을 확보했다면 중복 수집하지 않는다")
+    @DisplayName("다른 요청이 최초 수집 권한을 확보했다면 중복 수집하지 않는다")
     void getWeathersSkipsCollectionWhenReservationFails() {
         double latitude = 37.5665;
         double longitude = 126.9780;
@@ -264,7 +342,7 @@ class WeatherQueryServiceTest {
     }
 
     @Test
-    @DisplayName("getWeathers는 다른 요청의 최초 수집이 완료되면 날씨를 반환한다")
+    @DisplayName("다른 요청의 최초 수집이 완료되면 저장된 날씨를 반환한다")
     void getWeathersReturnsWeatherAfterConcurrentCollection() {
         double latitude = 37.5665;
         double longitude = 126.9780;
@@ -308,7 +386,7 @@ class WeatherQueryServiceTest {
     }
 
     @Test
-    @DisplayName("getWeathers는 다른 요청의 최초 수집이 3초 안에 완료되지 않으면 빈 목록을 반환한다")
+    @DisplayName("다른 요청의 최초 수집이 3초 안에 끝나지 않으면 빈 목록을 반환한다")
     void getWeathersReturnsEmptyWhenInitialCollectionTimesOut() {
         double latitude = 37.5665;
         double longitude = 126.9780;
@@ -351,7 +429,7 @@ class WeatherQueryServiceTest {
     }
 
     @Test
-    @DisplayName("getWeathers는 재시도 대기 중 불필요한 수집 완료 대기를 하지 않는다")
+    @DisplayName("재시도 대기 중에는 불필요한 최초 수집 완료 대기를 하지 않는다")
     void getWeathersDoesNotWaitDuringRetryInterval() {
         double latitude = 37.5665;
         double longitude = 126.9780;

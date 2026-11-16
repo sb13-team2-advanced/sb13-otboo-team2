@@ -11,8 +11,10 @@ import java.time.ZoneId;
 import java.util.List;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class WeatherQueryService {
@@ -114,6 +116,16 @@ public class WeatherQueryService {
     ) {
 
         weatherForecastCollector.collectForecasts(location);
+
+        try {
+            weatherForecastCollector.collectHistoricalForecasts(location);
+        } catch (RuntimeException e) {
+            log.warn(
+                "One Call 과거 날씨 수집 실패, Forecast5 데이터로 진행: cellId={}, errorType{}",
+                location.getCellId(),
+                e.getClass().getSimpleName()
+            );
+        }
 
         for (int day = 0; day < 6; day++) {
             weatherService.calculateAndSaveDailyWeather(

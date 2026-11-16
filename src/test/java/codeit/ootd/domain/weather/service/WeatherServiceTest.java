@@ -36,7 +36,6 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 @ExtendWith(MockitoExtension.class)
-@DisplayName("일별 날씨 집계 서비스 테스트")
 class WeatherServiceTest {
 
     private static final LocalDate WEATHER_DATE =

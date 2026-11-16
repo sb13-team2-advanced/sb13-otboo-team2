@@ -15,7 +15,6 @@ import org.springframework.batch.core.job.parameters.JobParameters;
 import org.springframework.batch.core.launch.JobOperator;
 import org.springframework.boot.test.context.runner.ApplicationContextRunner;
 
-@DisplayName("날씨 Batch 스케줄러 테스트")
 class WeatherBatchSchedulerTest {
 
     private final ApplicationContextRunner contextRunner =

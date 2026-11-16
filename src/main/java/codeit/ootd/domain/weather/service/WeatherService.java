@@ -16,6 +16,7 @@ import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
@@ -102,7 +103,9 @@ public class WeatherService {
         nextDayStartForecast.ifPresent(precipitationForecasts::add);
 
         double precipitationProbability = precipitationForecasts.stream()
-            .mapToDouble(WeatherForecast::getPrecipitationProbability)
+            .map(WeatherForecast::getPrecipitationProbability)
+            .filter(Objects::nonNull)
+            .mapToDouble(Double::doubleValue)
             .max()
             .orElse(0.0);
 
