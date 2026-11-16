@@ -112,11 +112,11 @@ class AuthControllerTest {
                 .andExpect(jsonPath("$.accessToken").value("test-access-token"))
                 .andExpect(jsonPath("$.refreshToken").doesNotExist())
 
-                .andExpect(cookie().value("refreshToken", "test-refresh-token"))
-                .andExpect(cookie().httpOnly("refreshToken", true))
-                .andExpect(cookie().secure("refreshToken", true))
-                .andExpect(cookie().path("refreshToken", "/api/auth"))
-                .andExpect(cookie().maxAge("refreshToken", 604800))
+                .andExpect(cookie().value("REFRESH_TOKEN", "test-refresh-token"))
+                .andExpect(cookie().httpOnly("REFRESH_TOKEN", true))
+                .andExpect(cookie().secure("REFRESH_TOKEN", true))
+                .andExpect(cookie().path("REFRESH_TOKEN", "/api/auth"))
+                .andExpect(cookie().maxAge("REFRESH_TOKEN", 604800))
                 .andExpect(header().string(
                         HttpHeaders.SET_COOKIE,
                         containsString("SameSite=Lax")
@@ -132,10 +132,9 @@ class AuthControllerTest {
     @DisplayName("프론트 CSRF 경로로 토큰을 발급한다")
     void csrf_frontendPath_success() throws Exception {
         mockMvc.perform(get("/api/auth/csrf-token"))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.token").isNotEmpty())
-                .andExpect(cookie().exists("XSRF-TOKEN"))
-                .andExpect(cookie().httpOnly("XSRF-TOKEN", false));
+                .andExpect(status().isNoContent())
+                .andExpect(content().string(""))
+                .andExpect(cookie().exists("XSRF-TOKEN"));
     }
 
     @Test
@@ -246,8 +245,9 @@ class AuthControllerTest {
                 .thenReturn(result);
 
         Cookie csrfCookie = issueCsrfCookie();
+
         Cookie refreshCookie = new Cookie(
-                "refreshToken",
+                "REFRESH_TOKEN",
                 oldRefreshToken
         );
 
@@ -264,12 +264,12 @@ class AuthControllerTest {
                         .value("USER"))
                 .andExpect(jsonPath("$.refreshToken").doesNotExist())
                 .andExpect(cookie().value(
-                        "refreshToken",
+                        "REFRESH_TOKEN",
                         "new-refresh-token"
                 ))
-                .andExpect(cookie().httpOnly("refreshToken", true))
-                .andExpect(cookie().secure("refreshToken", true))
-                .andExpect(cookie().path("refreshToken", "/api/auth"));
+                .andExpect(cookie().httpOnly("REFRESH_TOKEN", true))
+                .andExpect(cookie().secure("REFRESH_TOKEN", true))
+                .andExpect(cookie().path("REFRESH_TOKEN", "/api/auth"));
 
         verify(authService).refresh(oldRefreshToken);
     }
@@ -345,7 +345,7 @@ class AuthControllerTest {
         mockMvc.perform(post("/api/auth/refresh")
                         .cookie(
                                 csrfCookie,
-                                new Cookie("refreshToken", invalidRefreshToken)
+                                new Cookie("REFRESH_TOKEN", invalidRefreshToken)
                         )
                         .header("X-XSRF-TOKEN", csrfCookie.getValue()))
                 .andExpect(status().isUnauthorized());
@@ -361,17 +361,17 @@ class AuthControllerTest {
 
         Cookie csrfCookie = issueCsrfCookie();
 
-        Cookie refreshCookie = new Cookie("refreshToken", refreshToken);
+        Cookie refreshCookie = new Cookie("REFRESH_TOKEN", refreshToken);
 
         // when & then
         mockMvc.perform(post("/api/auth/sign-out")
                         .cookie(csrfCookie, refreshCookie)
                         .header("X-XSRF-TOKEN", csrfCookie.getValue()))
                 .andExpect(status().isNoContent())
-                .andExpect(cookie().exists("refreshToken"))
-                .andExpect(cookie().maxAge("refreshToken", 0))
-                .andExpect(cookie().httpOnly("refreshToken", true))
-                .andExpect(cookie().path("refreshToken", "/api/auth"));
+                .andExpect(cookie().exists("REFRESH_TOKEN"))
+                .andExpect(cookie().maxAge("REFRESH_TOKEN", 0))
+                .andExpect(cookie().httpOnly("REFRESH_TOKEN", true))
+                .andExpect(cookie().path("REFRESH_TOKEN", "/api/auth"));
 
         verify(authService).signOut(refreshToken);
     }
@@ -380,7 +380,6 @@ class AuthControllerTest {
     @DisplayName("Refresh Token 쿠키가 없어도 로그아웃에 성공한다")
     void signOut_withoutRefreshToken() throws Exception {
         // given
-        // 기존 CSRF 쿠키 발급 코드 대신
         Cookie csrfCookie = issueCsrfCookie();
 
         // when & then
@@ -388,9 +387,9 @@ class AuthControllerTest {
                         .cookie(csrfCookie)
                         .header("X-XSRF-TOKEN", csrfCookie.getValue()))
                 .andExpect(status().isNoContent())
-                .andExpect(cookie().exists("refreshToken"))
-                .andExpect(cookie().maxAge("refreshToken", 0))
-                .andExpect(cookie().path("refreshToken", "/api/auth"));
+                .andExpect(cookie().exists("REFRESH_TOKEN"))
+                .andExpect(cookie().maxAge("REFRESH_TOKEN", 0))
+                .andExpect(cookie().path("REFRESH_TOKEN", "/api/auth"));
 
         verify(authService, never()).signOut(anyString());
     }
@@ -456,7 +455,7 @@ class AuthControllerTest {
 
     private Cookie issueCsrfCookie() throws Exception {
         MvcResult result = mockMvc.perform(get("/api/auth/csrf-token"))
-                .andExpect(status().isOk())
+                .andExpect(status().isNoContent())
                 .andExpect(cookie().exists("XSRF-TOKEN"))
                 .andExpect(cookie().httpOnly("XSRF-TOKEN", false))
                 .andReturn();
