@@ -62,6 +62,8 @@ ootd:
     batch:
       scheduler-enabled: ${OOTD_WEATHER_BATCH_SCHEDULER_ENABLED:false}
       min-request-interval: ${OOTD_BATCH_MIN_REQUEST_INTERVAL:2s}
+    cleanup:
+      scheduler-enabled: ${OOTD_WEATHER_CLEANUP_SCHEDULER_ENABLED:false}
   kakao:
     local:
       api-key: ${KAKAO_API_KEY}
