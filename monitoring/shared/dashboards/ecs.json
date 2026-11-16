@@ -1,0 +1,61 @@
+{
+  "uid": "otboo-ecs-monitoring",
+  "title": "otboo-ecs-monitoring",
+  "schemaVersion": 39,
+  "version": 1,
+  "editable": true,
+  "timezone": "Asia/Seoul",
+  "refresh": "1m",
+  "time": {"from": "now-1h", "to": "now"},
+  "tags": ["otboo", "ecs"],
+  "panels": [
+    {
+      "id": 1,
+      "title": "ECS CPU utilization (%)",
+      "type": "timeseries",
+      "gridPos": {"h": 9, "w": 12, "x": 0, "y": 0},
+      "datasource": {"type": "cloudwatch", "uid": "otboo-cloudwatch"},
+      "fieldConfig": {"defaults": {"unit": "percent", "min": 0, "max": 100}, "overrides": []},
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {"type": "cloudwatch", "uid": "otboo-cloudwatch"},
+          "queryMode": "Metrics",
+          "metricEditorMode": 0,
+          "metricQueryType": 0,
+          "region": "ap-northeast-2",
+          "namespace": "AWS/ECS",
+          "metricName": "CPUUtilization",
+          "statistic": "Average",
+          "period": "60",
+          "matchExact": true,
+          "dimensions": {"ClusterName": "otboo-dev-cluster", "ServiceName": "otboo-backend"}
+        }
+      ]
+    },
+    {
+      "id": 2,
+      "title": "ECS memory utilization (%)",
+      "type": "timeseries",
+      "gridPos": {"h": 9, "w": 12, "x": 12, "y": 0},
+      "datasource": {"type": "cloudwatch", "uid": "otboo-cloudwatch"},
+      "fieldConfig": {"defaults": {"unit": "percent", "min": 0, "max": 100}, "overrides": []},
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {"type": "cloudwatch", "uid": "otboo-cloudwatch"},
+          "queryMode": "Metrics",
+          "metricEditorMode": 0,
+          "metricQueryType": 0,
+          "region": "ap-northeast-2",
+          "namespace": "AWS/ECS",
+          "metricName": "MemoryUtilization",
+          "statistic": "Average",
+          "period": "60",
+          "matchExact": true,
+          "dimensions": {"ClusterName": "otboo-dev-cluster", "ServiceName": "otboo-backend"}
+        }
+      ]
+    }
+  ]
+}
