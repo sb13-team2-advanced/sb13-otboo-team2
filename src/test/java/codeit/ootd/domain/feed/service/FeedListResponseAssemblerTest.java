@@ -2,6 +2,8 @@ package codeit.ootd.domain.feed.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.BDDMockito.given;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoMoreInteractions;
 
 import codeit.ootd.domain.clothes.entity.Clothes;
 import codeit.ootd.domain.clothes.enums.ClothesType;
@@ -18,6 +20,7 @@ import codeit.ootd.domain.feed.mapper.FeedMapper;
 import codeit.ootd.domain.feed.mapper.OotdMapper;
 import codeit.ootd.domain.feed.repository.FeedClothesRepository;
 import codeit.ootd.domain.feed.repository.FeedLikeRepository;
+import codeit.ootd.domain.profile.entity.Profile;
 import codeit.ootd.domain.profile.repository.ProfileRepository;
 import codeit.ootd.domain.user.entity.User;
 import codeit.ootd.domain.user.repository.UserRepository;
@@ -25,6 +28,7 @@ import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
@@ -175,5 +179,52 @@ class FeedListResponseAssemblerTest {
                 .isEqualTo(20.0);
         assertThat(response.weather().temperature().comparedToDayBefore())
                 .isNull();
+    }
+
+    @Test
+    @DisplayName("여러 피드의 작성자 프로필을 한 번에 조회하고 각 피드에 연결한다")
+    void loadsAuthorProfilesInOneQuery() {
+        UUID firstId = UUID.randomUUID();
+        UUID secondId = UUID.randomUUID();
+
+        User first = User.create("첫 작성자", "first@example.com", "encoded");
+        User second = User.create("둘째 작성자", "second@example.com", "encoded");
+        ReflectionTestUtils.setField(first, "id", firstId);
+        ReflectionTestUtils.setField(second, "id", secondId);
+
+        Profile profile = new Profile(firstId);
+        profile.changeProfileImageUrl("/images/first.png");
+
+        List<UUID> authorIds = List.of(firstId, secondId);
+        given(userRepository.findAllById(authorIds)).willReturn(List.of(second, first));
+        given(profileRepository.findByUserIdIn(authorIds)).willReturn(List.of(profile));
+
+        List<Feed> feeds = List.of(
+                feedBy(firstId, "첫 번째 코디"),
+                feedBy(secondId, "두 번째 코디"),
+                feedBy(firstId, "세 번째 코디")
+        );
+
+        List<FeedDto> result = assembler.toFeedDtos(feeds, UUID.randomUUID());
+
+        verify(profileRepository).findByUserIdIn(authorIds);
+        verifyNoMoreInteractions(profileRepository);
+
+        AuthorDto firstAuthor = new AuthorDto(firstId, "첫 작성자", "/images/first.png");
+        AuthorDto secondAuthor = new AuthorDto(secondId, "둘째 작성자", null);
+        assertThat(result).extracting(FeedDto::author)
+                .containsExactly(firstAuthor, secondAuthor, firstAuthor);
+    }
+
+    private Feed feedBy(UUID authorId, String content) {
+        Feed feed = Feed.builder()
+                .authorId(authorId)
+                .content(content)
+                .weatherId(UUID.randomUUID())
+                .weatherSkyStatus("CLEAR")
+                .weatherPrecipitationType("NONE")
+                .build();
+        ReflectionTestUtils.setField(feed, "id", UUID.randomUUID());
+        return feed;
     }
 }
