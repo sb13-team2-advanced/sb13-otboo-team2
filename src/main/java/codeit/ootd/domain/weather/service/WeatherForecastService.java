@@ -5,11 +5,13 @@ import codeit.ootd.domain.notification.event.NotificationRequestedEvent;
 import codeit.ootd.domain.weather.entity.WeatherForecast;
 import codeit.ootd.domain.weather.entity.WeatherLocation;
 import codeit.ootd.domain.weather.repository.WeatherForecastRepository;
+import codeit.ootd.infra.weather.OwmHourlyForecastConverter.ThreeHourForecast;
 import codeit.ootd.infra.weather.dto.OwmForecastResponse;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.LinkedHashSet;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
@@ -161,4 +163,59 @@ public class WeatherForecastService {
             );
         }
     }
+
+    @Transactional
+    public void saveHistoricalForecasts(
+        WeatherLocation location,
+        List<ThreeHourForecast> forecasts
+    ) {
+        Instant collectedAt = clock.instant();
+
+        for (ThreeHourForecast item : forecasts) {
+
+            Instant forecastAt = item.forecastAt();
+
+            if (!forecastAt.isBefore(collectedAt)) {
+                continue;
+            }
+
+            Optional<WeatherForecast> existingForecasts =
+                weatherForecastRepository.findByLocationIdAndForecastAt(
+                    location.getId(),
+                    forecastAt
+                );
+
+            WeatherForecast forecast;
+
+            if (existingForecasts.isPresent()) {
+                forecast = existingForecasts.get();
+
+                forecast.updateForecast(
+                    collectedAt,
+                    item.temperature(),
+                    item.humidity(),
+                    item.weatherCode(),
+                    item.precipitationProbability(),
+                    item.rainAmount(),
+                    item.snowAmount(),
+                    item.windSpeed()
+                );
+            } else {
+                forecast = new WeatherForecast(
+                    location.getId(),
+                    forecastAt,
+                    collectedAt,
+                    item.temperature(),
+                    item.humidity(),
+                    item.weatherCode(),
+                    item.precipitationProbability(),
+                    item.rainAmount(),
+                    item.snowAmount(),
+                    item.windSpeed()
+                );
+            }
+
+            weatherForecastRepository.save(forecast);
+        }
+    }   
 }
