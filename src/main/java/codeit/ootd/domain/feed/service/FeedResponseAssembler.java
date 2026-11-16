@@ -59,12 +59,21 @@ public class FeedResponseAssembler {
                 .distinct()
                 .toList();
 
+        Map<UUID, Profile> profilesByUserId = profileRepository
+                .findByUserIdIn(authorIds)
+                .stream()
+                .collect(Collectors.toMap(Profile::getUserId, Function.identity()));
+
         Map<UUID, AuthorDto> authorsById = userRepository
                 .findAllById(authorIds)
                 .stream()
                 .collect(Collectors.toMap(
                         User::getId,
-                        this::toAuthorDto
+                        author -> {
+                            Profile profile = profilesByUserId.get(author.getId());
+                            String imageUrl = profile == null ? null : profile.getProfileImageUrl();
+                            return feedMapper.toAuthorDto(author, imageUrl);
+                        }
                 ));
 
         List<FeedClothes> feedClothes =
