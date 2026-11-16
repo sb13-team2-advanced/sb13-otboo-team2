@@ -1,5 +1,6 @@
 package codeit.ootd.domain.user.controller;
 
+import codeit.ootd.domain.user.docs.UserApiDocs;
 import codeit.ootd.domain.user.dto.request.UserCreateRequest;
 import codeit.ootd.domain.user.dto.request.UserLockUpdateRequest;
 import codeit.ootd.domain.user.dto.request.UserPasswordUpdateRequest;
@@ -9,8 +10,6 @@ import codeit.ootd.domain.user.dto.response.UserListResponse;
 import codeit.ootd.domain.user.entity.UserRole;
 import codeit.ootd.domain.user.exception.InvalidUserQueryException;
 import codeit.ootd.domain.user.service.UserService;
-import io.swagger.v3.oas.annotations.Operation;
-import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Min;
 import lombok.RequiredArgsConstructor;
@@ -20,10 +19,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
 import org.springframework.validation.annotation.Validated;
-import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.*;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RestController;
 
 import java.time.Instant;
 import java.time.format.DateTimeParseException;
@@ -34,13 +30,12 @@ import java.util.UUID;
 @RestController
 @RequestMapping("/api/users")
 @RequiredArgsConstructor
-@Tag(name = "프로필 관리", description = "프로필 관련 API")
-public class UserController {
+public class UserController implements UserApiDocs {
 
     private final UserService userService;
 
+    @Override
     @PostMapping
-    @Operation(summary = "사용자 등록(회원가입)")
     public ResponseEntity<UserDto> signup(
             @Valid @RequestBody UserCreateRequest request
     ) {
@@ -49,12 +44,14 @@ public class UserController {
         return ResponseEntity.status(HttpStatus.CREATED).body(response);
     }
 
+    @Override
     @GetMapping
-    @Operation(summary = "계정 목록 조회")
     public ResponseEntity<UserListResponse> getUsers(
             @RequestParam(required = false) String cursor,
             @RequestParam(required = false) UUID idAfter,
-            @RequestParam @Min(value = 1, message = "limit는 1 이상이어야 합니다.") int limit,
+            @RequestParam
+            @Min(value = 1, message = "limit는 1 이상이어야 합니다.")
+            int limit,
             @RequestParam String sortBy,
             @RequestParam String sortDirection,
             @RequestParam(required = false) String emailLike,
@@ -105,9 +102,9 @@ public class UserController {
         return ResponseEntity.ok(response);
     }
 
+    @Override
     @PreAuthorize("hasRole('ADMIN')")
     @PatchMapping("/{userId}/role")
-    @Operation(summary = "권한 수정")
     public ResponseEntity<UserDto> updateRole(
             @PathVariable UUID userId,
             @Valid @RequestBody UserRoleUpdateRequest request
@@ -120,9 +117,9 @@ public class UserController {
         return ResponseEntity.ok(response);
     }
 
+    @Override
     @PreAuthorize("hasRole('ADMIN')")
     @PatchMapping("/{userId}/lock")
-    @Operation(summary = "계정 잠금 상태 변경")
     public ResponseEntity<UserDto> updateLock(
             @PathVariable UUID userId,
             @Valid @RequestBody UserLockUpdateRequest request
@@ -135,8 +132,8 @@ public class UserController {
         return ResponseEntity.ok(response);
     }
 
+    @Override
     @PatchMapping("/{userId}/password")
-    @Operation(summary = "비밀번호 변경")
     public ResponseEntity<Void> updatePassword(
             @PathVariable UUID userId,
             @Valid @RequestBody UserPasswordUpdateRequest request,
@@ -154,8 +151,4 @@ public class UserController {
 
         return ResponseEntity.noContent().build();
     }
-
-
-
-
 }
