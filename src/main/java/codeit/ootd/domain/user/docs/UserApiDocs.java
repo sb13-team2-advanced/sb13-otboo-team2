@@ -16,6 +16,8 @@ import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.parameters.RequestBody;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.validation.Valid;
+import jakarta.validation.constraints.Min;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
 
@@ -63,7 +65,9 @@ public interface UserApiDocs {
                     schema = @Schema(implementation = ErrorResponse.class)
             )
     )
-    ResponseEntity<UserDto> signup(UserCreateRequest request);
+    ResponseEntity<UserDto> signup(
+            @Valid UserCreateRequest request
+    );
 
     @Operation(
             summary = "계정 목록 조회",
@@ -87,6 +91,7 @@ public interface UserApiDocs {
     ResponseEntity<UserListResponse> getUsers(
             String cursor,
             UUID idAfter,
+            @Min(value = 1, message = "limit는 1 이상이어야 합니다.")
             int limit,
 
             @Parameter(
@@ -129,7 +134,7 @@ public interface UserApiDocs {
     )
     ResponseEntity<UserDto> updateRole(
             UUID userId,
-            UserRoleUpdateRequest request
+            @Valid UserRoleUpdateRequest request
     );
 
     @Operation(
@@ -150,9 +155,8 @@ public interface UserApiDocs {
     )
     ResponseEntity<UserDto> updateLock(
             UUID userId,
-            UserLockUpdateRequest request
+            @Valid UserLockUpdateRequest request
     );
-
 
     @Operation(
             summary = "비밀번호 변경",
@@ -181,7 +185,7 @@ public interface UserApiDocs {
     )
     ResponseEntity<Void> updatePassword(
             @Parameter(hidden = true) UUID userId,
-            UserPasswordUpdateRequest request,
+            @Valid UserPasswordUpdateRequest request,
             @Parameter(hidden = true) Authentication authentication
     );
 

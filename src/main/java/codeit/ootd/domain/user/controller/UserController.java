@@ -37,7 +37,7 @@ public class UserController implements UserApiDocs {
     @Override
     @PostMapping
     public ResponseEntity<UserDto> signup(
-            @Valid @RequestBody UserCreateRequest request
+            @RequestBody UserCreateRequest request
     ) {
         UserDto response = userService.signup(request);
 
@@ -50,7 +50,6 @@ public class UserController implements UserApiDocs {
             @RequestParam(required = false) String cursor,
             @RequestParam(required = false) UUID idAfter,
             @RequestParam
-            @Min(value = 1, message = "limit는 1 이상이어야 합니다.")
             int limit,
             @RequestParam String sortBy,
             @RequestParam String sortDirection,
@@ -107,7 +106,7 @@ public class UserController implements UserApiDocs {
     @PatchMapping("/{userId}/role")
     public ResponseEntity<UserDto> updateRole(
             @PathVariable UUID userId,
-            @Valid @RequestBody UserRoleUpdateRequest request
+            @RequestBody UserRoleUpdateRequest request
     ) {
         UserDto response = userService.updateRole(
                 userId,
@@ -122,7 +121,7 @@ public class UserController implements UserApiDocs {
     @PatchMapping("/{userId}/lock")
     public ResponseEntity<UserDto> updateLock(
             @PathVariable UUID userId,
-            @Valid @RequestBody UserLockUpdateRequest request
+            @RequestBody UserLockUpdateRequest request
     ) {
         UserDto response = userService.updateLock(
                 userId,
@@ -136,7 +135,7 @@ public class UserController implements UserApiDocs {
     @PatchMapping("/{userId}/password")
     public ResponseEntity<Void> updatePassword(
             @PathVariable UUID userId,
-            @Valid @RequestBody UserPasswordUpdateRequest request,
+            @RequestBody UserPasswordUpdateRequest request,
             Authentication authentication
     ) {
         UUID authenticatedUserId = UUID.fromString(
