@@ -11,6 +11,8 @@ import codeit.ootd.domain.directmessage.dto.DirectMessageDto;
 import codeit.ootd.domain.directmessage.dto.request.DirectMessageSendRequest;
 import codeit.ootd.domain.directmessage.event.DirectMessageEventListener;
 import codeit.ootd.domain.directmessage.repository.DirectMessageRepository;
+import codeit.ootd.domain.directmessage.repository.DirectMessageQueryRepository;
+import codeit.ootd.global.config.QuerydslConfig;
 import codeit.ootd.domain.user.entity.User;
 import codeit.ootd.domain.user.repository.UserRepository;
 import codeit.ootd.global.exception.OtbooException;
@@ -20,6 +22,7 @@ import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
@@ -37,9 +40,11 @@ import org.springframework.transaction.support.TransactionTemplate;
 
 @DataJpaTest
 @Import({DirectMessageService.class, DirectMessageStompController.class,
-        DirectMessageEventListener.class, JpaAuditingConfig.class})
+        DirectMessageEventListener.class, DirectMessageQueryRepository.class,
+        QuerydslConfig.class, JpaAuditingConfig.class})
 @Transactional(propagation = Propagation.NOT_SUPPORTED)
 @ActiveProfiles("test")
+@DisplayName("DM 전송 통합 테스트")
 class DirectMessageSendIntegrationTest {
 
     @Autowired private DirectMessageService service;
@@ -67,6 +72,7 @@ class DirectMessageSendIntegrationTest {
     }
 
     @ParameterizedTest
+    @DisplayName("전송 방향에 관계없이 커밋 후 저장된 메시지를 구독 경로로 전달한다")
     @ValueSource(booleans = {false, true})
     void sendsSavedDtoOnlyAfterCommit(boolean reverse) {
         User from = reverse ? receiver : sender;
@@ -94,6 +100,7 @@ class DirectMessageSendIntegrationTest {
     }
 
     @Test
+    @DisplayName("롤백되면 메시지를 저장하거나 구독자에게 전달하지 않는다")
     void rollbackDoesNotPersistOrBroadcast() {
         DirectMessageDto dto = new TransactionTemplate(transactionManager).execute(status -> {
             DirectMessageDto result = service.send(request(sender, receiver, "rollback"), sender.getId());
@@ -105,27 +112,32 @@ class DirectMessageSendIntegrationTest {
     }
 
     @Test
+    @DisplayName("인증 사용자와 발신자가 다르면 전송을 거부한다")
     void rejectsForgedSender() {
         assertRejected(request(receiver, sender, "forged"), sender.getId(), ErrorCode.ACCESS_DENIED);
     }
 
     @Test
+    @DisplayName("수신자가 존재하지 않으면 전송을 거부한다")
     void rejectsMissingReceiver() {
         assertRejected(new DirectMessageSendRequest(sender.getId(), UUID.randomUUID(), "hello"),
                 sender.getId(), ErrorCode.USER_NOT_FOUND);
     }
 
     @Test
+    @DisplayName("인증되지 않은 사용자의 전송을 거부한다")
     void rejectsUnauthenticatedSender() {
         assertRejected(request(sender, receiver, "hello"), null, ErrorCode.AUTHENTICATION_REQUIRED);
     }
 
     @Test
+    @DisplayName("메시지 내용이 공백뿐이면 전송을 거부한다")
     void rejectsBlankContent() {
         assertRejected(request(sender, receiver, " \n\t"), sender.getId(), ErrorCode.INVALID_REQUEST);
     }
 
     @Test
+    @DisplayName("발신자 계정이 잠겨 있으면 전송을 거부한다")
     void rejectsLockedSender() {
         sender.lock();
         users.saveAndFlush(sender);
@@ -133,6 +145,7 @@ class DirectMessageSendIntegrationTest {
     }
 
     @ParameterizedTest
+    @DisplayName("발신자 또는 수신자가 비활성 계정이면 전송을 거부한다")
     @ValueSource(booleans = {false, true})
     void rejectsInactiveParticipant(boolean inactiveSender) {
         User inactive = inactiveSender ? sender : receiver;
