@@ -155,7 +155,7 @@ tasks.named('check') {
 tasks.named('jacocoTestReport', JacocoReport) {
     dependsOn tasks.named('test')
     classDirectories.setFrom(sourceSets.main.output.asFileTree.matching {
-        exclude '**/entity/**', '**/dto/**'
+        exclude '**/entity/**', '**/dto/**', '**/docs/**'
     })
     reports {
         html.required = true
