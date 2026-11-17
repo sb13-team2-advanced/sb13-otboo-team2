@@ -9,17 +9,23 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import codeit.ootd.domain.auth.jwt.JwtProvider;
+import codeit.ootd.domain.auth.oauth2.CustomOAuth2UserService;
+import codeit.ootd.domain.auth.service.AuthSessionService;
 import codeit.ootd.domain.recommendation.dto.response.RecommendationResponse;
 import codeit.ootd.domain.recommendation.service.RecommendationService;
+import codeit.ootd.domain.user.repository.UserRepository;
 import codeit.ootd.global.exception.ErrorCode;
 import codeit.ootd.global.exception.OtbooException;
 
 import java.util.List;
 import java.util.UUID;
 
+import codeit.ootd.global.security.SecurityConfig;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
+import org.springframework.context.annotation.Import;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.test.context.support.WithMockUser;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
@@ -32,10 +38,20 @@ import org.springframework.test.web.servlet.MockMvc;
 @org.springframework.context.annotation.ComponentScan.Filter(
         type = org.springframework.context.annotation.FilterType.ASSIGNABLE_TYPE,
         classes = codeit.ootd.infra.storage.LocalStorageWebConfig.class))
+@Import(SecurityConfig.class)
 class RecommendationControllerTest {
     private static final String USER_ID = "00000000-0000-0000-0000-000000000001";
     @Autowired private MockMvc mockMvc;
     @MockitoBean private RecommendationService service;
+    @MockitoBean
+    private JwtProvider jwtProvider;
+    @MockitoBean
+    private AuthSessionService authSessionService;
+    @MockitoBean
+    private UserRepository userRepository;
+    @MockitoBean
+    private CustomOAuth2UserService customOAuth2UserService;
+
 
     /**
      * 보안 필터에서 차단되어 MVC 요청으로 도달하지 않는 컨트롤러의 방어 로직을 검증한다.
@@ -103,4 +119,5 @@ class RecommendationControllerTest {
                 .andExpect(status().isUnauthorized());
         verifyNoInteractions(service);
     }
+
 }

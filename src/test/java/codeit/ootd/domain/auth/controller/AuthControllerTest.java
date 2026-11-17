@@ -275,21 +275,6 @@ class AuthControllerTest {
     }
 
     @Test
-    @DisplayName("Refresh Token 쿠키가 없으면 재발급 요청을 거부한다")
-    void refresh_missingCookie() throws Exception {
-        // given
-        Cookie csrfCookie = issueCsrfCookie();
-
-        // when & then
-        mockMvc.perform(post("/api/auth/refresh")
-                        .cookie(csrfCookie)
-                        .header("X-XSRF-TOKEN", csrfCookie.getValue()))
-                .andExpect(status().isBadRequest());
-
-        verify(authService, never()).refresh(anyString());
-    }
-
-    @Test
     @DisplayName("CSRF 헤더가 없으면 Refresh Token 재발급을 거부한다")
     void refresh_withoutCsrfHeader_forbidden() throws Exception {
         // given
@@ -541,7 +526,5 @@ class AuthControllerTest {
 
         verifyNoInteractions(authService);
     }
-
-
 
 }

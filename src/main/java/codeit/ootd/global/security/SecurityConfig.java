@@ -88,6 +88,7 @@ public class SecurityConfig {
                         "/oauth2/authorization/**",
                         "/login/oauth2/code/**"
                 ).permitAll()
+                .requestMatchers("/error").permitAll()
                 .requestMatchers("/ws", "/ws/**").permitAll()
                 .requestMatchers(HttpMethod.GET, "/files/clothes/**").permitAll()
                 .requestMatchers(HttpMethod.GET, "/actuator/health/readiness").permitAll()
@@ -105,12 +106,14 @@ public class SecurityConfig {
         );
 
         http.exceptionHandling(exception -> exception
-                .authenticationEntryPoint((request, response, authException) ->
-                        writeSecurityError(
-                                response,
-                                ErrorCode.AUTHENTICATION_REQUIRED,
-                                jsonMapper
-                        )
+                .defaultAuthenticationEntryPointFor(
+                        (request, response, authException) ->
+                                writeSecurityError(
+                                        response,
+                                        ErrorCode.AUTHENTICATION_REQUIRED,
+                                        jsonMapper
+                                ),
+                        request -> request.getServletPath().startsWith("/api/")
                 )
                 .accessDeniedHandler((request, response, accessDeniedException) ->
                         writeSecurityError(
@@ -120,6 +123,7 @@ public class SecurityConfig {
                         )
                 )
         );
+
 
         JwtAuthenticationFilter jwtAuthenticationFilter =
                 new JwtAuthenticationFilter(

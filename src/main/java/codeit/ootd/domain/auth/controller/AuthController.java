@@ -9,6 +9,8 @@ import codeit.ootd.domain.auth.dto.response.TokenRefreshResponse;
 import codeit.ootd.domain.auth.dto.response.TokenRefreshResult;
 import codeit.ootd.domain.auth.service.AuthService;
 import codeit.ootd.domain.auth.service.PasswordResetRateLimiter;
+import codeit.ootd.global.exception.ErrorCode;
+import codeit.ootd.global.exception.OtbooException;
 import io.swagger.v3.oas.annotations.Parameter;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
@@ -83,11 +85,15 @@ public class AuthController implements AuthApiDocs {
         return ResponseEntity.noContent().build();
     }
 
-    @Override
     @PostMapping("/refresh")
     public ResponseEntity<TokenRefreshResponse> refresh(
-            @CookieValue("REFRESH_TOKEN") String refreshToken
+            @CookieValue(value = "REFRESH_TOKEN", required = false)
+            String refreshToken
     ) {
+        if (refreshToken == null || refreshToken.isBlank()) {
+            throw new OtbooException(ErrorCode.AUTHENTICATION_REQUIRED);
+        }
+
         TokenRefreshResult result = authService.refresh(refreshToken);
 
         ResponseCookie cookie =
