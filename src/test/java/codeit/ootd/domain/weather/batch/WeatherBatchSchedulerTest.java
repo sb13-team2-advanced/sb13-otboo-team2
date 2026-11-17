@@ -19,7 +19,10 @@ class WeatherBatchSchedulerTest {
 
     private final ApplicationContextRunner contextRunner =
         new ApplicationContextRunner()
-            .withUserConfiguration(WeatherBatchScheduler.class)
+            .withUserConfiguration(
+                WeatherBatchScheduler.class,
+                WeatherSchedulerConfig.class
+            )
             .withBean(JobOperator.class, () -> mock(JobOperator.class))
             .withBean("weatherCollectionJob", Job.class, () -> mock(Job.class));
 
