@@ -7,6 +7,8 @@ import codeit.ootd.domain.directmessage.entity.DirectMessage;
 import codeit.ootd.domain.directmessage.event.DirectMessageSentEvent;
 import codeit.ootd.domain.directmessage.repository.DirectMessageQueryRepository;
 import codeit.ootd.domain.directmessage.repository.DirectMessageRepository;
+import codeit.ootd.domain.notification.enums.NotificationLevel;
+import codeit.ootd.domain.notification.event.NotificationRequestedEvent;
 import codeit.ootd.domain.profile.entity.Profile;
 import codeit.ootd.domain.profile.repository.ProfileRepository;
 import codeit.ootd.domain.user.dto.response.UserSummary;
@@ -63,6 +65,9 @@ public class DirectMessageService {
                 summary(sender), summary(receiver), saved.getContent());
         // DB 커밋에 성공한 메시지만 구독자에게 전달한다.
         eventPublisher.publishEvent(new DirectMessageSentEvent(dto));
+        eventPublisher.publishEvent(new NotificationRequestedEvent(
+                receiver.getId(), "새 DM이 도착했습니다.",
+                sender.getName() + "님이 DM을 보냈습니다.", NotificationLevel.INFO));
         return dto;
     }
 
