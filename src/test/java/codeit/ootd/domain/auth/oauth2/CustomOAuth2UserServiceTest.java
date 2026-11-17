@@ -128,4 +128,28 @@ class CustomOAuth2UserServiceTest {
                         ).isEqualTo("user_not_exists")
                 );
     }
+
+    @Test
+    @DisplayName("지원하지 않는 OAuth2 제공자는 로그인을 거부한다")
+    void load_user_unsupported_provider_throwsException() {
+        // given
+        OAuth2UserRequest request = mock(OAuth2UserRequest.class);
+        ClientRegistration registration = mock(ClientRegistration.class);
+
+        when(request.getClientRegistration()).thenReturn(registration);
+        when(registration.getRegistrationId()).thenReturn("naver");
+
+        // when & then
+        assertThatThrownBy(() -> userService.loadUser(request))
+                .isInstanceOfSatisfying(
+                        OAuth2AuthenticationException.class,
+                        exception -> assertThat(
+                                exception.getError().getErrorCode()
+                        ).isEqualTo("unsupported_oauth_provider")
+                );
+
+        verifyNoInteractions(delegate, extractor, resolver);
+    }
+
+
 }
