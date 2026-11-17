@@ -19,6 +19,7 @@ from prepare_stack import CONFIG_DIRECTORY, CONFIG_FILES, config_payloads
 REMOTE_DIRECTORY = Path("/opt/otboo-grafana")
 PASSWORD_FILE = Path("/etc/otboo-grafana/admin-password")
 BACKUP_DIRECTORY = Path("/var/backups/otboo-grafana")
+SMTP_DIRECTORY = Path("/etc/otboo-grafana")
 COMMAND_TIMEOUT_SECONDS = 900
 DNS_LABEL_PATTERN = re.compile(r"[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?")
 
@@ -40,8 +41,9 @@ def validate_address(address):
 
 
 def update_script(address, directory=CONFIG_DIRECTORY, remote_directory=REMOTE_DIRECTORY,
-                  password_file=PASSWORD_FILE, backup_directory=BACKUP_DIRECTORY):
-    """Render a staged update with candidate validation and consistent volume backups."""
+                  password_file=PASSWORD_FILE, backup_directory=BACKUP_DIRECTORY,
+                  smtp_directory=SMTP_DIRECTORY):
+    """Validate optional SMTP secrets and preserve them alongside consistent volume backups."""
     validate_address(address)
     commands = [
         "#!/bin/bash",
@@ -51,10 +53,19 @@ def update_script(address, directory=CONFIG_DIRECTORY, remote_directory=REMOTE_D
         f"backup_root={shlex.quote(str(backup_directory))}",
         f"export GRAFANA_ADDRESS={shlex.quote(address)}",
         f"export GRAFANA_ADMIN_PASSWORD_FILE={shlex.quote(str(password_file))}",
+        f"export GRAFANA_SMTP_USER_FILE={shlex.quote(str(smtp_directory / 'smtp-user'))}",
+        f"export GRAFANA_SMTP_PASSWORD_FILE={shlex.quote(str(smtp_directory / 'smtp-password'))}",
+        f"export GRAFANA_ALERT_EMAIL_FILE={shlex.quote(str(smtp_directory / 'alert-email'))}",
         'test -s "$GRAFANA_ADMIN_PASSWORD_FILE"',
         'test -f "$deploy_root/compose.yaml"',
         'exec 9>"$deploy_root/.deploy.lock"',
         "flock -n 9 || { echo 'Another Grafana update is running' >&2; exit 1; }",
+        "smtp_files=0",
+        'for secret_file in "$GRAFANA_SMTP_USER_FILE" "$GRAFANA_SMTP_PASSWORD_FILE" "$GRAFANA_ALERT_EMAIL_FILE"; do',
+        '  if [ -e "$secret_file" ]; then test -s "$secret_file"; smtp_files=$((smtp_files + 1)); fi',
+        "done",
+        '[ "$smtp_files" -eq 0 ] || [ "$smtp_files" -eq 3 ] || { echo "SMTP configuration requires all three secret files" >&2; exit 1; }',
+        'if [ "$smtp_files" -eq 3 ]; then export GRAFANA_ALERT_EMAIL="$(cat "$GRAFANA_ALERT_EMAIL_FILE")"; fi',
         'staging=$(mktemp -d "$deploy_root/.update.XXXXXX")',
         'trap \'rm -rf -- "$staging"\' EXIT',
     ]
@@ -62,22 +73,29 @@ def update_script(address, directory=CONFIG_DIRECTORY, remote_directory=REMOTE_D
         parent = Path(relative_path).parent.as_posix()
         commands.extend([
             f'install -d -m 755 "$staging/{parent}"',
-            f'printf %s {shlex.quote(encoded)} | base64 --decode > "$staging/{relative_path}"',
+            f'printf %s {shlex.quote(encoded)} | base64 --decode | gzip --decompress > "$staging/{relative_path}"',
             f'chmod 644 "$staging/{relative_path}"',
         ])
     config_paths = " ".join(shlex.quote(path) for path in CONFIG_FILES)
     commands.extend([
-        'candidate() { docker compose --env-file /dev/null -f "$staging/compose.yaml" "$@"; }',
-        'current() { docker compose --env-file /dev/null -f "$deploy_root/compose.yaml" "$@"; }',
+        'compose_at() { local config_root="$1"; shift; if [ "$smtp_files" -eq 3 ] && [ -f "$config_root/compose.email.yaml" ]; then docker compose --env-file /dev/null -f "$config_root/compose.yaml" -f "$config_root/compose.email.yaml" "$@"; else docker compose --env-file /dev/null -f "$config_root/compose.yaml" "$@"; fi; }',
+        'candidate() { compose_at "$staging" "$@"; }',
+        'current() { compose_at "$deploy_root" "$@"; }',
         "candidate config --quiet",
         'candidate config --format json > "$staging/resolved.json"',
         'caddy_image=$(python3 -c \'import json,sys; print(json.load(open(sys.argv[1]))["services"]["caddy"]["image"])\' "$staging/resolved.json")',
         "candidate pull",
         'docker run --rm --network none -e GRAFANA_ADDRESS -v "$staging/Caddyfile:/etc/caddy/Caddyfile:ro" --entrypoint caddy "$caddy_image" validate --config /etc/caddy/Caddyfile --adapter caddyfile',
+        'if [ "$smtp_files" -eq 3 ]; then docker run --rm --network none -v "$staging/provisioning:/etc/grafana/provisioning:ro" -v "$staging/email/notifications.json:/etc/grafana/provisioning/alerting/email.json:ro" --entrypoint /bin/sh "$caddy_image" -c \'test -r /etc/grafana/provisioning/alerting/email.json && test -r /etc/grafana/provisioning/alerting/otboo.json\'; fi',
         'install -d -m 700 "$backup_root"',
         'backup=$(mktemp -d "$backup_root/update-$(date -u +%Y%m%dT%H%M%SZ).XXXXXX")',
-        f'tar -czf "$backup/config.tar.gz" -C "$deploy_root" {config_paths}',
+        "existing_paths=()",
+        f"for path in {config_paths}; do",
+        '  if [ -f "$deploy_root/$path" ]; then existing_paths+=("$path"); fi',
+        "done",
+        'tar -czf "$backup/config.tar.gz" -C "$deploy_root" "${existing_paths[@]}"',
         'cp -p "$GRAFANA_ADMIN_PASSWORD_FILE" "$backup/admin-password"',
+        'if [ "$smtp_files" -eq 3 ]; then cp -p "$GRAFANA_SMTP_USER_FILE" "$GRAFANA_SMTP_PASSWORD_FILE" "$GRAFANA_ALERT_EMAIL_FILE" "$backup/"; fi',
         'cleanup() { result=$?; trap - EXIT; current start >/dev/null 2>&1 || true; rm -rf -- "$staging"; exit "$result"; }',
         "trap cleanup EXIT",
         "current stop",

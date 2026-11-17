@@ -18,6 +18,7 @@ services:
       GF_USERS_AUTO_ASSIGN_ORG_ROLE: Viewer
       GF_PLUGINS_PREINSTALL_SYNC: grafana-amazonprometheus-datasource
       GF_ANALYTICS_REPORTING_ENABLED: "false"
+      GF_UNIFIED_ALERTING_EXECUTE_ALERTS: "false"
     secrets:
       - grafana_admin_password
     volumes:
