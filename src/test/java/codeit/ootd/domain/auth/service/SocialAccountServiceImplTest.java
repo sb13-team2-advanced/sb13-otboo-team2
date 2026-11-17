@@ -11,10 +11,12 @@ import codeit.ootd.domain.auth.exception.OAuthProviderAlreadyLinkedException;
 import codeit.ootd.domain.auth.exception.SocialAccountAlreadyLinkedException;
 import codeit.ootd.domain.auth.repository.SocialAccountRepository;
 import codeit.ootd.domain.auth.service.impl.SocialAccountServiceImpl;
+import codeit.ootd.domain.user.exception.UserNotFoundException;
 import codeit.ootd.domain.user.repository.UserRepository;
 import java.util.Optional;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
@@ -42,9 +44,32 @@ class SocialAccountServiceImplTest {
     }
 
     @Test
-    void 기존_회원이_소셜_계정을_정상적으로_연동한다() {
+    @DisplayName("소셜 계정으로 연결된 사용자 ID를 조회한다")
+    void find_user_id_success() {
+        // given
+        SocialAccount account = SocialAccount.create(
+                userId, OAuthProvider.GOOGLE, "google-123"
+        );
+
+        when(socialAccountRepository.findByProviderAndProviderUserId(
+                OAuthProvider.GOOGLE, "google-123"
+        )).thenReturn(Optional.of(account));
+
+        // when
+        Optional<UUID> result = socialAccountService.findUserId(
+                OAuthProvider.GOOGLE, "google-123"
+        );
+
+        // then
+        assertThat(result).contains(userId);
+    }
+
+    @Test
+    @DisplayName("기존 회원이 소셜 계정을 정상적으로 연동한다")
+    void link_account_success() {
         // given
         when(userRepository.existsById(userId)).thenReturn(true);
+
         when(socialAccountRepository.findByProviderAndProviderUserId(
                 OAuthProvider.GOOGLE, "google-123"
         )).thenReturn(Optional.empty());
@@ -72,7 +97,8 @@ class SocialAccountServiceImplTest {
     }
 
     @Test
-    void 이미_연동된_소셜_계정은_다른_사용자에게_연동할_수_없다() {
+    @DisplayName("이미 다른 사용자에게 연동된 소셜 계정은 연동할 수 없다")
+    void link_account_fails_when_social_account_already_linked() {
         // given
         when(userRepository.existsById(userId)).thenReturn(true);
 
@@ -97,7 +123,8 @@ class SocialAccountServiceImplTest {
     }
 
     @Test
-    void 이미_같은_제공자를_연동한_사용자는_추가_연동할_수_없다() {
+    @DisplayName("동일 제공자의 계정이 이미 연동되어 있으면 추가 연동할 수 없다")
+    void link_account_fails_when_provider_already_linked() {
         // given
         when(userRepository.existsById(userId)).thenReturn(true);
 
@@ -115,6 +142,38 @@ class SocialAccountServiceImplTest {
                         userId, OAuthProvider.GOOGLE, "another-google"
                 )
         ).isInstanceOf(OAuthProviderAlreadyLinkedException.class);
+
+        verify(socialAccountRepository, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("소셜 사용자 ID가 공백이면 연동할 수 없다")
+    void link_account_fails_when_provider_user_id_blank() {
+        // when & then
+        assertThatThrownBy(() ->
+                socialAccountService.linkAccount(
+                        userId, OAuthProvider.GOOGLE, " "
+                )
+        ).isInstanceOf(IllegalArgumentException.class);
+
+        verifyNoInteractions(
+                userRepository,
+                socialAccountRepository
+        );
+    }
+
+    @Test
+    @DisplayName("존재하지 않는 사용자는 소셜 계정을 연동할 수 없다")
+    void link_account_fails_when_user_not_found() {
+        // given
+        when(userRepository.existsById(userId)).thenReturn(false);
+
+        // when & then
+        assertThatThrownBy(() ->
+                socialAccountService.linkAccount(
+                        userId, OAuthProvider.GOOGLE, "google-123"
+                )
+        ).isInstanceOf(UserNotFoundException.class);
 
         verify(socialAccountRepository, never()).save(any());
     }
