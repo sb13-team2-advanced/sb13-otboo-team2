@@ -1,0 +1,11 @@
+apiVersion: 1
+
+providers:
+  - name: otboo-ecs
+    orgId: 1
+    folder: AWS
+    type: file
+    disableDeletion: true
+    allowUiUpdates: true
+    options:
+      path: /var/lib/grafana/dashboards

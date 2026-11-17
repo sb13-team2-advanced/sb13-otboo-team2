@@ -1,0 +1,12 @@
+{
+	default_sni {$GRAFANA_ADDRESS}
+}
+
+{$GRAFANA_ADDRESS} {
+	tls {
+		issuer acme https://acme-v02.api.letsencrypt.org/directory {
+			profile shortlived
+		}
+	}
+	reverse_proxy grafana:3000
+}
