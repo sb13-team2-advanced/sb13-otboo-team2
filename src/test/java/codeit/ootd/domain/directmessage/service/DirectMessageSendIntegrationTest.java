@@ -12,6 +12,14 @@ import codeit.ootd.domain.directmessage.dto.request.DirectMessageSendRequest;
 import codeit.ootd.domain.directmessage.event.DirectMessageEventListener;
 import codeit.ootd.domain.directmessage.repository.DirectMessageRepository;
 import codeit.ootd.domain.directmessage.repository.DirectMessageQueryRepository;
+import codeit.ootd.domain.notification.dto.response.NotificationDto;
+import codeit.ootd.domain.notification.entity.Notification;
+import codeit.ootd.domain.notification.enums.NotificationLevel;
+import codeit.ootd.domain.notification.event.NotificationEventListener;
+import codeit.ootd.domain.notification.repository.NotificationRepository;
+import codeit.ootd.domain.notification.repository.NotificationQueryRepository;
+import codeit.ootd.domain.notification.service.NotificationService;
+import codeit.ootd.domain.notification.service.NotificationSseService;
 import codeit.ootd.global.config.QuerydslConfig;
 import codeit.ootd.domain.user.entity.User;
 import codeit.ootd.domain.user.repository.UserRepository;
@@ -41,6 +49,7 @@ import org.springframework.transaction.support.TransactionTemplate;
 @DataJpaTest
 @Import({DirectMessageService.class, DirectMessageStompController.class,
         DirectMessageEventListener.class, DirectMessageQueryRepository.class,
+        NotificationEventListener.class, NotificationService.class, NotificationQueryRepository.class,
         QuerydslConfig.class, JpaAuditingConfig.class})
 @Transactional(propagation = Propagation.NOT_SUPPORTED)
 @ActiveProfiles("test")
@@ -51,8 +60,10 @@ class DirectMessageSendIntegrationTest {
     @Autowired private DirectMessageStompController controller;
     @Autowired private DirectMessageRepository messages;
     @Autowired private UserRepository users;
+    @Autowired private NotificationRepository notifications;
     @Autowired private PlatformTransactionManager transactionManager;
     @MockitoBean private SimpMessagingTemplate messagingTemplate;
+    @MockitoBean private NotificationSseService notificationSseService;
 
     private User sender;
     private User receiver;
@@ -65,6 +76,7 @@ class DirectMessageSendIntegrationTest {
 
     @AfterEach
     void tearDown() {
+        notifications.deleteAll(receivedNotifications());
         messages.deleteAll(messages.findAll().stream()
                 .filter(message -> message.getSenderId().equals(sender.getId())
                         || message.getSenderId().equals(receiver.getId())).toList());
@@ -72,7 +84,7 @@ class DirectMessageSendIntegrationTest {
     }
 
     @ParameterizedTest
-    @DisplayName("전송 방향에 관계없이 커밋 후 저장된 메시지를 구독 경로로 전달한다")
+    @DisplayName("전송 방향에 관계없이 커밋 후 채팅을 전달하고 수신자에게 알림을 저장·전송한다")
     @ValueSource(booleans = {false, true})
     void sendsSavedDtoOnlyAfterCommit(boolean reverse) {
         User from = reverse ? receiver : sender;
@@ -81,6 +93,8 @@ class DirectMessageSendIntegrationTest {
             controller.send(request(from, to, "hello"), from.getId());
             assertThat(messages.count()).isPositive();
             verifyNoInteractions(messagingTemplate);
+            assertThat(receivedNotifications()).isEmpty();
+            verifyNoInteractions(notificationSseService);
         });
 
         var payload = ArgumentCaptor.forClass(DirectMessageDto.class);
@@ -97,10 +111,24 @@ class DirectMessageSendIntegrationTest {
         assertThat(saved.getContent()).isEqualTo(dto.content());
         assertThat(saved.getSenderId()).isEqualTo(from.getId());
         assertThat(saved.getReceiverId()).isEqualTo(to.getId());
+
+        assertThat(receivedNotifications()).hasSize(1);
+        Notification notification = receivedNotifications().get(0);
+        assertThat(notification.getReceiverId()).isEqualTo(to.getId());
+        assertThat(notification.getTitle()).isEqualTo("새 DM이 도착했습니다.");
+        assertThat(notification.getContent()).isEqualTo(from.getName() + "님이 DM을 보냈습니다.");
+        assertThat(notification.getLevel()).isEqualTo(NotificationLevel.INFO);
+        var sentNotification = ArgumentCaptor.forClass(NotificationDto.class);
+        verify(notificationSseService).send(eq(to.getId()), sentNotification.capture());
+        assertThat(sentNotification.getValue().id()).isEqualTo(notification.getId());
+        assertThat(sentNotification.getValue().receiverId()).isEqualTo(to.getId());
+        assertThat(sentNotification.getValue().title()).isEqualTo(notification.getTitle());
+        assertThat(sentNotification.getValue().content()).isEqualTo(notification.getContent());
+        assertThat(sentNotification.getValue().level()).isEqualTo(NotificationLevel.INFO);
     }
 
     @Test
-    @DisplayName("롤백되면 메시지를 저장하거나 구독자에게 전달하지 않는다")
+    @DisplayName("롤백되면 메시지와 알림을 저장하거나 전달하지 않는다")
     void rollbackDoesNotPersistOrBroadcast() {
         DirectMessageDto dto = new TransactionTemplate(transactionManager).execute(status -> {
             DirectMessageDto result = service.send(request(sender, receiver, "rollback"), sender.getId());
@@ -109,6 +137,8 @@ class DirectMessageSendIntegrationTest {
         });
         assertThat(messages.findById(dto.id())).isEmpty();
         verifyNoInteractions(messagingTemplate);
+        assertThat(receivedNotifications()).isEmpty();
+        verifyNoInteractions(notificationSseService);
     }
 
     @Test
@@ -161,6 +191,14 @@ class DirectMessageSendIntegrationTest {
                         exception -> assertThat(exception.getErrorCode()).isEqualTo(errorCode));
         assertThat(messages.count()).isEqualTo(count);
         verifyNoInteractions(messagingTemplate);
+        assertThat(receivedNotifications()).isEmpty();
+        verifyNoInteractions(notificationSseService);
+    }
+
+    private List<Notification> receivedNotifications() {
+        return notifications.findAll().stream()
+                .filter(notification -> notification.getReceiverId().equals(sender.getId())
+                        || notification.getReceiverId().equals(receiver.getId())).toList();
     }
 
     private DirectMessageSendRequest request(User from, User to, String content) {
