@@ -36,7 +36,8 @@ springdoc:
   swagger-ui:
     path: /swagger-ui.html
     operations-sorter: method
-    tags-sorter: alpha
+    doc-expansion: list
+    display-request-duration: true
 
 otboo:
   storage:
