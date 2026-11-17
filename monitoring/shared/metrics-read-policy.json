@@ -1,0 +1,17 @@
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "ReadCloudWatchMetrics",
+      "Effect": "Allow",
+      "Action": ["cloudwatch:ListMetrics", "cloudwatch:GetMetricData"],
+      "Resource": "*"
+    },
+    {
+      "Sid": "ReadOtbooPrometheusMetrics",
+      "Effect": "Allow",
+      "Action": ["aps:QueryMetrics", "aps:GetLabels", "aps:GetSeries", "aps:GetMetricMetadata"],
+      "Resource": "arn:aws:aps:ap-northeast-2:121246721746:workspace/ws-96794085-a73c-4fe5-b589-0a1f0e1cecc9"
+    }
+  ]
+}
