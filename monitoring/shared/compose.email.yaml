@@ -1,0 +1,24 @@
+services:
+  grafana:
+    environment:
+      GF_SMTP_ENABLED: "true"
+      GF_SMTP_HOST: smtp.gmail.com:587
+      GF_SMTP_USER__FILE: /run/secrets/grafana_smtp_user
+      GF_SMTP_PASSWORD__FILE: /run/secrets/grafana_smtp_password
+      GF_SMTP_FROM_ADDRESS__FILE: /run/secrets/grafana_smtp_user
+      GF_SMTP_FROM_NAME: Otboo Grafana
+      GF_SMTP_STARTTLS_POLICY: MandatoryStartTLS
+      GF_SMTP_SKIP_VERIFY: "false"
+      GF_UNIFIED_ALERTING_EXECUTE_ALERTS: "true"
+      OTBOO_ALERT_EMAIL: ${GRAFANA_ALERT_EMAIL:?Set the email notification recipient}
+    secrets:
+      - grafana_smtp_user
+      - grafana_smtp_password
+    volumes:
+      - ./email/notifications.json:/etc/grafana/provisioning/alerting/email.json:ro
+
+secrets:
+  grafana_smtp_user:
+    file: ${GRAFANA_SMTP_USER_FILE:?Set the existing SMTP user secret file}
+  grafana_smtp_password:
+    file: ${GRAFANA_SMTP_PASSWORD_FILE:?Set the existing SMTP password secret file}

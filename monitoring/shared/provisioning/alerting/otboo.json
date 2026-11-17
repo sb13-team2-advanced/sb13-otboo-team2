@@ -108,10 +108,10 @@
           "noDataState": "NoData",
           "execErrState": "Error",
           "for": "5m",
-          "isPaused": true,
+          "isPaused": false,
           "annotations": {
             "summary": "ECS CPU > 80% for 5m",
-            "description": "Prepared only. Configure a contact point and notification routing before enabling evaluation.",
+            "description": "ECS CPU utilization exceeds 80%. Inspect service load and task capacity in the linked dashboard.",
             "__dashboardUid__": "otboo-ecs-monitoring",
             "__panelId__": "1"
           },
@@ -222,10 +222,10 @@
           "noDataState": "NoData",
           "execErrState": "Error",
           "for": "5m",
-          "isPaused": true,
+          "isPaused": false,
           "annotations": {
             "summary": "ECS memory > 80% for 5m",
-            "description": "Prepared only. Configure a contact point and notification routing before enabling evaluation.",
+            "description": "ECS memory utilization exceeds 80%. Inspect JVM heap, GC activity and task memory capacity.",
             "__dashboardUid__": "otboo-ecs-monitoring",
             "__panelId__": "2"
           },
@@ -327,10 +327,10 @@
           "noDataState": "NoData",
           "execErrState": "Error",
           "for": "2m",
-          "isPaused": true,
+          "isPaused": false,
           "annotations": {
             "summary": "Application metrics unavailable for 2m",
-            "description": "Prepared only. Configure a contact point and notification routing before enabling evaluation.",
+            "description": "No application target is being scraped successfully. Check ADOT logs, ECS task status and /actuator/prometheus.",
             "__dashboardUid__": "otboo-application-monitoring",
             "__panelId__": "1"
           },
@@ -432,10 +432,10 @@
           "noDataState": "OK",
           "execErrState": "Error",
           "for": "5m",
-          "isPaused": true,
+          "isPaused": false,
           "annotations": {
             "summary": "HTTP 5xx > 5% for 5m (at least 20 requests/5m)",
-            "description": "Prepared only. Configure a contact point and notification routing before enabling evaluation.",
+            "description": "HTTP 5xx ratio exceeds 5% with at least 20 requests in 5 minutes. Inspect application errors and downstream dependencies.",
             "__dashboardUid__": "otboo-application-monitoring",
             "__panelId__": "9"
           },
@@ -537,10 +537,10 @@
           "noDataState": "OK",
           "execErrState": "Error",
           "for": "5m",
-          "isPaused": true,
+          "isPaused": false,
           "annotations": {
             "summary": "HTTP mean latency > 1s for 5m (at least 20 requests/5m)",
-            "description": "Prepared only. Configure a contact point and notification routing before enabling evaluation.",
+            "description": "Mean HTTP latency exceeds 1 second with at least 20 requests in 5 minutes. Inspect request latency, database and downstream dependencies.",
             "__dashboardUid__": "otboo-application-monitoring",
             "__panelId__": "8"
           },

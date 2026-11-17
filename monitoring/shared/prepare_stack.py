@@ -14,12 +14,15 @@ from pathlib import Path
 CONFIG_DIRECTORY = Path(__file__).resolve().parent
 CONFIG_FILES = (
     "compose.yaml",
+    "compose.email.yaml",
     "Caddyfile",
     "provisioning/datasources/aws.yaml",
     "provisioning/dashboards/ecs.yaml",
     "dashboards/ecs.json",
     "dashboards/application.json",
     "provisioning/alerting/otboo.json",
+    "provisioning/alerting/email.json",
+    "email/notifications.json",
 )
 USER_DATA_LIMIT_BYTES = 16384
 

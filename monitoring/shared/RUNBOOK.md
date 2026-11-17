@@ -173,7 +173,7 @@ AMI를 의도적으로 바꿀 때에도 백업과 이 복구 계획을 먼저 �
    직접 확인한다. 채팅이나 Git에 붙이지 않는다.
 3. 공용 HTTPS 주소에 `admin`과 해당 비밀번호로 로그인한다.
 4. Grafana 사용자 관리에서 팀원별 계정을 생성하거나 초대 링크를 발급한다.
-   메일 전송은 설정되어 있지 않으므로 초대 링크를 각 팀원에게 직접 전달한다.
+   초대 링크를 직접 전달하거나 SMTP 구성 후 초대 메일을 사용한다.
 5. 조회만 필요한 팀원은 Viewer, 대시보드를 편집할 팀원은 Editor를 부여한다.
    공용 admin 계정을 공유하지 않는다.
 
@@ -211,11 +211,11 @@ HTTP·GC 패널은 최근 5분의 변화율을 사용한다. HTTP 지표에서 `
 AMP 연결 검사 성공과 `up=1`을 각각 확인해야 한다. ADOT 로그의 401은 앱
 이미지의 SecurityConfig·Prometheus 레지스트리·엔드포인트 노출 설정을 점검한다.
 
-### 준비된 알림 규칙
+### 알림 규칙
 
 `provisioning/alerting/otboo.json`에는 다음 다섯 규칙을 준비한다.
-수신 채널이 정해지지 않은 상태이므로 모두 `isPaused=true`로 배포하며,
-계정·연락처·알림 라우팅은 생성하거나 변경하지 않는다.
+초기 구성에서는 모두 `isPaused=true`로 준비했다. 2026-11-17 실제 메일 수신을
+확인한 뒤 파일에서 일시정지를 해제했다. 팀원 계정 추가는 별도 작업이다.
 
 | 규칙 | 조건 | 지속 시간 |
 | --- | --- | --- |
@@ -225,11 +225,81 @@ AMP 연결 검사 성공과 `up=1`을 각각 확인해야 한다. ADOT 로그의
 | HTTP 5xx 비율 | 5분간 20건 이상 요청 중 5% 초과 | 5분 |
 | HTTP 평균 응답 시간 | 5분간 20건 이상 요청에서 1초 초과 | 5분 |
 
-수신 채널을 정한 뒤 Grafana에서 Contact point와 Notification policy를 구성하고,
-전송 테스트를 확인한 다음 파일의 `isPaused`를 false로 바꿔 재배포한다.
-파일로 프로비저닝한 규칙 변경은 이 파일에 반영한다. HTTP 무트래픽은 정상으로
+개인 이메일 Contact point와 Notification policy는 아래 선택적 SMTP 구성으로
+프로비저닝한다. 파일로 프로비저닝한 규칙 변경은 이 파일에 반영한다. HTTP 무트래픽은 정상으로
 처리하며, 메트릭 수집 누락은 별도 수집 실패 규칙으로 감시한다. CPU·메모리의
 No data와 모든 규칙의 조회 오류는 각각 NoData·Error로 구분한다.
+
+### 개인 이메일 알림
+
+기존 ECS 앱의 Gmail SMTP 계정을 재사용한다. 발송 서버는 `smtp.gmail.com:587`이며
+인증서 검증과 `MandatoryStartTLS`를 적용한다. 발송 계정과 비밀번호, 수신 주소는
+서버의 `/etc/otboo-grafana` 아래에만 보관한다. `.env` 파일은 사용하지 않는다.
+
+| 파일 | 용도 | 소유자·권한 |
+| --- | --- | --- |
+| `smtp-user` | SMTP 인증 계정 및 발신 주소 | `472:472`, `0400` |
+| `smtp-password` | 기존 Gmail 앱 비밀번호 | `472:472`, `0400` |
+| `alert-email` | 수신 이메일 주소 한 개 | `root:root`, `0400` |
+
+이 디렉터리는 root 소유 `0700`을 유지한다. SMTP 파일을 Git이나 채팅, SSM 명령
+본문·출력에 넣지 않는다. 최초 설치 시 Parameter Store의 기존
+`/otboo/prod/smtp/password`를 메모리에서 읽어 서버의 일회성 공개키로 암호화하고,
+서버 내부에서만 복호화해 설치했다. 서버에서 STARTTLS 인증 성공을 확인했으며
+전송용 개인키는 설치 직후 삭제했다. 앱 비밀번호를 교체하면 Grafana 파일도
+동일한 값으로 교체한 뒤 재배포한다.
+
+`prepare_update.py`는 세 파일이 모두 없으면 기본 Compose만 사용한다. 모두 있으면
+`compose.email.yaml`을 함께 적용하고 `alert-email`을 수신자 환경 변수로 읽는다.
+일부 파일만 존재하거나 비어 있으면 서비스 중지 전에 실패한다. 발송 계정과
+비밀번호는 Docker secrets의 `__FILE` 설정으로 전달한다. 재부팅 시 기존 컨테이너는
+동일한 마운트로 재시작하며 이후 설정 갱신에도 SMTP 구성이 유지된다.
+
+기본 Compose는 알림 평가를 비활성화하고 이메일 Compose는 평가를 허용한다.
+규칙의 `isPaused`도 해제해야 실제 평가·발송이 시작된다. SMTP 없는 신규 서버는
+이메일 구성 완료 전까지 알림을 평가하지 않는다.
+
+`email/notifications.json`의 수신 주소는 환경 변수로 치환되며 저장소에 개인 주소를
+기록하지 않는다. 이 파일은 선택적 이메일 Compose를 사용할 때만 Grafana에 마운트한다.
+`provisioning/alerting/email.json`은 읽기 전용 부모 볼륨 안에 필요한 마운트 지점이며,
+이메일 미설정 시 비어 있는 프로비저닝 설정으로 동작한다. 실제 파일 마운트까지
+임시 컨테이너에서 검증한 뒤 기존 서비스를 중지한다.
+
+Contact point와 기본 Notification policy의 이름은 `otboo-personal-email`이다.
+알림은 최초 30초 대기, 변경 알림 최소 5분, 동일 미해결 알림 반복 4시간 간격이며
+복구 알림도 발송한다. 정책 파일은 전체 라우팅 트리를 관리하므로 별도 채널을
+추가할 때는 이 파일의 정책도 함께 갱신한다.
+
+Grafana의 Alerting → Contact points에서 Test로 발송을 확인한다. Grafana 13의
+API를 사용하는 경우 새 `notifications.alerting.grafana.app/v1beta1` receiver test
+경로를 사용한다. 테스트 API의 success는 SMTP 전송 성공이며 실제 받은편지함·스팸함
+도착 확인은 별도로 수행한다. 실제 수신을 확인하기 전에는 규칙을 일시정지 상태로 둔다.
+
+2026-11-17 `OtbooGrafanaEmailTest` 테스트에서 Grafana API의 HTTP 200·success를
+확인하고 수신자가 Gmail에서 실제 메일 도착을 확인했다. Gmail 스팸함에 분류됐으므로
+수신 계정에서 스팸 해제를 수행한다. SMTP 전송 성공만으로 받은편지함 분류를
+보장하지 않는다.
+
+수신 확인 후 규칙 5개를 활성화했고 실제 첫 평가에서 모두 `health=ok`,
+`state=inactive`, 오류 없음으로 확인했다. 최초 판정과 이후 평가는 1분 간격이며
+표의 지속 시간 동안 조건이 유지될 때 알림을 발송한다. 활성화 직전 백업은
+`/var/backups/otboo-grafana/update-20261117T081227Z.XBnbqL`이다.
+
+갱신 백업에는 `smtp-user`, `smtp-password`, `alert-email`도 포함된다. 복구 시 이 세
+파일을 위 소유자·권한으로 함께 복원하고, 이메일 Compose를 포함해 시작한다.
+기본 Compose만 지정해 컨테이너를 재생성하면 이메일 구성이 적용되지 않는다.
+직접 실행해야 하면 root 셸에서 아래처럼 명시한다.
+
+```bash
+export GRAFANA_ADDRESS=52.78.212.1
+export GRAFANA_ADMIN_PASSWORD_FILE=/etc/otboo-grafana/admin-password
+export GRAFANA_SMTP_USER_FILE=/etc/otboo-grafana/smtp-user
+export GRAFANA_SMTP_PASSWORD_FILE=/etc/otboo-grafana/smtp-password
+export GRAFANA_ALERT_EMAIL="$(cat /etc/otboo-grafana/alert-email)"
+docker compose --env-file /dev/null \
+  -f /opt/otboo-grafana/compose.yaml \
+  -f /opt/otboo-grafana/compose.email.yaml up -d
+```
 
 ### 2026-11-17 앱 수집 복구 기록
 
