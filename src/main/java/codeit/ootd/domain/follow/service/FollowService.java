@@ -6,6 +6,8 @@ import codeit.ootd.domain.follow.entity.Follow;
 import codeit.ootd.domain.follow.exception.FollowAlreadyExistsException;
 import codeit.ootd.domain.follow.repository.FollowRepository;
 import codeit.ootd.domain.follow.repository.FollowQueryRepository;
+import codeit.ootd.domain.notification.enums.NotificationLevel;
+import codeit.ootd.domain.notification.event.NotificationRequestedEvent;
 import codeit.ootd.domain.profile.entity.Profile;
 import codeit.ootd.domain.profile.repository.ProfileRepository;
 import codeit.ootd.domain.user.entity.User;
@@ -25,6 +27,7 @@ import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.hibernate.exception.ConstraintViolationException;
 import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -38,6 +41,7 @@ public class FollowService {
     private final FollowQueryRepository followQueryRepository;
     private final UserRepository userRepository;
     private final ProfileRepository profileRepository;
+    private final ApplicationEventPublisher eventPublisher;
 
     public UUID currentUserId(String userId) {
         if (userId == null) throw new OtbooException(AUTHENTICATION_REQUIRED);
@@ -65,7 +69,11 @@ public class FollowService {
             if (isDuplicateFollow(exception)) throw new FollowAlreadyExistsException();
             throw exception;
         }
-        return new FollowDto(follow.getId(), summary(followee), summary(follower));
+        FollowDto dto = new FollowDto(follow.getId(), summary(followee), summary(follower));
+        eventPublisher.publishEvent(new NotificationRequestedEvent(
+                followee.getId(), "새 팔로워가 생겼습니다.",
+                follower.getName() + "님이 회원님을 팔로우했습니다.", NotificationLevel.INFO));
+        return dto;
     }
 
     private boolean isDuplicateFollow(Throwable exception) {
