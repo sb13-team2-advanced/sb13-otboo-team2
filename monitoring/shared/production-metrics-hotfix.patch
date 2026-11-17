@@ -1,0 +1,47 @@
+--- a/build.gradle
++++ b/build.gradle
+@@ -94,6 +94,8 @@
+     runtimeOnly 'io.jsonwebtoken:jjwt-jackson:0.13.0'
+ 
+ 
++    runtimeOnly 'io.micrometer:micrometer-registry-prometheus'
++
+     // Test
+     testImplementation 'org.springframework.boot:spring-boot-starter-actuator-test'
+     testImplementation 'org.springframework.boot:spring-boot-starter-batch-test'
+--- a/src/main/resources/application-prod.yaml
++++ b/src/main/resources/application-prod.yaml
+@@ -32,3 +32,12 @@
+   openapi:
+     server-url: ${OOTD_SERVER_URL}
+     server-description: 운영 배포 서버
++
++management:
++  endpoints:
++    web:
++      exposure:
++        include: health, prometheus
++  metrics:
++    tags:
++      application: ${spring.application.name}
+--- a/src/main/java/codeit/ootd/global/security/SecurityConfig.java
++++ b/src/main/java/codeit/ootd/global/security/SecurityConfig.java
+@@ -28,7 +28,7 @@
+ public class SecurityConfig {
+ 
+     /**
+-     * 정적 리소스와 공개 인증 API, 준비 상태 조회를 허용하고 나머지 요청에는 JWT 인증을 적용한다.
++     * 정적 리소스와 공개 인증 API, 준비 상태 및 Prometheus 수집을 허용하고 나머지 요청에는 JWT 인증을 적용한다.
+      */
+     @Bean
+     public SecurityFilterChain securityFilterChain(
+@@ -76,7 +76,8 @@
+                 .requestMatchers(
+                         HttpMethod.GET,
+                         "/api/auth/csrf",
+-                        "/api/auth/csrf-token"
++                        "/api/auth/csrf-token",
++                        "/actuator/prometheus"
+                 ).permitAll()
+                 .anyRequest().authenticated()
+         );

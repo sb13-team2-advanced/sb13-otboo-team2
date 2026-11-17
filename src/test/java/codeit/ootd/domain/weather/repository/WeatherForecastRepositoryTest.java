@@ -212,4 +212,37 @@ class WeatherForecastRepositoryTest {
 
         return forecastRepository.saveAndFlush(forecast);
     }
+
+    @Test
+    @DisplayName("여러 예보 시각을 일괄 조회할 때 해당 위치와 요청 시각의 데이터만 반환한다")
+    void findByLocationIdAndForecastAtInFiltersByLocationAndTime() {
+        WeatherLocation location = saveLocation("8828308281fffff");
+        WeatherLocation otherLocation = saveLocation("8828308283fffff");
+
+        Instant firstAt = Instant.parse("2026-11-17T03:00:00Z");
+        Instant secondAt = Instant.parse("2026-11-17T06:00:00Z");
+
+        WeatherForecast first = saveForecast(
+            location, "2026-11-17T03:00:00Z"
+        );
+        WeatherForecast second = saveForecast(
+            location, "2026-11-17T06:00:00Z"
+        );
+
+        saveForecast(location, "2026-11-17T09:00:00Z");
+        saveForecast(otherLocation, "2026-11-17T03:00:00Z");
+
+        List<WeatherForecast> result =
+            forecastRepository.findByLocationIdAndForecastAtIn(
+                location.getId(),
+                List.of(firstAt, secondAt)
+            );
+
+        assertThat(result)
+            .extracting(WeatherForecast::getId)
+            .containsExactlyInAnyOrder(
+                first.getId(),
+                second.getId()
+            );
+    }
 }

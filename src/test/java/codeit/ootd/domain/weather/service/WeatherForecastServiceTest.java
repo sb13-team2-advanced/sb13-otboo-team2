@@ -1,7 +1,9 @@
 package codeit.ootd.domain.weather.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
@@ -17,8 +19,8 @@ import codeit.ootd.infra.weather.OwmHourlyForecastConverter.ThreeHourForecast;
 import codeit.ootd.infra.weather.dto.OwmForecastResponse;
 import java.time.Clock;
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.List;
-import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 import org.junit.jupiter.api.DisplayName;
@@ -75,9 +77,9 @@ class WeatherForecastServiceTest {
             List.of(forecastItem(forecastAt, 18.5, 800))
         );
 
-        when(weatherForecastRepository.findByLocationIdAndForecastAt(
-            locationId, forecastAt
-        )).thenReturn(Optional.empty());
+        when(weatherForecastRepository.findByLocationIdAndForecastAtIn(
+            locationId, List.of(forecastAt)
+        )).thenReturn(List.of());
 
         when(clock.instant()).thenReturn(NOW);
 
@@ -87,6 +89,9 @@ class WeatherForecastServiceTest {
             ArgumentCaptor.forClass(WeatherForecast.class);
 
         verify(weatherForecastRepository).save(captor.capture());
+        verify(weatherForecastRepository).findByLocationIdAndForecastAtIn(
+            locationId, List.of(forecastAt)
+        );
 
         WeatherForecast savedForecast = captor.getValue();
 
@@ -139,9 +144,9 @@ class WeatherForecastServiceTest {
             ))
         );
 
-        when(weatherForecastRepository.findByLocationIdAndForecastAt(
-            locationId, forecastAt
-        )).thenReturn(Optional.of(existingForecast));
+        when(weatherForecastRepository.findByLocationIdAndForecastAtIn(
+            locationId, List.of(forecastAt)
+        )).thenReturn(List.of(existingForecast));
 
         when(clock.instant()).thenReturn(NOW);
 
@@ -179,9 +184,9 @@ class WeatherForecastServiceTest {
         WeatherForecast existingForecast =
             previousForecast(locationId, forecastAt, 20.0, 800);
 
-        when(weatherForecastRepository.findByLocationIdAndForecastAt(
-            locationId, forecastAt
-        )).thenReturn(Optional.of(existingForecast));
+        when(weatherForecastRepository.findByLocationIdAndForecastAtIn(
+            locationId, List.of(forecastAt)
+        )).thenReturn(List.of(existingForecast));
 
         when(clock.instant()).thenReturn(NOW);
 
@@ -222,17 +227,12 @@ class WeatherForecastServiceTest {
         WeatherForecast third =
             previousForecast(locationId, thirdAt, 20.0, 800);
 
-        when(weatherForecastRepository.findByLocationIdAndForecastAt(
-            locationId, firstAt
-        )).thenReturn(Optional.of(first));
+        List<Instant> forecastAts =
+            List.of(thirdAt, firstAt, secondAt);
 
-        when(weatherForecastRepository.findByLocationIdAndForecastAt(
-            locationId, secondAt
-        )).thenReturn(Optional.of(second));
-
-        when(weatherForecastRepository.findByLocationIdAndForecastAt(
-            locationId, thirdAt
-        )).thenReturn(Optional.of(third));
+        when(weatherForecastRepository.findByLocationIdAndForecastAtIn(
+            locationId, forecastAts
+        )).thenReturn(List.of(first, second, third));
 
         when(clock.instant()).thenReturn(NOW);
 
@@ -245,6 +245,10 @@ class WeatherForecastServiceTest {
         );
 
         weatherForecastService.saveForecasts(location, response);
+
+        verify(weatherForecastRepository).findByLocationIdAndForecastAtIn(
+            locationId, forecastAts
+        );
 
         verify(weatherForecastRepository).save(first);
         verify(weatherForecastRepository).save(second);
@@ -272,9 +276,9 @@ class WeatherForecastServiceTest {
         WeatherForecast existingForecast =
             previousForecast(locationId, forecastAt, 20.0, 800);
 
-        when(weatherForecastRepository.findByLocationIdAndForecastAt(
-            locationId, forecastAt
-        )).thenReturn(Optional.of(existingForecast));
+        when(weatherForecastRepository.findByLocationIdAndForecastAtIn(
+            locationId, List.of(forecastAt)
+        )).thenReturn(List.of(existingForecast));
 
         when(clock.instant()).thenReturn(NOW);
 
@@ -289,39 +293,102 @@ class WeatherForecastServiceTest {
         verifyNoInteractions(recipientFinder, eventPublisher);
     }
 
-    private WeatherForecast previousForecast(
-        UUID locationId,
-        Instant forecastAt,
-        double temperature,
-        int weatherCode
-    ) {
-        return new WeatherForecast(
-            locationId,
-            forecastAt,
-            NOW.minusSeconds(86400),
-            temperature,
-            (short) 65,
-            weatherCode,
-            0.2,
-            0.0,
-            0.0,
-            2.5
+    @Test
+    @DisplayName("40개 예보를 저장할 때 기존 예보를 한 번만 조회한다")
+    void saveForecastsLoadsFortyForecastsInOneQuery() {
+        UUID locationId = UUID.randomUUID();
+        WeatherLocation location = mock(WeatherLocation.class);
+        when(location.getId()).thenReturn(locationId);
+
+        List<OwmForecastResponse.ForecastItem> items = new ArrayList<>();
+        List<Instant> forecastAts = new ArrayList<>();
+
+        for (int i = 1; i <= 40; i++) {
+            Instant forecastAt = NOW.plusSeconds(i * 10800L);
+            forecastAts.add(forecastAt);
+            items.add(forecastItem(forecastAt, 18.0, 800));
+        }
+
+        when(clock.instant()).thenReturn(NOW);
+        when(weatherForecastRepository.findByLocationIdAndForecastAtIn(
+            locationId, forecastAts
+        )).thenReturn(List.of());
+
+        weatherForecastService.saveForecasts(
+            location,
+            new OwmForecastResponse(items)
         );
+
+        verify(weatherForecastRepository, times(1))
+            .findByLocationIdAndForecastAtIn(locationId, forecastAts);
+
+        verify(weatherForecastRepository, times(40))
+            .save(any(WeatherForecast.class));
+
+        verify(weatherForecastRepository, never())
+            .findByLocationIdAndForecastAt(any(), any());
+
+        verifyNoInteractions(recipientFinder, eventPublisher);
     }
 
-    private OwmForecastResponse.ForecastItem forecastItem(
-        Instant forecastAt,
-        double temperature,
-        int weatherCode
-    ) {
-        return new OwmForecastResponse.ForecastItem(
-            forecastAt.getEpochSecond(),
-            new OwmForecastResponse.Main(temperature, (short) 65),
-            List.of(new OwmForecastResponse.WeatherCondition(weatherCode)),
-            0.2,
-            null,
-            null,
-            new OwmForecastResponse.Wind(2.5)
+    @Test
+    @DisplayName("동일 시각의 예보가 중복되면 한 번 조회하고 같은 엔티티를 갱신한다")
+    void saveForecastsReusesForecastForDuplicateTime() {
+        UUID locationId = UUID.randomUUID();
+        WeatherLocation location = mock(WeatherLocation.class);
+        when(location.getId()).thenReturn(locationId);
+
+        Instant forecastAt = NOW.plusSeconds(3600);
+
+        OwmForecastResponse response = new OwmForecastResponse(
+            List.of(
+                forecastItem(forecastAt, 18.0, 800),
+                forecastItem(forecastAt, 18.0, 800)
+            )
+        );
+
+        when(clock.instant()).thenReturn(NOW);
+        when(weatherForecastRepository.findByLocationIdAndForecastAtIn(
+            locationId, List.of(forecastAt)
+        )).thenReturn(List.of());
+
+        weatherForecastService.saveForecasts(location, response);
+
+        ArgumentCaptor<WeatherForecast> captor =
+            ArgumentCaptor.forClass(WeatherForecast.class);
+
+        verify(weatherForecastRepository, times(1))
+            .findByLocationIdAndForecastAtIn(
+                locationId, List.of(forecastAt)
+            );
+
+        verify(weatherForecastRepository, times(2))
+            .save(captor.capture());
+
+        assertThat(captor.getAllValues().get(0))
+            .isSameAs(captor.getAllValues().get(1));
+
+        verifyNoInteractions(recipientFinder, eventPublisher);
+    }
+
+    @Test
+    @DisplayName("예보 목록이 비어 있으면 조회와 저장을 실행하지 않는다")
+    void saveForecastsSkipsEmptyResponse() {
+        WeatherLocation location = mock(WeatherLocation.class);
+
+        when(clock.instant()).thenReturn(NOW);
+
+        weatherForecastService.saveForecasts(
+            location,
+            new OwmForecastResponse(List.of())
+        );
+
+        verifyNoInteractions(
+            weatherForecastRepository,
+            weatherChangeDetector,
+            weatherNotificationMessageBuilder,
+            recipientFinder,
+            eventPublisher
         );
     }
 
@@ -342,9 +409,9 @@ class WeatherForecastServiceTest {
         WeatherForecast existingForecast =
             previousForecast(locationId, forecastAt, 20.0, 800);
 
-        when(weatherForecastRepository.findByLocationIdAndForecastAt(
-            locationId, forecastAt
-        )).thenReturn(Optional.of(existingForecast));
+        when(weatherForecastRepository.findByLocationIdAndForecastAtIn(
+            locationId, List.of(forecastAt)
+        )).thenReturn(List.of(existingForecast));
 
         when(clock.instant()).thenReturn(NOW);
         when(recipientFinder.findRecipientIds(cellId))
@@ -374,7 +441,6 @@ class WeatherForecastServiceTest {
         });
     }
 
-
     @Test
     @DisplayName("과거 예보가 없으면 강수확률 null을 유지하여 신규 저장하고 알림을 발송하지 않는다")
     void saveHistoricalForecastsCreatesNewForecast() {
@@ -396,9 +462,9 @@ class WeatherForecastServiceTest {
         );
 
         when(clock.instant()).thenReturn(NOW);
-        when(weatherForecastRepository.findByLocationIdAndForecastAt(
-            locationId, forecastAt
-        )).thenReturn(Optional.empty());
+        when(weatherForecastRepository.findByLocationIdAndForecastAtIn(
+            locationId, List.of(forecastAt)
+        )).thenReturn(List.of());
 
         weatherForecastService.saveHistoricalForecasts(
             location,
@@ -466,9 +532,9 @@ class WeatherForecastServiceTest {
         );
 
         when(clock.instant()).thenReturn(NOW);
-        when(weatherForecastRepository.findByLocationIdAndForecastAt(
-            locationId, forecastAt
-        )).thenReturn(Optional.of(existing));
+        when(weatherForecastRepository.findByLocationIdAndForecastAtIn(
+            locationId, List.of(forecastAt)
+        )).thenReturn(List.of(existing));
 
         weatherForecastService.saveHistoricalForecasts(
             location,
@@ -485,6 +551,80 @@ class WeatherForecastServiceTest {
         assertThat(existing.getRainAmount()).isEqualTo(0.5);
         assertThat(existing.getSnowAmount()).isEqualTo(1.2);
         assertThat(existing.getWindSpeed()).isEqualTo(3.0);
+
+        verifyNoInteractions(
+            weatherChangeDetector,
+            weatherNotificationMessageBuilder,
+            recipientFinder,
+            eventPublisher
+        );
+    }
+
+    @Test
+    @DisplayName("여러 과거 예보를 저장할 때 기존 데이터를 한 번만 조회한다")
+    void saveHistoricalForecastsLoadsForecastsInOneQuery() {
+        UUID locationId = UUID.randomUUID();
+        WeatherLocation location = mock(WeatherLocation.class);
+        when(location.getId()).thenReturn(locationId);
+
+        Instant firstAt = NOW.minusSeconds(21600);
+        Instant secondAt = NOW.minusSeconds(10800);
+
+        WeatherForecast existing =
+            previousForecast(locationId, firstAt, 10.0, 800);
+
+        ThreeHourForecast first = new ThreeHourForecast(
+            firstAt,
+            13.0,
+            (short) 70,
+            500,
+            null,
+            0.6,
+            0.0,
+            2.0
+        );
+
+        ThreeHourForecast second = new ThreeHourForecast(
+            secondAt,
+            14.0,
+            (short) 75,
+            800,
+            null,
+            0.0,
+            0.0,
+            3.0
+        );
+
+        when(clock.instant()).thenReturn(NOW);
+        when(weatherForecastRepository.findByLocationIdAndForecastAtIn(
+            locationId, List.of(firstAt, secondAt)
+        )).thenReturn(List.of(existing));
+
+        weatherForecastService.saveHistoricalForecasts(
+            location,
+            List.of(first, second)
+        );
+
+        ArgumentCaptor<WeatherForecast> captor =
+            ArgumentCaptor.forClass(WeatherForecast.class);
+
+        verify(weatherForecastRepository, times(1))
+            .findByLocationIdAndForecastAtIn(
+                locationId, List.of(firstAt, secondAt)
+            );
+
+        verify(weatherForecastRepository, times(2))
+            .save(captor.capture());
+
+        assertThat(captor.getAllValues())
+            .extracting(WeatherForecast::getForecastAt)
+            .containsExactly(firstAt, secondAt);
+
+        assertThat(existing.getTemperature()).isEqualTo(13.0);
+        assertThat(existing.getWeatherCode()).isEqualTo(500);
+
+        verify(weatherForecastRepository, never())
+            .findByLocationIdAndForecastAt(any(), any());
 
         verifyNoInteractions(
             weatherChangeDetector,
@@ -534,6 +674,42 @@ class WeatherForecastServiceTest {
             weatherNotificationMessageBuilder,
             recipientFinder,
             eventPublisher
+        );
+    }
+
+    private WeatherForecast previousForecast(
+        UUID locationId,
+        Instant forecastAt,
+        double temperature,
+        int weatherCode
+    ) {
+        return new WeatherForecast(
+            locationId,
+            forecastAt,
+            NOW.minusSeconds(86400),
+            temperature,
+            (short) 65,
+            weatherCode,
+            0.2,
+            0.0,
+            0.0,
+            2.5
+        );
+    }
+
+    private OwmForecastResponse.ForecastItem forecastItem(
+        Instant forecastAt,
+        double temperature,
+        int weatherCode
+    ) {
+        return new OwmForecastResponse.ForecastItem(
+            forecastAt.getEpochSecond(),
+            new OwmForecastResponse.Main(temperature, (short) 65),
+            List.of(new OwmForecastResponse.WeatherCondition(weatherCode)),
+            0.2,
+            null,
+            null,
+            new OwmForecastResponse.Wind(2.5)
         );
     }
 }

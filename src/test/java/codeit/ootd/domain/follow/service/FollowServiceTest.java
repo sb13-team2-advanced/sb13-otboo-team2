@@ -25,6 +25,7 @@ import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.test.util.ReflectionTestUtils;
 import codeit.ootd.domain.follow.repository.FollowQueryRepository;
 import static codeit.ootd.global.exception.ErrorCode.*;
@@ -37,6 +38,7 @@ class FollowServiceTest {
     @Mock FollowQueryRepository queries;
     @Mock UserRepository users;
     @Mock ProfileRepository profiles;
+    @Mock ApplicationEventPublisher eventPublisher;
     @InjectMocks FollowService service;
     private final UUID me = UUID.randomUUID();
     private final UUID target = UUID.randomUUID();
