@@ -33,7 +33,11 @@ public class WeatherBatchScheduler {
         this.weatherCollectionJob = weatherCollectionJob;
     }
 
-    @Scheduled(cron = "0 */10 * * * *", zone = "Asia/Seoul")
+    @Scheduled(
+        cron = "0 */10 * * * *",
+        zone = "Asia/Seoul",
+        scheduler = "weatherCollectionScheduler"
+    )
     public void run() {
 
         long runSlot = Instant.now().getEpochSecond() / 600;
