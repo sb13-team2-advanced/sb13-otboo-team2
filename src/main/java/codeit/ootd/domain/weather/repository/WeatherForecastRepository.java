@@ -29,4 +29,9 @@ public interface WeatherForecastRepository
         @Param("start") Instant start,
         @Param("end") Instant end
     );
+
+    List<WeatherForecast> findByLocationIdAndForecastAtIn(
+        UUID locationId,
+        List<Instant> forecastAts
+    );
 }
