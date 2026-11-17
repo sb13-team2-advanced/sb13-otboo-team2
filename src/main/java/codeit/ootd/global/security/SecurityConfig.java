@@ -74,6 +74,10 @@ public class SecurityConfig {
                         "/js/**",
                         "/images/**"
                 ).permitAll()
+                .requestMatchers(
+                        "/oauth2/authorization/**",
+                        "/login/oauth2/code/**"
+                ).permitAll()
                 .requestMatchers("/ws", "/ws/**").permitAll()
                 .requestMatchers(HttpMethod.GET, "/files/clothes/**").permitAll()
                 .requestMatchers(HttpMethod.GET, "/actuator/health/readiness").permitAll()
