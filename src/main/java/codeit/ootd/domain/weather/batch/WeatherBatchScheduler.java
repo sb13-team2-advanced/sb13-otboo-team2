@@ -5,6 +5,8 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.batch.core.job.Job;
 import org.springframework.batch.core.job.parameters.JobParameters;
 import org.springframework.batch.core.job.parameters.JobParametersBuilder;
+import org.springframework.batch.core.launch.JobExecutionAlreadyRunningException;
+import org.springframework.batch.core.launch.JobInstanceAlreadyCompleteException;
 import org.springframework.batch.core.launch.JobOperator;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
@@ -58,6 +60,8 @@ public class WeatherBatchScheduler {
                 execution.getStatus()
             );
 
+        } catch (JobExecutionAlreadyRunningException | JobInstanceAlreadyCompleteException e) {
+            log.info("날씨 Batch 중복 실행 생략: slot={}", runSlot);
         } catch (Exception e) {
             log.error("날씨 Batch 실행 실패: slot={}", runSlot, e);
         }
