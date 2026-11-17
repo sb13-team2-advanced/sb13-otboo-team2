@@ -27,6 +27,10 @@ public enum ErrorCode {
     ACCOUNT_LOCKED(HttpStatus.FORBIDDEN, "잠긴 계정입니다."),
     ACCOUNT_INACTIVE(HttpStatus.FORBIDDEN, "활성화되지 않은 계정입니다."),
 
+    // 소셜 계정 연동
+    SOCIAL_ACCOUNT_ALREADY_LINKED(HttpStatus.CONFLICT, "이미 다른 사용자에게 연동된 소셜 계정입니다."),
+    OAUTH_PROVIDER_ALREADY_LINKED(HttpStatus.CONFLICT, "이미 해당 제공자의 계정이 연동되어 있습니다."),
+
     // 의상
     CLOTHES_ATTRIBUTE_DEFINITION_NOT_FOUND(HttpStatus.NOT_FOUND, "의상 속성 정의를 찾을 수 없습니다."),
     CLOTHES_ATTRIBUTE_DEFINITION_NAME_DUPLICATED(HttpStatus.CONFLICT, "이미 존재하는 속성 정의 이름입니다."),

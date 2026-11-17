@@ -84,22 +84,43 @@ public class AuthServiceImpl implements AuthService {
     @Transactional
     public SignInResult signIn(String email, String password) {
         User user = authenticate(email, password);
+        return issueTokens(user);
+    }
 
-        AuthSession session = authSessionService.createSession(user.getId());
+    @Override
+    @Transactional
+    public SignInResult issueTokensForAuthenticatedUser(User user) {
+        validateAccountStatus(user);
+        return issueTokens(user);
+    }
+
+    private void validateAccountStatus(User user) {
+        if (user.isLocked()) {
+            throw new AccountLockedException();
+        }
+
+        if (user.getStatus() != UserStatus.ACTIVE) {
+            throw new AccountInactiveException();
+        }
+    }
+
+    private SignInResult issueTokens(User user) {
+        AuthSession session =
+                authSessionService.createSession(user.getId());
 
         String accessToken = jwtProvider.generateAccessToken(
                 user.getId(),
                 session.getId()
         );
 
-        String refreshToken = refreshTokenService.issue(session.getId());
+        String refreshToken =
+                refreshTokenService.issue(session.getId());
 
         return new SignInResult(
                 UserDto.from(user),
                 accessToken,
                 refreshToken
         );
-
     }
 
     @Override
