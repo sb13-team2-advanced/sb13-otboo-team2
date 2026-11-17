@@ -68,6 +68,8 @@ ootd:
   kakao:
     local:
       api-key: ${KAKAO_API_KEY}
+      connect-timeout: ${KAKAO_CONNECT_TIMEOUT:2s}
+      read-timeout: ${KAKAO_READ_TIMEOUT:5s}
 
 management:
   endpoint:
