@@ -23,7 +23,10 @@ class WeatherCleanupSchedulerTest {
 
     private final ApplicationContextRunner contextRunner =
         new ApplicationContextRunner()
-            .withUserConfiguration(WeatherCleanupScheduler.class)
+            .withUserConfiguration(
+                WeatherCleanupScheduler.class,
+                WeatherSchedulerConfig.class
+            )
             .withBean(JobOperator.class, () -> mock(JobOperator.class))
             .withBean("weatherCleanupJob", Job.class, () -> mock(Job.class))
             .withBean(Clock.class, Clock::systemUTC);

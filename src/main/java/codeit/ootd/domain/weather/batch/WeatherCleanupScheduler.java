@@ -42,7 +42,11 @@ public class WeatherCleanupScheduler {
         this.clock = clock;
     }
 
-    @Scheduled(cron = "0 0 3 * * *", zone = "Asia/Seoul")
+    @Scheduled(
+        cron = "0 0 3 * * *",
+        zone = "Asia/Seoul",
+        scheduler = "weatherCleanupTaskScheduler"
+    )
     public void run() {
 
         LocalDate runDate = LocalDate.ofInstant(
