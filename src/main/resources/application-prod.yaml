@@ -1,4 +1,9 @@
 spring:
+  data:
+    redis:
+      host: ${SPRING_REDIS_HOST}
+      port: ${SPRING_REDIS_PORT}
+
   datasource:
     url: jdbc:postgresql://${OOTD_DB_HOST}:${OOTD_DB_PORT:5432}/${OOTD_DB_NAME}
     username: ${OOTD_DB_USERNAME}

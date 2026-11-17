@@ -1,5 +1,6 @@
 package codeit.ootd.domain.user.controller;
 
+import codeit.ootd.domain.user.docs.UserApiDocs;
 import codeit.ootd.domain.user.dto.request.UserCreateRequest;
 import codeit.ootd.domain.user.dto.request.UserLockUpdateRequest;
 import codeit.ootd.domain.user.dto.request.UserPasswordUpdateRequest;
@@ -18,10 +19,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
 import org.springframework.validation.annotation.Validated;
-import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.*;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RestController;
 
 import java.time.Instant;
 import java.time.format.DateTimeParseException;
@@ -32,24 +30,27 @@ import java.util.UUID;
 @RestController
 @RequestMapping("/api/users")
 @RequiredArgsConstructor
-public class UserController {
+public class UserController implements UserApiDocs {
 
     private final UserService userService;
 
+    @Override
     @PostMapping
     public ResponseEntity<UserDto> signup(
-            @Valid @RequestBody UserCreateRequest request
+            @RequestBody UserCreateRequest request
     ) {
         UserDto response = userService.signup(request);
 
         return ResponseEntity.status(HttpStatus.CREATED).body(response);
     }
 
+    @Override
     @GetMapping
     public ResponseEntity<UserListResponse> getUsers(
             @RequestParam(required = false) String cursor,
             @RequestParam(required = false) UUID idAfter,
-            @RequestParam @Min(value = 1, message = "limit는 1 이상이어야 합니다.") int limit,
+            @RequestParam
+            int limit,
             @RequestParam String sortBy,
             @RequestParam String sortDirection,
             @RequestParam(required = false) String emailLike,
@@ -100,11 +101,12 @@ public class UserController {
         return ResponseEntity.ok(response);
     }
 
+    @Override
     @PreAuthorize("hasRole('ADMIN')")
     @PatchMapping("/{userId}/role")
     public ResponseEntity<UserDto> updateRole(
             @PathVariable UUID userId,
-            @Valid @RequestBody UserRoleUpdateRequest request
+            @RequestBody UserRoleUpdateRequest request
     ) {
         UserDto response = userService.updateRole(
                 userId,
@@ -114,11 +116,12 @@ public class UserController {
         return ResponseEntity.ok(response);
     }
 
+    @Override
     @PreAuthorize("hasRole('ADMIN')")
     @PatchMapping("/{userId}/lock")
     public ResponseEntity<UserDto> updateLock(
             @PathVariable UUID userId,
-            @Valid @RequestBody UserLockUpdateRequest request
+            @RequestBody UserLockUpdateRequest request
     ) {
         UserDto response = userService.updateLock(
                 userId,
@@ -128,10 +131,11 @@ public class UserController {
         return ResponseEntity.ok(response);
     }
 
+    @Override
     @PatchMapping("/{userId}/password")
     public ResponseEntity<Void> updatePassword(
             @PathVariable UUID userId,
-            @Valid @RequestBody UserPasswordUpdateRequest request,
+            @RequestBody UserPasswordUpdateRequest request,
             Authentication authentication
     ) {
         UUID authenticatedUserId = UUID.fromString(
@@ -146,8 +150,4 @@ public class UserController {
 
         return ResponseEntity.noContent().build();
     }
-
-
-
-
 }

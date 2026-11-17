@@ -84,7 +84,6 @@ public class SecurityConfig {
                 .requestMatchers(HttpMethod.POST, "/api/auth/sign-out").permitAll()
                 .requestMatchers(
                         HttpMethod.GET,
-                        "/api/auth/csrf",
                         "/api/auth/csrf-token",
                         "/actuator/prometheus"
                 ).permitAll()
@@ -161,5 +160,24 @@ public class SecurityConfig {
                 .anyRequest().permitAll()
             )
             .build();
+    }
+
+    @Bean
+    @Profile("dev")
+    @Order(2)
+    public SecurityFilterChain devSwaggerSecurityFilterChain(
+            HttpSecurity http
+    ) throws Exception {
+        return http
+                .securityMatcher(
+                        "/swagger-ui.html",
+                        "/swagger-ui/**",
+                        "/v3/api-docs",
+                        "/v3/api-docs/**"
+                )
+                .authorizeHttpRequests(auth -> auth
+                        .anyRequest().permitAll()
+                )
+                .build();
     }
 }
