@@ -30,6 +30,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 
 import org.springframework.mail.MailSendException;
 import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.test.util.ReflectionTestUtils;
 
 import java.time.Clock;
 import java.time.Instant;
@@ -37,6 +38,8 @@ import java.time.ZoneOffset;
 import java.util.Optional;
 import java.util.UUID;
 
+import static org.assertj.core.api.AssertionsForClassTypes.assertThat;
+import static org.assertj.core.api.AssertionsForClassTypes.assertThatThrownBy;
 import static org.junit.jupiter.api.Assertions.assertAll;
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -907,6 +910,92 @@ class AuthServiceImplTest {
         verify(temporaryPasswordMailSender)
                 .send(normalizedEmail, temporaryPassword);
     }
+
+    @Test
+    @DisplayName("소셜 인증된 활성 사용자에게 Access Token과 Refresh Token을 발급한다")
+    void issue_tokens_for_authenticated_user_success() {
+        // given
+        UUID userId = UUID.randomUUID();
+        UUID sessionId = UUID.randomUUID();
+
+        User user = User.create(
+                "테스터",
+                "social@example.com",
+                "encoded-password"
+        );
+        ReflectionTestUtils.setField(user, "id", userId);
+
+        AuthSession session = mock(AuthSession.class);
+        when(session.getId()).thenReturn(sessionId);
+
+        when(authSessionService.createSession(userId))
+                .thenReturn(session);
+
+        when(jwtProvider.generateAccessToken(userId, sessionId))
+                .thenReturn("access-token");
+
+        when(refreshTokenService.issue(sessionId))
+                .thenReturn("refresh-token");
+
+        // when
+        SignInResult result =
+                authService.issueTokensForAuthenticatedUser(user);
+
+        // then
+        assertThat(result.accessToken()).isEqualTo("access-token");
+        assertThat(result.refreshToken()).isEqualTo("refresh-token");
+
+        verify(authSessionService).createSession(userId);
+        verify(jwtProvider).generateAccessToken(userId, sessionId);
+        verify(refreshTokenService).issue(sessionId);
+    }
+
+    @Test
+    @DisplayName("잠긴 계정은 소셜 로그인 토큰을 발급할 수 없다")
+    void issue_tokens_for_authenticated_user_fails_when_locked() {
+        // given
+        User user = User.create(
+                "테스터",
+                "social@example.com",
+                "encoded-password"
+        );
+        user.lock();
+
+        // when & then
+        assertThatThrownBy(() ->
+                authService.issueTokensForAuthenticatedUser(user)
+        ).isInstanceOf(AccountLockedException.class);
+
+        verifyNoInteractions(
+                authSessionService,
+                jwtProvider,
+                refreshTokenService
+        );
+    }
+
+    @Test
+    @DisplayName("비활성 계정은 소셜 로그인 토큰을 발급할 수 없다")
+    void issue_tokens_for_authenticated_user_fails_when_inactive() {
+        // given
+        User user = User.create(
+                "테스터",
+                "social@example.com",
+                "encoded-password"
+        );
+        user.deactivate();
+
+        // when & then
+        assertThatThrownBy(() ->
+                authService.issueTokensForAuthenticatedUser(user)
+        ).isInstanceOf(AccountInactiveException.class);
+
+        verifyNoInteractions(
+                authSessionService,
+                jwtProvider,
+                refreshTokenService
+        );
+    }
+
 
 
 }

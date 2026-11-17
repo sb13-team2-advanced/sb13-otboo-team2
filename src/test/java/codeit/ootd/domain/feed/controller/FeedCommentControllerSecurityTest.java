@@ -114,7 +114,7 @@ class FeedCommentControllerSecurityTest {
             MockHttpServletRequestBuilder request
     ) throws Exception {
         Cookie cookie = mockMvc.perform(get("/api/auth/csrf-token"))
-                .andExpect(status().isOk())
+                .andExpect(status().isNoContent())
                 .andReturn()
                 .getResponse()
                 .getCookie("XSRF-TOKEN");

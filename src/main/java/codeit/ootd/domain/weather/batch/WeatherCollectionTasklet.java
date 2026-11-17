@@ -117,7 +117,7 @@ public class WeatherCollectionTasklet implements Tasklet {
                         KOREA_ZONE
                     );
 
-                    for (int day = 0; day < 5; day++) {
+                    for (int day = 0; day < 6; day++) {
                         weatherService.calculateAndSaveDailyWeather(
                             location,
                             today.plusDays(day)

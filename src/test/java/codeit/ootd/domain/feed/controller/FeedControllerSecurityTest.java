@@ -170,7 +170,7 @@ class FeedControllerSecurityTest {
             FeedCreateRequest request
     ) throws Exception {
         Cookie csrfCookie = mockMvc.perform(get("/api/auth/csrf-token"))
-                .andExpect(status().isOk())
+                .andExpect(status().isNoContent())
                 .andExpect(cookie().exists("XSRF-TOKEN"))
                 .andReturn()
                 .getResponse()

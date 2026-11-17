@@ -58,3 +58,10 @@ ootd:
 auth:
   cookie:
     secure: false
+
+springdoc:
+  swagger-ui:
+    csrf:
+      enabled: true
+      cookie-name: XSRF-TOKEN
+      header-name: X-XSRF-TOKEN

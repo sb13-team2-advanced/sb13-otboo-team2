@@ -13,6 +13,7 @@ import codeit.ootd.domain.weather.entity.WeatherForecast;
 import codeit.ootd.domain.weather.entity.WeatherLocation;
 import codeit.ootd.domain.weather.repository.WeatherForecastRepository;
 import codeit.ootd.domain.weather.service.WeatherChangeDetector.PrecipitationType;
+import codeit.ootd.infra.weather.OwmHourlyForecastConverter.ThreeHourForecast;
 import codeit.ootd.infra.weather.dto.OwmForecastResponse;
 import java.time.Clock;
 import java.time.Instant;
@@ -371,5 +372,168 @@ class WeatherForecastServiceTest {
             assertThat(event.level()).isEqualTo(NotificationLevel.INFO);
             assertThat(event.content()).contains("비가 올", "높아졌어요");
         });
+    }
+
+
+    @Test
+    @DisplayName("과거 예보가 없으면 강수확률 null을 유지하여 신규 저장하고 알림을 발송하지 않는다")
+    void saveHistoricalForecastsCreatesNewForecast() {
+        UUID locationId = UUID.randomUUID();
+        WeatherLocation location = mock(WeatherLocation.class);
+        when(location.getId()).thenReturn(locationId);
+
+        Instant forecastAt = NOW.minusSeconds(10800);
+
+        ThreeHourForecast item = new ThreeHourForecast(
+            forecastAt,
+            12.5,
+            (short) 75,
+            500,
+            null,
+            0.9,
+            0.0,
+            2.3
+        );
+
+        when(clock.instant()).thenReturn(NOW);
+        when(weatherForecastRepository.findByLocationIdAndForecastAt(
+            locationId, forecastAt
+        )).thenReturn(Optional.empty());
+
+        weatherForecastService.saveHistoricalForecasts(
+            location,
+            List.of(item)
+        );
+
+        ArgumentCaptor<WeatherForecast> captor =
+            ArgumentCaptor.forClass(WeatherForecast.class);
+
+        verify(weatherForecastRepository).save(captor.capture());
+
+        WeatherForecast saved = captor.getValue();
+
+        assertThat(saved.getLocationId()).isEqualTo(locationId);
+        assertThat(saved.getForecastAt()).isEqualTo(forecastAt);
+        assertThat(saved.getCollectedAt()).isEqualTo(NOW);
+        assertThat(saved.getTemperature()).isEqualTo(12.5);
+        assertThat(saved.getHumidity()).isEqualTo((short) 75);
+        assertThat(saved.getWeatherCode()).isEqualTo(500);
+        assertThat(saved.getPrecipitationProbability()).isNull();
+        assertThat(saved.getRainAmount()).isEqualTo(0.9);
+        assertThat(saved.getSnowAmount()).isZero();
+        assertThat(saved.getWindSpeed()).isEqualTo(2.3);
+
+        verifyNoInteractions(
+            weatherChangeDetector,
+            weatherNotificationMessageBuilder,
+            recipientFinder,
+            eventPublisher
+        );
+    }
+
+    @Test
+    @DisplayName("기존 과거 예보가 있으면 새로운 관측값으로 갱신한다")
+    void saveHistoricalForecastsUpdatesExistingForecast() {
+        UUID locationId = UUID.randomUUID();
+        WeatherLocation location = mock(WeatherLocation.class);
+        when(location.getId()).thenReturn(locationId);
+
+        Instant forecastAt = NOW.minusSeconds(10800);
+        Instant oldCollectedAt = NOW.minusSeconds(86400);
+
+        WeatherForecast existing = new WeatherForecast(
+            locationId,
+            forecastAt,
+            oldCollectedAt,
+            10.0,
+            (short) 60,
+            800,
+            0.2,
+            0.0,
+            0.0,
+            1.0
+        );
+
+        ThreeHourForecast item = new ThreeHourForecast(
+            forecastAt,
+            15.0,
+            (short) 80,
+            600,
+            null,
+            0.5,
+            1.2,
+            3.0
+        );
+
+        when(clock.instant()).thenReturn(NOW);
+        when(weatherForecastRepository.findByLocationIdAndForecastAt(
+            locationId, forecastAt
+        )).thenReturn(Optional.of(existing));
+
+        weatherForecastService.saveHistoricalForecasts(
+            location,
+            List.of(item)
+        );
+
+        verify(weatherForecastRepository).save(existing);
+
+        assertThat(existing.getCollectedAt()).isEqualTo(NOW);
+        assertThat(existing.getTemperature()).isEqualTo(15.0);
+        assertThat(existing.getHumidity()).isEqualTo((short) 80);
+        assertThat(existing.getWeatherCode()).isEqualTo(600);
+        assertThat(existing.getPrecipitationProbability()).isNull();
+        assertThat(existing.getRainAmount()).isEqualTo(0.5);
+        assertThat(existing.getSnowAmount()).isEqualTo(1.2);
+        assertThat(existing.getWindSpeed()).isEqualTo(3.0);
+
+        verifyNoInteractions(
+            weatherChangeDetector,
+            weatherNotificationMessageBuilder,
+            recipientFinder,
+            eventPublisher
+        );
+    }
+
+    @Test
+    @DisplayName("현재와 미래 시각의 데이터는 과거 예보로 저장하지 않는다")
+    void saveHistoricalForecastsSkipsCurrentAndFutureForecasts() {
+        WeatherLocation location = mock(WeatherLocation.class);
+
+        ThreeHourForecast current = new ThreeHourForecast(
+            NOW,
+            15.0,
+            (short) 70,
+            803,
+            null,
+            0.0,
+            0.0,
+            2.0
+        );
+
+        ThreeHourForecast future = new ThreeHourForecast(
+            NOW.plusSeconds(3600),
+            16.0,
+            (short) 75,
+            500,
+            0.5,
+            0.3,
+            0.0,
+            3.0
+        );
+
+        when(clock.instant()).thenReturn(NOW);
+
+        weatherForecastService.saveHistoricalForecasts(
+            location,
+            List.of(current, future)
+        );
+
+        verifyNoInteractions(
+            weatherForecastRepository,
+            weatherChangeDetector,
+            weatherNotificationMessageBuilder,
+            recipientFinder,
+            eventPublisher
+        );
     }
 }

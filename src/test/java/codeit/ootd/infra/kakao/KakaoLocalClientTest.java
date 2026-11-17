@@ -16,7 +16,6 @@ import org.springframework.http.MediaType;
 import org.springframework.test.web.client.MockRestServiceServer;
 import org.springframework.web.client.RestClient;
 
-@DisplayName("카카오 위치 API 클라이언트 테스트")
 class KakaoLocalClientTest {
 
     private static final double LATITUDE = 37.5665;
