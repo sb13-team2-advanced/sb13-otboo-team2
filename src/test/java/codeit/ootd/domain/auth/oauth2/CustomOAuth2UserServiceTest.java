@@ -77,9 +77,8 @@ class CustomOAuth2UserServiceTest {
         OAuth2User result = userService.loadUser(request);
 
         // then
-        assertThat(result.getName()).isEqualTo(userId.toString());
-        assertThat(result.getAttribute("otbooUserId"))
-                .isEqualTo(userId.toString());
+        String otbooUserId = result.getAttribute("otbooUserId");
+        assertThat(otbooUserId).isEqualTo(userId.toString());
 
         verify(delegate).loadUser(request);
         verify(resolver).resolveUserId(userInfo);

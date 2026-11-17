@@ -1,6 +1,7 @@
 package codeit.ootd.global.security;
 
 import codeit.ootd.domain.auth.jwt.JwtProvider;
+import codeit.ootd.domain.auth.oauth2.CustomOAuth2UserService;
 import codeit.ootd.domain.auth.service.AuthSessionService;
 import codeit.ootd.domain.user.repository.UserRepository;
 import codeit.ootd.global.exception.ErrorCode;
@@ -18,6 +19,7 @@ import org.springframework.security.config.annotation.method.configuration.Enabl
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.config.http.SessionCreationPolicy;
+import org.springframework.security.oauth2.client.userinfo.DefaultOAuth2UserService;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 import org.springframework.security.web.context.RequestAttributeSecurityContextRepository;
@@ -38,7 +40,8 @@ public class SecurityConfig {
             JwtProvider jwtProvider,
             AuthSessionService authSessionService,
             UserRepository userRepository,
-            JsonMapper jsonMapper
+            JsonMapper jsonMapper,
+            CustomOAuth2UserService customOAuth2UserService
     ) throws Exception {
 
         http.csrf(csrf -> csrf
@@ -54,6 +57,13 @@ public class SecurityConfig {
         // Spring Security 기본 로그인 방식 비활성화
         http.formLogin(form -> form.disable());
         http.httpBasic(basic -> basic.disable());
+
+        // OAuth2 사용자 서비스 연결
+        http.oauth2Login(oauth2 -> oauth2
+                .userInfoEndpoint(userInfo -> userInfo
+                        .userService(customOAuth2UserService)
+                )
+        );
 
         // 기존 API 접근 권한 설정
         http.sessionManagement(session -> session
@@ -183,5 +193,10 @@ public class SecurityConfig {
                         .anyRequest().permitAll()
                 )
                 .build();
+    }
+
+    @Bean
+    public DefaultOAuth2UserService defaultOAuth2UserService() {
+        return new DefaultOAuth2UserService();
     }
 }
