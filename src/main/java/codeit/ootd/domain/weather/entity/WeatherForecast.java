@@ -41,8 +41,8 @@ public class WeatherForecast extends BaseTimeEntity {
     @Column(nullable = false)
     private int weatherCode;
 
-    @Column(nullable = false)
-    private double precipitationProbability;
+    @Column
+    private Double precipitationProbability;
 
     @Column(nullable = false)
     private double rainAmount;
@@ -60,7 +60,7 @@ public class WeatherForecast extends BaseTimeEntity {
         double temperature,
         short humidity,
         int weatherCode,
-        double precipitationProbability,
+        Double precipitationProbability,
         double rainAmount,
         double snowAmount,
         double windSpeed
@@ -82,7 +82,7 @@ public class WeatherForecast extends BaseTimeEntity {
         double temperature,
         short humidity,
         int weatherCode,
-        double precipitationProbability,
+        Double precipitationProbability,
         double rainAmount,
         double snowAmount,
         double windSpeed

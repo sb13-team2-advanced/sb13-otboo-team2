@@ -14,6 +14,20 @@ spring:
       enabled: false
     jdbc:
       initialize-schema: never
+  mail:
+    host: ${MAIL_HOST}
+    port: ${MAIL_PORT:587}
+    username: ${MAIL_USERNAME}
+    password: ${MAIL_PASSWORD}
+    properties:
+      mail:
+        smtp:
+          auth: true
+          starttls:
+            enable: true
+          connectiontimeout: 5000
+          timeout: 5000
+          writetimeout: 5000
 
 springdoc:
   api-docs:
@@ -22,7 +36,8 @@ springdoc:
   swagger-ui:
     path: /swagger-ui.html
     operations-sorter: method
-    tags-sorter: alpha
+    doc-expansion: list
+    display-request-duration: true
 
 otboo:
   storage:
@@ -30,6 +45,10 @@ otboo:
     local:
       root-path: ./uploads
       base-url: /files
+  admin:
+    name: ${ADMIN_NAME:관리자}
+    email: ${ADMIN_EMAIL:}
+    password: ${ADMIN_PASSWORD:}
 
 jwt:
   secret: ${JWT_SECRET}
@@ -39,9 +58,27 @@ ootd:
   weather:
     openweathermap:
       api-key: ${OWM_API_KEY}
+      connect-timeout: ${OWM_CONNECT_TIMEOUT:2s}
+      read-timeout: ${OWM_READ_TIMEOUT:5s}
+    batch:
+      scheduler-enabled: ${OOTD_WEATHER_BATCH_SCHEDULER_ENABLED:false}
+      min-request-interval: ${OOTD_BATCH_MIN_REQUEST_INTERVAL:2s}
+    cleanup:
+      scheduler-enabled: ${OOTD_WEATHER_CLEANUP_SCHEDULER_ENABLED:false}
   kakao:
     local:
       api-key: ${KAKAO_API_KEY}
+
+management:
+  endpoint:
+    health:
+      probes:
+        enabled: true
+      group:
+        readiness:
+          include:
+            - readinessState
+            - db
 
 auth:
   cookie:

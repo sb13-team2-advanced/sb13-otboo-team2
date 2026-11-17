@@ -49,6 +49,8 @@ public class WeatherLocationService {
         double latitude,
         double longitude
     ) {
+        h3Service.validateCoordinates(latitude, longitude);       
+
         KakaoRegionResponse.Region region = kakaoLocalClient.getAdministrativeRegion(
             latitude,
             longitude

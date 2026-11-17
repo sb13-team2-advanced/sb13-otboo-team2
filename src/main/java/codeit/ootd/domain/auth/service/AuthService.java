@@ -14,4 +14,8 @@ public interface AuthService {
 
     void signOut(String refreshToken);
 
+    void resetPassword(String email);
+
+    SignInResult issueTokensForAuthenticatedUser(User user);
+
 }

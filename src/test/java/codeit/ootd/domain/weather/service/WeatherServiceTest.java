@@ -1,6 +1,9 @@
 package codeit.ootd.domain.weather.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.same;
@@ -33,7 +36,6 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 @ExtendWith(MockitoExtension.class)
-@DisplayName("일별 날씨 집계 서비스 테스트")
 class WeatherServiceTest {
 
     private static final LocalDate WEATHER_DATE =
@@ -472,5 +474,69 @@ class WeatherServiceTest {
         verify(weatherRepository).save(captor.capture());
 
         return captor.getValue();
+    }
+
+    @Test
+    @DisplayName("카카오 위치 조회가 실패해도 저장된 날씨를 반환한다")
+    void getWeathersReturnsWeatherWhenLocationLookupFails() {
+
+        double latitude = 37.5665;
+        double longitude = 126.9780;
+
+        LocalDate today = LocalDate.of(2026, 10, 28);
+        ZoneId koreaZone = ZoneId.of("Asia/Seoul");
+
+        Clock fixedClock = Clock.fixed(
+            Instant.parse("2026-10-28T09:00:00Z"),
+            koreaZone
+        );
+
+        when(clock.withZone(koreaZone)).thenReturn(fixedClock);
+
+        when(weatherLocationService.findOrCreate(latitude, longitude))
+            .thenReturn(location);
+
+        Weather current = mock(Weather.class);
+        when(current.getWeatherDate()).thenReturn(today);
+
+        when(weatherRepository
+            .findByLocationIdAndWeatherDateBetweenOrderByWeatherDateAsc(
+                locationId,
+                today.minusDays(1),
+                today.plusDays(4)
+            ))
+            .thenReturn(List.of(current));
+
+        when(weatherLocationService.getLocation(latitude, longitude))
+            .thenThrow(new IllegalStateException("카카오 API 장애"));
+
+        WeatherDto todayDto = mock(WeatherDto.class);
+
+        when(weatherDtoMapper.toDto(
+            eq(current),
+            isNull(),
+            any(WeatherAPILocation.class)
+        )).thenReturn(todayDto);
+
+        List<WeatherDto> result =
+            weatherService.getWeathers(latitude, longitude);
+
+        assertThat(result).containsExactly(todayDto);
+
+        ArgumentCaptor<WeatherAPILocation> captor =
+            ArgumentCaptor.forClass(WeatherAPILocation.class);
+
+        verify(weatherDtoMapper).toDto(
+            eq(current),
+            isNull(),
+            captor.capture()
+        );
+
+        WeatherAPILocation fallback = captor.getValue();
+
+        assertThat(fallback.latitude()).isEqualTo(latitude);
+        assertThat(fallback.longitude()).isEqualTo(longitude);
+        assertThat(fallback.locationNames())
+            .containsExactly("위치 정보가 없습니다.");
     }
 }

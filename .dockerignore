@@ -4,10 +4,10 @@
 .gradle
 .idea
 build
+uploads
 .logs
-.env
-.env.dev
-.env.prod
+.env*
+**/.env*
 *.log
 docs
 scripts/performance

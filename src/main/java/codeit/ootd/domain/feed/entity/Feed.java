@@ -45,11 +45,8 @@ public class Feed extends BaseTimeEntity {
     @Column(name = "weather_temperature_current", nullable = false)
     private double weatherTemperatureCurrent;
 
-    @Column(
-            name = "weather_temperature_compared_to_day_before",
-            nullable = false
-    )
-    private double weatherTemperatureComparedToDayBefore;
+    @Column(name = "weather_temperature_compared_to_day_before")
+    private Double weatherTemperatureComparedToDayBefore;
 
     @Column(name = "weather_temperature_min", nullable = false)
     private double weatherTemperatureMin;
@@ -73,5 +70,19 @@ public class Feed extends BaseTimeEntity {
 
     public void updateContent(@NonNull String content) {
         this.content = content;
+    }
+
+    public void increaseLikeCount() {
+        this.likeCount++;
+    }
+
+    public void decreaseLikeCount() {
+        if (this.likeCount > 0) {
+            this.likeCount--;
+        }
+    }
+
+    public void increaseCommentCount() {
+        this.commentCount++;
     }
 }

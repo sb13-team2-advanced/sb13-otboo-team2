@@ -27,6 +27,9 @@ dependencies {
     // 외부 API 호출용 RestClient
     implementation 'org.springframework.boot:spring-boot-starter-restclient'
 
+    // 구매 링크 HTML 파싱 (의상 속성 추출)
+    implementation 'org.jsoup:jsoup:1.18.3'
+
     // JPA
     implementation 'org.springframework.boot:spring-boot-starter-data-jpa'
 
@@ -81,6 +84,7 @@ dependencies {
 
     // WebSocket
     implementation 'org.springframework.boot:spring-boot-starter-websocket'
+    implementation 'org.springframework.security:spring-security-messaging'
 
     // H3
     implementation 'com.uber:h3:4.5.1'
@@ -90,6 +94,8 @@ dependencies {
     runtimeOnly 'io.jsonwebtoken:jjwt-impl:0.13.0'
     runtimeOnly 'io.jsonwebtoken:jjwt-jackson:0.13.0'
 
+    // Prometheus
+    runtimeOnly 'io.micrometer:micrometer-registry-prometheus'
 
     // Test
     testImplementation 'org.springframework.boot:spring-boot-starter-actuator-test'
@@ -149,7 +155,7 @@ tasks.named('check') {
 tasks.named('jacocoTestReport', JacocoReport) {
     dependsOn tasks.named('test')
     classDirectories.setFrom(sourceSets.main.output.asFileTree.matching {
-        exclude '**/entity/**', '**/dto/**'
+        exclude '**/entity/**', '**/dto/**', '**/docs/**'
     })
     reports {
         html.required = true

@@ -33,6 +33,8 @@ import codeit.ootd.domain.clothes.repository.ClothesQueryRepository;
 import codeit.ootd.domain.clothes.repository.ClothesRepository;
 import codeit.ootd.domain.user.repository.UserRepository;
 import codeit.ootd.global.enums.SortDirection;
+import codeit.ootd.global.exception.ErrorCode;
+import codeit.ootd.global.exception.OtbooException;
 import codeit.ootd.infra.storage.FileStorage;
 import codeit.ootd.infra.storage.TransactionalFileCleaner;
 import java.time.Instant;
@@ -108,7 +110,7 @@ class ClothesServiceImplTest {
         givenSaveAssignsId();
 
         ClothesDto dto = service.create(
-                new ClothesCreateRequest(OWNER_ID, " 셔츠 ", ClothesType.TOP, null), null);
+                new ClothesCreateRequest(OWNER_ID, " 셔츠 ", ClothesType.TOP, null), null, OWNER_ID);
 
         assertThat(dto.id()).isEqualTo(CLOTHES_ID);
         assertThat(dto.ownerId()).isEqualTo(OWNER_ID);
@@ -131,7 +133,7 @@ class ClothesServiceImplTest {
                 .willReturn(List.of(new ClothesAttribute(CLOTHES_ID, color.getId(), "검정")));
 
         ClothesDto dto = service.create(new ClothesCreateRequest(OWNER_ID, "셔츠", ClothesType.TOP,
-                List.of(new ClothesAttributeRequest(color.getId(), " 검정 "))), image);
+                List.of(new ClothesAttributeRequest(color.getId(), " 검정 "))), image, OWNER_ID);
 
         assertThat(dto.imageUrl()).isEqualTo("/files/clothes/a.png");
         assertThat(dto.attributes()).hasSize(1);
@@ -150,7 +152,7 @@ class ClothesServiceImplTest {
         given(userRepository.existsById(OWNER_ID)).willReturn(false);
 
         assertThatThrownBy(() -> service.create(
-                new ClothesCreateRequest(OWNER_ID, "셔츠", ClothesType.TOP, null), image()))
+                new ClothesCreateRequest(OWNER_ID, "셔츠", ClothesType.TOP, null), image(), OWNER_ID))
                 .isInstanceOf(ClothesOwnerNotFoundException.class);
 
         verifyNoInteractions(clothesRepository, fileStorage);
@@ -163,7 +165,7 @@ class ClothesServiceImplTest {
 
         assertThatThrownBy(() -> service.create(new ClothesCreateRequest(OWNER_ID, "셔츠", ClothesType.TOP,
                 List.of(new ClothesAttributeRequest(definitionId, "검정"),
-                        new ClothesAttributeRequest(definitionId, "흰색"))), image()))
+                        new ClothesAttributeRequest(definitionId, "흰색"))), image(), OWNER_ID))
                 .isInstanceOf(ClothesAttributeDuplicatedException.class);
 
         verifyNoInteractions(clothesRepository, fileStorage);
@@ -175,7 +177,7 @@ class ClothesServiceImplTest {
         given(definitionRepository.findAllById(any())).willReturn(List.of());
 
         assertThatThrownBy(() -> service.create(new ClothesCreateRequest(OWNER_ID, "셔츠", ClothesType.TOP,
-                List.of(new ClothesAttributeRequest(UUID.randomUUID(), "검정"))), image()))
+                List.of(new ClothesAttributeRequest(UUID.randomUUID(), "검정"))), image(), OWNER_ID))
                 .isInstanceOf(ClothesAttributeDefinitionNotFoundException.class);
 
         verifyNoInteractions(clothesRepository, fileStorage);
@@ -188,7 +190,7 @@ class ClothesServiceImplTest {
         given(definitionRepository.findAllById(any())).willReturn(List.of(color));
 
         assertThatThrownBy(() -> service.create(new ClothesCreateRequest(OWNER_ID, "셔츠", ClothesType.TOP,
-                List.of(new ClothesAttributeRequest(color.getId(), "보라"))), image()))
+                List.of(new ClothesAttributeRequest(color.getId(), "보라"))), image(), OWNER_ID))
                 .isInstanceOf(ClothesAttributeValueInvalidException.class);
 
         verifyNoInteractions(clothesRepository, fileStorage);
@@ -202,7 +204,7 @@ class ClothesServiceImplTest {
         given(clothesRepository.save(any(Clothes.class))).willThrow(new IllegalStateException("db"));
 
         assertThatThrownBy(() -> service.create(
-                new ClothesCreateRequest(OWNER_ID, "셔츠", ClothesType.TOP, null), image))
+                new ClothesCreateRequest(OWNER_ID, "셔츠", ClothesType.TOP, null), image, OWNER_ID))
                 .isInstanceOf(IllegalStateException.class);
         verify(fileStorage, never()).delete(any());
 
@@ -218,7 +220,7 @@ class ClothesServiceImplTest {
         given(fileStorage.upload(image, "clothes")).willReturn("/files/clothes/a.png");
         givenSaveAssignsId();
 
-        service.create(new ClothesCreateRequest(OWNER_ID, "셔츠", ClothesType.TOP, null), image);
+        service.create(new ClothesCreateRequest(OWNER_ID, "셔츠", ClothesType.TOP, null), image, OWNER_ID);
         commit();
 
         verify(fileStorage, never()).delete(any());
@@ -301,7 +303,7 @@ class ClothesServiceImplTest {
     void 수정할_의상이_없으면_예외가_난다() {
         given(clothesRepository.findById(CLOTHES_ID)).willReturn(Optional.empty());
 
-        assertThatThrownBy(() -> service.update(CLOTHES_ID, new ClothesUpdateRequest("새 이름", null, null), null))
+        assertThatThrownBy(() -> service.update(CLOTHES_ID, new ClothesUpdateRequest("새 이름", null, null), null, OWNER_ID))
                 .isInstanceOf(ClothesNotFoundException.class);
     }
 
@@ -310,7 +312,7 @@ class ClothesServiceImplTest {
         Clothes existing = existingClothes("/files/clothes/old.png");
         given(clothesRepository.findById(CLOTHES_ID)).willReturn(Optional.of(existing));
 
-        ClothesDto dto = service.update(CLOTHES_ID, new ClothesUpdateRequest(" 새 이름 ", null, null), null);
+        ClothesDto dto = service.update(CLOTHES_ID, new ClothesUpdateRequest(" 새 이름 ", null, null), null, OWNER_ID);
 
         assertThat(dto.name()).isEqualTo("새 이름");
         assertThat(dto.type()).isEqualTo(ClothesType.TOP);
@@ -334,7 +336,7 @@ class ClothesServiceImplTest {
 
         ClothesDto dto = service.update(CLOTHES_ID, new ClothesUpdateRequest(null, null, List.of(
                 new ClothesAttributeRequest(color.getId(), "흰색"),
-                new ClothesAttributeRequest(material.getId(), "면"))), null);
+                new ClothesAttributeRequest(material.getId(), "면"))), null, OWNER_ID);
 
         assertThat(colorAttribute.getValue()).isEqualTo("흰색");
         verify(attributeRepository).delete(sizeAttribute);
@@ -350,7 +352,7 @@ class ClothesServiceImplTest {
         given(clothesRepository.findById(CLOTHES_ID)).willReturn(Optional.of(existingClothes(null)));
         given(attributeRepository.findAllByClothesId(CLOTHES_ID)).willReturn(List.of(attribute));
 
-        service.update(CLOTHES_ID, new ClothesUpdateRequest(null, null, List.of()), null);
+        service.update(CLOTHES_ID, new ClothesUpdateRequest(null, null, List.of()), null, OWNER_ID);
 
         verify(attributeRepository).delete(attribute);
         verify(attributeRepository, never()).save(any(ClothesAttribute.class));
@@ -363,7 +365,7 @@ class ClothesServiceImplTest {
                 .willReturn(Optional.of(existingClothes("/files/clothes/old.png")));
         given(fileStorage.upload(image, "clothes")).willReturn("/files/clothes/new.png");
 
-        ClothesDto dto = service.update(CLOTHES_ID, new ClothesUpdateRequest(null, null, null), image);
+        ClothesDto dto = service.update(CLOTHES_ID, new ClothesUpdateRequest(null, null, null), image, OWNER_ID);
 
         assertThat(dto.imageUrl()).isEqualTo("/files/clothes/new.png");
         verify(fileStorage, never()).delete(any());
@@ -381,7 +383,7 @@ class ClothesServiceImplTest {
                 .willReturn(Optional.of(existingClothes("/files/clothes/old.png")));
         given(fileStorage.upload(image, "clothes")).willReturn("/files/clothes/new.png");
 
-        service.update(CLOTHES_ID, new ClothesUpdateRequest(null, null, null), image);
+        service.update(CLOTHES_ID, new ClothesUpdateRequest(null, null, null), image, OWNER_ID);
         rollback();
 
         verify(fileStorage).delete("/files/clothes/new.png");
@@ -399,7 +401,7 @@ class ClothesServiceImplTest {
         given(attributeRepository.findAllByClothesId(CLOTHES_ID)).willThrow(new IllegalStateException("db"));
 
         assertThatThrownBy(() -> service.update(CLOTHES_ID, new ClothesUpdateRequest(null, null,
-                List.of(new ClothesAttributeRequest(color.getId(), "검정"))), image))
+                List.of(new ClothesAttributeRequest(color.getId(), "검정"))), image, OWNER_ID))
                 .isInstanceOf(IllegalStateException.class);
 
         rollback();
@@ -415,7 +417,7 @@ class ClothesServiceImplTest {
         given(definitionRepository.findAllById(any())).willReturn(List.of(color));
 
         assertThatThrownBy(() -> service.update(CLOTHES_ID, new ClothesUpdateRequest(null, null,
-                List.of(new ClothesAttributeRequest(color.getId(), "보라"))), image()))
+                List.of(new ClothesAttributeRequest(color.getId(), "보라"))), image(), OWNER_ID))
                 .isInstanceOf(ClothesAttributeValueInvalidException.class);
 
         verifyNoInteractions(fileStorage);
@@ -427,7 +429,7 @@ class ClothesServiceImplTest {
     void 삭제할_의상이_없으면_예외가_난다() {
         given(clothesRepository.findById(CLOTHES_ID)).willReturn(Optional.empty());
 
-        assertThatThrownBy(() -> service.delete(CLOTHES_ID)).isInstanceOf(ClothesNotFoundException.class);
+        assertThatThrownBy(() -> service.delete(CLOTHES_ID, OWNER_ID)).isInstanceOf(ClothesNotFoundException.class);
     }
 
     @Test
@@ -436,7 +438,7 @@ class ClothesServiceImplTest {
                 .willReturn(Optional.of(existingClothes("/files/clothes/old.png")));
         given(clothesRepository.existsInFeed(CLOTHES_ID)).willReturn(true);
 
-        assertThatThrownBy(() -> service.delete(CLOTHES_ID)).isInstanceOf(ClothesInUseException.class);
+        assertThatThrownBy(() -> service.delete(CLOTHES_ID, OWNER_ID)).isInstanceOf(ClothesInUseException.class);
 
         verify(clothesRepository, never()).delete(any(Clothes.class));
         verifyNoInteractions(attributeRepository, fileStorage);
@@ -447,7 +449,7 @@ class ClothesServiceImplTest {
         Clothes existing = existingClothes("/files/clothes/old.png");
         given(clothesRepository.findById(CLOTHES_ID)).willReturn(Optional.of(existing));
 
-        service.delete(CLOTHES_ID);
+        service.delete(CLOTHES_ID, OWNER_ID);
 
         InOrder order = inOrder(attributeRepository, clothesRepository);
         order.verify(attributeRepository).deleteAllByClothesId(CLOTHES_ID);
@@ -465,7 +467,7 @@ class ClothesServiceImplTest {
         given(clothesRepository.findById(CLOTHES_ID))
                 .willReturn(Optional.of(existingClothes("/files/clothes/old.png")));
 
-        service.delete(CLOTHES_ID);
+        service.delete(CLOTHES_ID, OWNER_ID);
         rollback();
 
         verifyNoInteractions(fileStorage);
@@ -477,12 +479,61 @@ class ClothesServiceImplTest {
                 .willReturn(Optional.of(existingClothes("/files/clothes/old.png")));
         doThrow(new DataIntegrityViolationException("fk")).when(clothesRepository).flush();
 
-        assertThatThrownBy(() -> service.delete(CLOTHES_ID)).isInstanceOf(ClothesInUseException.class);
+        assertThatThrownBy(() -> service.delete(CLOTHES_ID, OWNER_ID)).isInstanceOf(ClothesInUseException.class);
 
         verifyNoInteractions(fileStorage);
     }
 
     // ---------- 준비 ----------
+
+    // ---------- 소유자가 아니면 거절한다 ----------
+
+    @Test
+    void 다른_사용자_ID로_등록하면_거절되고_아무것도_저장하지_않는다() {
+        assertThatThrownBy(() -> service.create(
+                new ClothesCreateRequest(OWNER_ID, "셔츠", ClothesType.TOP, null), image(), UUID.randomUUID()))
+                .isInstanceOfSatisfying(OtbooException.class,
+                        e -> assertThat(e.getErrorCode()).isEqualTo(ErrorCode.ACCESS_DENIED));
+
+        verifyNoInteractions(userRepository, clothesRepository, fileStorage);
+    }
+
+    @Test
+    void 인증_정보가_없으면_등록이_거절된다() {
+        assertThatThrownBy(() -> service.create(
+                new ClothesCreateRequest(OWNER_ID, "셔츠", ClothesType.TOP, null), image(), null))
+                .isInstanceOfSatisfying(OtbooException.class,
+                        e -> assertThat(e.getErrorCode()).isEqualTo(ErrorCode.ACCESS_DENIED));
+
+        verifyNoInteractions(userRepository, clothesRepository, fileStorage);
+    }
+
+    @Test
+    void 소유자가_아니면_수정이_거절되고_이미지를_올리지_않는다() {
+        given(clothesRepository.findById(CLOTHES_ID))
+                .willReturn(Optional.of(existingClothes("/files/clothes/old.png")));
+
+        assertThatThrownBy(() -> service.update(CLOTHES_ID,
+                new ClothesUpdateRequest("새 이름", null, null), image(), UUID.randomUUID()))
+                .isInstanceOfSatisfying(OtbooException.class,
+                        e -> assertThat(e.getErrorCode()).isEqualTo(ErrorCode.ACCESS_DENIED));
+
+        verifyNoInteractions(fileStorage, attributeRepository, definitionRepository);
+    }
+
+    @Test
+    void 소유자가_아니면_삭제가_거절되고_아무것도_지우지_않는다() {
+        given(clothesRepository.findById(CLOTHES_ID))
+                .willReturn(Optional.of(existingClothes("/files/clothes/old.png")));
+
+        assertThatThrownBy(() -> service.delete(CLOTHES_ID, UUID.randomUUID()))
+                .isInstanceOfSatisfying(OtbooException.class,
+                        e -> assertThat(e.getErrorCode()).isEqualTo(ErrorCode.ACCESS_DENIED));
+
+        verify(clothesRepository, never()).existsInFeed(any());
+        verify(clothesRepository, never()).delete(any());
+        verifyNoInteractions(attributeRepository, fileStorage);
+    }
 
     private void commit() {
         List<TransactionSynchronization> synchronizations =

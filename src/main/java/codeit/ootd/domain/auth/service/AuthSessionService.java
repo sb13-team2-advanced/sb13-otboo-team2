@@ -12,4 +12,6 @@ public interface AuthSessionService {
 
     void revokeSession(UUID sessionId);
 
+    void revokeAllSessions(UUID userId);
+
 }
