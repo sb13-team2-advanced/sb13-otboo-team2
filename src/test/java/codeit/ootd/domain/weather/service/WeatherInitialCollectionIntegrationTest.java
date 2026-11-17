@@ -17,11 +17,19 @@ import codeit.ootd.infra.weather.OpenWeatherMapClient;
 import codeit.ootd.infra.weather.dto.OwmForecastResponse;
 import codeit.ootd.infra.weather.dto.OwmOneCallHourlyResponse;
 import java.time.Clock;
+import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.ZoneId;
 import java.util.List;
 import java.util.UUID;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicReference;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -302,5 +310,86 @@ class WeatherInitialCollectionIntegrationTest {
             new OwmOneCallHourlyResponse.Precipitation(rainAmount),
             null
         );
+    }
+
+    @Test
+    @DisplayName("예약 만료 후 이전 수집이 늦게 완료되어도 최신 예보를 유지한다")
+    void expiredInitialCollectionDoesNotOverwriteNewerForecast() throws Exception {
+        prepareLocation();
+
+        AtomicReference<Instant> currentTime = new AtomicReference<>(NOW);
+
+        when(clock.instant()).thenAnswer(invocation -> currentTime.get());
+        when(clock.withZone(KOREA_ZONE)).thenAnswer(
+            invocation -> Clock.fixed(currentTime.get(), KOREA_ZONE)
+        );
+
+        CountDownLatch firstRequestStarted = new CountDownLatch(1);
+        CountDownLatch releaseFirstRequest = new CountDownLatch(1);
+        AtomicInteger requestCount = new AtomicInteger();
+
+        when(openWeatherMapClient.getForecast(LATITUDE, LONGITUDE))
+            .thenAnswer(invocation -> {
+                if (requestCount.incrementAndGet() == 1) {
+                    firstRequestStarted.countDown();
+
+                    if (!releaseFirstRequest.await(10, TimeUnit.SECONDS)) {
+                        throw new IllegalStateException("첫 번째 수집 대기 시간 초과");
+                    }
+
+                    return forecastResponse();
+                }
+
+                return new OwmForecastResponse(
+                    List.of(
+                        forecastItem(NOW, 30.0),
+                        forecastItem(NOW.plusSeconds(10800), 32.0)
+                    )
+                );
+            });
+
+        ExecutorService executor = Executors.newSingleThreadExecutor();
+
+        try {
+            Future<?> firstRequest = executor.submit(
+                () -> weatherQueryService.getWeathers(LATITUDE, LONGITUDE)
+            );
+
+            assertThat(firstRequestStarted.await(10, TimeUnit.SECONDS))
+                .isTrue();
+
+            Instant secondCollectionAt = NOW.plus(Duration.ofMinutes(6));
+            currentTime.set(secondCollectionAt);
+
+            weatherQueryService.getWeathers(LATITUDE, LONGITUDE);
+
+            WeatherForecast newerForecast = forecastRepository
+                .findByLocationIdAndForecastAt(locationId, NOW)
+                .orElseThrow();
+
+            assertThat(newerForecast.getTemperature()).isEqualTo(30.0);
+
+            releaseFirstRequest.countDown();
+            firstRequest.get(10, TimeUnit.SECONDS);
+
+            WeatherForecast finalForecast = forecastRepository
+                .findByLocationIdAndForecastAt(locationId, NOW)
+                .orElseThrow();
+
+            assertThat(finalForecast.getTemperature()).isEqualTo(30.0);
+
+            WeatherLocation completed = locationRepository
+                .findById(locationId)
+                .orElseThrow();
+
+            assertThat(completed.getLastCollectedAt())
+                .isEqualTo(secondCollectionAt);
+
+            assertThat(completed.isInitialCollectionInProgress()).isFalse();
+        } finally {
+            releaseFirstRequest.countDown();
+            executor.shutdownNow();
+            executor.awaitTermination(5, TimeUnit.SECONDS);
+        }
     }
 }
