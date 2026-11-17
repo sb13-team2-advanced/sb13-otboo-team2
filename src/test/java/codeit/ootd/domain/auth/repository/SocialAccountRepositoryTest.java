@@ -7,7 +7,6 @@ import codeit.ootd.domain.auth.entity.OAuthProvider;
 import codeit.ootd.domain.auth.entity.SocialAccount;
 import codeit.ootd.domain.user.entity.User;
 import codeit.ootd.domain.user.repository.UserRepository;
-import java.util.UUID;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.data.jpa.test.autoconfigure.DataJpaTest;
