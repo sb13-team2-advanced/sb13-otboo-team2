@@ -191,6 +191,70 @@ UI에서 비밀번호를 바꾸면 서버의 최초 비밀번호 파일과 달�
 - 애플리케이션 `/actuator/prometheus`의 401 응답은 Grafana 배포와 별도로 해결한다.
   JVM/HTTP 지표는 해당 지표를 노출하는 애플리케이션 이미지 배포 후 확인한다.
 
+### JVM·HTTP 대시보드
+
+AWS 폴더의 `otboo-application-monitoring`은 AMP의 `otboo` job과
+`otboo-backend` 태스크 패밀리, `otboo-dev-cluster` 클러스터를 조회한다.
+수집 상태, 정상 대상 수, HTTP 요청률·5xx 비율, JVM 힙·GC 정지 시간·스레드,
+상태 코드별 요청률, 평균 응답 시간 패널을 제공한다. 태스크별 JVM 지표는
+`aws_ecs_task_id`로 구분하므로 배포 중에도 서로 다른 JVM을 합치지 않는다.
+
+HTTP·GC 패널은 최근 5분의 변화율을 사용한다. HTTP 지표에서 `/actuator` 요청은
+제외한다. 시작 직후 표본이 부족하거나 실제 요청이 없으면 HTTP 패널에 No data가
+표시될 수 있다. 수집 상태 패널이 1인지 별도로 확인한다. 평균 응답 시간은
+요청 시간 합계를 요청 수로 나눈 값이며 p95·p99가 아니다.
+
+실제 ECS 배포에는 ADOT 사이드카가 있다. Parameter Store의
+`/otboo/monitoring/adot-config`를 `AOT_CONFIG_CONTENT`로 받아
+`localhost:8080/actuator/prometheus`를 30초마다 수집하고 AMP로 전송한다.
+로컬 `monitoring/prometheus.yml`은 이 ECS 수집 설정에 적용되지 않는다.
+AMP 연결 검사 성공과 `up=1`을 각각 확인해야 한다. ADOT 로그의 401은 앱
+이미지의 SecurityConfig·Prometheus 레지스트리·엔드포인트 노출 설정을 점검한다.
+
+### 준비된 알림 규칙
+
+`provisioning/alerting/otboo.json`에는 다음 다섯 규칙을 준비한다.
+수신 채널이 정해지지 않은 상태이므로 모두 `isPaused=true`로 배포하며,
+계정·연락처·알림 라우팅은 생성하거나 변경하지 않는다.
+
+| 규칙 | 조건 | 지속 시간 |
+| --- | --- | --- |
+| ECS CPU | 80% 초과 | 5분 |
+| ECS 메모리 | 80% 초과 | 5분 |
+| 앱 지표 수집 실패 | 수집 값 0 또는 현재 시계열 없음 | 2분 |
+| HTTP 5xx 비율 | 5분간 20건 이상 요청 중 5% 초과 | 5분 |
+| HTTP 평균 응답 시간 | 5분간 20건 이상 요청에서 1초 초과 | 5분 |
+
+수신 채널을 정한 뒤 Grafana에서 Contact point와 Notification policy를 구성하고,
+전송 테스트를 확인한 다음 파일의 `isPaused`를 false로 바꿔 재배포한다.
+파일로 프로비저닝한 규칙 변경은 이 파일에 반영한다. HTTP 무트래픽은 정상으로
+처리하며, 메트릭 수집 누락은 별도 수집 실패 규칙으로 감시한다. CPU·메모리의
+No data와 모든 규칙의 조회 오류는 각각 NoData·Error로 구분한다.
+
+### 2026-11-17 앱 수집 복구 기록
+
+운영 `otboo-backend:15`의 ADOT 수집기는 `/actuator/prometheus`에서 401을
+받았다. 당시 운영 소스인 `3bb49cc764429330d45a833d1d7060fd6d0aebac`를
+별도 디렉터리로 추출하고 [최소 수정 패치](production-metrics-hotfix.patch)만
+적용했다. Prometheus 레지스트리 추가, 운영 엔드포인트 노출, 익명 GET 수집 허용,
+application 메트릭 태그 설정을 포함한다. 현재 브랜치의 다른 기능은 포함하지 않았다.
+
+- ECR 태그: `metrics-3bb49cc-20261117-v1`
+- 배포 이미지: `121246721746.dkr.ecr.ap-northeast-2.amazonaws.com/otboo-backend@sha256:1ddb51f25ae5d944a49695ec8b13d5c3e2fa78866b2a206add22fb6552c9fa79`
+- ECS 태스크 정의: `otboo-backend:16`, 기존 정의: `otboo-backend:15`
+- ADOT·태스크 역할·환경 변수·시크릿·네트워크 설정은 기존 정의를 유지했다.
+- 운영 수정본 전체 테스트 967개, 클린 빌드와 커버리지 검증을 통과했다.
+- 새 태스크의 ALB healthy, ECS COMPLETED, AMP `up=1`, JVM·HTTP 시계열을 확인했다.
+- `/api/auth/csrf` 조회가 HTTP 200으로 응답하는 것을 확인했다. 토큰은 기록하지 않았다.
+- Grafana의 JVM·HTTP 대시보드와 일시정지된 알림 규칙 5개를 반영하고 실제
+  데이터 소스 및 조건 쿼리가 오류 없이 실행되는 것을 확인했다.
+- Grafana 갱신 전 설정·비밀번호·데이터 볼륨 백업:
+  `/var/backups/otboo-grafana/update-20261117T055018Z.k4ANim`.
+
+롤백이 필요하면 ECS 서비스를 기존 `otboo-backend:15`로 되돌릴 수 있지만
+이전 버전의 메트릭 수집은 다시 실패한다. 이후 정식 앱 배포에서는 현재 소스의
+동일한 메트릭 구성과 `PrometheusSecurityIntegrationTest`를 유지한다.
+
 프로비저닝한 대시보드는 UI에서 편집·저장할 수 있지만 파일 갱신 시 다시 덮어쓸 수
 있다. 영구 변경은 JSON에 반영하거나 다른 UID로 복제한 대시보드에 저장한다.
 
@@ -219,7 +283,9 @@ python3 -B -m unittest discover -s monitoring/shared -p 'test_*.py' -v
 ```
 
 Docker·HTTPS 명령을 대체한 임시 디렉터리에서 비밀번호 유지, 데이터 백업,
-검증 실패 시 미적용을 확인한다. 실제 AWS 스택 업데이트·볼륨 복구 검증은 별도다.
+새 설정 파일 추가, 검증 실패 시 미적용을 확인한다. 설정 파일은 gzip으로 압축해
+EC2의 16 KiB UserData 제한 안에 포함하며 서버에서 원본으로 복원한다.
+실제 AWS 스택 업데이트·볼륨 복구 검증은 별도다.
 
 ## 참고 문서
 

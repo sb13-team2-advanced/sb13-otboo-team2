@@ -62,7 +62,7 @@ def update_script(address, directory=CONFIG_DIRECTORY, remote_directory=REMOTE_D
         parent = Path(relative_path).parent.as_posix()
         commands.extend([
             f'install -d -m 755 "$staging/{parent}"',
-            f'printf %s {shlex.quote(encoded)} | base64 --decode > "$staging/{relative_path}"',
+            f'printf %s {shlex.quote(encoded)} | base64 --decode | gzip --decompress > "$staging/{relative_path}"',
             f'chmod 644 "$staging/{relative_path}"',
         ])
     config_paths = " ".join(shlex.quote(path) for path in CONFIG_FILES)
@@ -76,7 +76,11 @@ def update_script(address, directory=CONFIG_DIRECTORY, remote_directory=REMOTE_D
         'docker run --rm --network none -e GRAFANA_ADDRESS -v "$staging/Caddyfile:/etc/caddy/Caddyfile:ro" --entrypoint caddy "$caddy_image" validate --config /etc/caddy/Caddyfile --adapter caddyfile',
         'install -d -m 700 "$backup_root"',
         'backup=$(mktemp -d "$backup_root/update-$(date -u +%Y%m%dT%H%M%SZ).XXXXXX")',
-        f'tar -czf "$backup/config.tar.gz" -C "$deploy_root" {config_paths}',
+        "existing_paths=()",
+        f"for path in {config_paths}; do",
+        '  if [ -f "$deploy_root/$path" ]; then existing_paths+=("$path"); fi',
+        "done",
+        'tar -czf "$backup/config.tar.gz" -C "$deploy_root" "${existing_paths[@]}"',
         'cp -p "$GRAFANA_ADMIN_PASSWORD_FILE" "$backup/admin-password"',
         'cleanup() { result=$?; trap - EXIT; current start >/dev/null 2>&1 || true; rm -rf -- "$staging"; exit "$result"; }',
         "trap cleanup EXIT",

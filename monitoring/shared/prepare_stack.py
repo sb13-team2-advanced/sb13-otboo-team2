@@ -7,6 +7,7 @@ The administrator password is generated on the host and never enters the stack.
 
 import argparse
 import base64
+import gzip
 import json
 from pathlib import Path
 
@@ -17,14 +18,18 @@ CONFIG_FILES = (
     "provisioning/datasources/aws.yaml",
     "provisioning/dashboards/ecs.yaml",
     "dashboards/ecs.json",
+    "dashboards/application.json",
+    "provisioning/alerting/otboo.json",
 )
 USER_DATA_LIMIT_BYTES = 16384
 
 
 def config_payloads(directory=CONFIG_DIRECTORY):
-    """Encode only the allowlisted non-secret files for remote deployment."""
+    """Compress allowlisted files to keep EC2 bootstrap data below its size limit."""
     return [
-        (relative_path, base64.b64encode((directory / relative_path).read_bytes()).decode())
+        (relative_path, base64.b64encode(gzip.compress(
+            (directory / relative_path).read_bytes(), mtime=0,
+        )).decode())
         for relative_path in CONFIG_FILES
     ]
 
@@ -34,7 +39,7 @@ def prepare_template():
     bootstrap = [
         "#!/bin/bash",
         "set -euo pipefail",
-        "dnf install -y docker openssl",
+        "dnf install -y docker openssl gzip",
         "systemctl enable --now docker amazon-ssm-agent",
         "install -d /usr/local/lib/docker/cli-plugins /opt/otboo-grafana",
         "curl --retry 5 --fail --location --silent --show-error https://github.com/docker/compose/releases/download/v5.7.1/docker-compose-linux-aarch64 -o /usr/local/lib/docker/cli-plugins/docker-compose",
@@ -55,7 +60,7 @@ def prepare_template():
         destination = f"/opt/otboo-grafana/{relative_path}"
         bootstrap.extend([
             f"install -d '{Path(destination).parent}'",
-            f"printf '%s' '{encoded}' | base64 --decode > '{destination}'",
+            f"printf '%s' '{encoded}' | base64 --decode | gzip --decompress > '{destination}'",
             f"chmod 644 '{destination}'",
         ])
     bootstrap.extend([

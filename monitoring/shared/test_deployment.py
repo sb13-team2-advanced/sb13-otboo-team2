@@ -132,6 +132,27 @@ elif args[:2] == ['volume', 'inspect']:
         self.assertFalse(any("stop" in call or "up" in call for call in calls))
         self.assertFalse(self.backups.exists())
 
+    def test_기존_서버에_없는_새_설정은_백업에서_제외하고_추가한다(self):
+        # given
+        added_paths = ("dashboards/application.json", "provisioning/alerting/otboo.json")
+        for relative_path in added_paths:
+            (self.remote / relative_path).unlink()
+
+        # when
+        result = self.run_update()
+
+        # then
+        self.assertEqual(result.returncode, 0, result.stderr)
+        backup, = self.backups.iterdir()
+        with tarfile.open(backup / "config.tar.gz") as archive:
+            self.assertIn("compose.yaml", archive.getnames())
+            for relative_path in added_paths:
+                self.assertNotIn(relative_path, archive.getnames())
+                self.assertEqual(
+                    (self.remote / relative_path).read_bytes(),
+                    (CONFIG_DIRECTORY / relative_path).read_bytes(),
+                )
+
     def test_Caddy_검증이_실패하면_기존_설정과_비밀번호가_유지된다(self):
         # given
         self.environment["FAIL_CADDY"] = "1"
