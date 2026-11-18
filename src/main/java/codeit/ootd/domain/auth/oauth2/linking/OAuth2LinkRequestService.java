@@ -55,8 +55,12 @@ public class OAuth2LinkRequestService {
         return token;
     }
 
-    public OAuth2LinkRequest consume(String token) {
-        if (token == null || token.isBlank()) {
+    public OAuth2LinkRequest consume(
+            String token,
+            OAuthProvider expectedProvider
+    ) {
+        if (token == null || token.isBlank()
+                || expectedProvider == null) {
             throw new OtbooException(
                     ErrorCode.OAUTH2_LINK_TOKEN_INVALID
             );
@@ -76,6 +80,13 @@ public class OAuth2LinkRequestService {
             );
         }
 
+        if (request.provider() != expectedProvider) {
+            throw new OtbooException(
+                    ErrorCode.OAUTH2_LINK_TOKEN_INVALID
+            );
+        }
+
         return request;
     }
+
 }

@@ -38,7 +38,7 @@ class OAuth2LinkRequestServiceTest {
 
         // when
         String token = service.create(userId, OAuthProvider.GOOGLE);
-        OAuth2LinkRequest result = service.consume(token);
+        OAuth2LinkRequest result = service.consume(token, OAuthProvider.GOOGLE);
 
         // then
         assertThat(token).isNotBlank();
@@ -55,10 +55,10 @@ class OAuth2LinkRequestServiceTest {
                 UUID.randomUUID(),
                 OAuthProvider.KAKAO
         );
-        service.consume(token);
+        service.consume(token,OAuthProvider.KAKAO);
 
         // when & then
-        assertThatThrownBy(() -> service.consume(token))
+        assertThatThrownBy(() -> service.consume(token, OAuthProvider.KAKAO))
                 .isInstanceOf(OtbooException.class)
                 .hasMessage(
                         ErrorCode.OAUTH2_LINK_TOKEN_INVALID.getMessage()
@@ -68,7 +68,7 @@ class OAuth2LinkRequestServiceTest {
     @Test
     @DisplayName("존재하지 않는 연동 요청은 거부한다")
     void consume_unknownToken_throwsException() {
-        assertThatThrownBy(() -> service.consume("unknown-token"))
+        assertThatThrownBy(() -> service.consume("unknown-token", OAuthProvider.GOOGLE))
                 .isInstanceOf(OtbooException.class)
                 .hasMessage(
                         ErrorCode.OAUTH2_LINK_TOKEN_INVALID.getMessage()
@@ -78,13 +78,13 @@ class OAuth2LinkRequestServiceTest {
     @Test
     @DisplayName("연동 요청 토큰이 없거나 공백이면 거부한다")
     void consume_blankToken_throwsException() {
-        assertThatThrownBy(() -> service.consume(null))
+        assertThatThrownBy(() -> service.consume(null, OAuthProvider.GOOGLE))
                 .isInstanceOf(OtbooException.class)
                 .hasMessage(
                         ErrorCode.OAUTH2_LINK_TOKEN_INVALID.getMessage()
                 );
 
-        assertThatThrownBy(() -> service.consume("   "))
+        assertThatThrownBy(() -> service.consume("   ", OAuthProvider.GOOGLE))
                 .isInstanceOf(OtbooException.class)
                 .hasMessage(
                         ErrorCode.OAUTH2_LINK_TOKEN_INVALID.getMessage()
@@ -114,10 +114,38 @@ class OAuth2LinkRequestServiceTest {
         );
 
         // when & then
-        assertThatThrownBy(() -> service.consume(token))
+        assertThatThrownBy(() -> service.consume(token, OAuthProvider.GOOGLE))
                 .isInstanceOf(OtbooException.class)
                 .hasMessage(
                         ErrorCode.OAUTH2_LINK_TOKEN_EXPIRED.getMessage()
                 );
     }
+
+    @Test
+    @DisplayName("요청한 소셜 제공자와 인증 제공자가 다르면 거부한다")
+    void consume_providerMismatch_throwsException() {
+        // given
+        String token = service.create(
+                UUID.randomUUID(),
+                OAuthProvider.GOOGLE
+        );
+
+        // when & then
+        assertThatThrownBy(() ->
+                service.consume(token, OAuthProvider.KAKAO)
+        )
+                .isInstanceOf(OtbooException.class)
+                .hasMessage(
+                        ErrorCode.OAUTH2_LINK_TOKEN_INVALID.getMessage()
+                );
+        assertThatThrownBy(
+                () -> service.consume(token, OAuthProvider.GOOGLE)
+        )
+                .isInstanceOf(OtbooException.class)
+                .hasMessage(
+                        ErrorCode.OAUTH2_LINK_TOKEN_INVALID.getMessage()
+                );
+
+    }
+
 }
