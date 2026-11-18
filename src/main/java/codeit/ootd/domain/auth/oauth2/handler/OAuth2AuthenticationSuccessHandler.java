@@ -10,15 +10,18 @@ import codeit.ootd.domain.auth.oauth2.linking.OAuth2LinkRequestService;
 import codeit.ootd.domain.auth.service.AuthService;
 import codeit.ootd.domain.auth.service.SocialAccountService;
 import codeit.ootd.domain.user.entity.User;
+import codeit.ootd.domain.user.exception.DuplicateEmailException;
 import codeit.ootd.domain.user.exception.UserNotFoundException;
 import codeit.ootd.domain.user.repository.UserRepository;
 import codeit.ootd.global.exception.OtbooException;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
+
 import java.io.IOException;
 import java.time.Duration;
 import java.util.UUID;
+
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.ResponseCookie;
@@ -48,7 +51,7 @@ public class OAuth2AuthenticationSuccessHandler
             HttpServletRequest request,
             HttpServletResponse response,
             Authentication authentication
-    ) throws IOException, ServletException{
+    ) throws IOException, ServletException {
 
         OAuth2User principal = (OAuth2User) authentication.getPrincipal();
 
@@ -123,6 +126,18 @@ public class OAuth2AuthenticationSuccessHandler
         } catch (OAuth2AuthenticationException e) {
             failureHandler.onAuthenticationFailure(request, response, e);
 
+        } catch (
+                DuplicateEmailException e) {
+            failureHandler.onAuthenticationFailure(
+                    request,
+                    response,
+                    new OAuth2AuthenticationException(
+                            new OAuth2Error("email_already_exists"),
+                            "이미 가입된 이메일입니다. 기존 계정으로 로그인한 후 소셜 계정을 연동해 주세요.",
+                            e
+                    )
+            );
+
         } catch (OtbooException e) {
             String errorCode = linkToken != null
                     ? "oauth_link_failed"
@@ -167,7 +182,6 @@ public class OAuth2AuthenticationSuccessHandler
                 cookie.toString()
         );
     }
-
 
 
 }
