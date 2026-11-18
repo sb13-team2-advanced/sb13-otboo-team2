@@ -98,9 +98,10 @@ public class OAuth2AuthenticationSuccessHandler
             OAuth2UserInfo userInfo = new OAuth2UserInfo(
                     provider,
                     providerUserId,
-                    null,
-                    null
+                    principal.getAttribute("otbooEmail"),
+                    principal.getAttribute("otbooName")
             );
+
 
             UUID userId = resolver.resolveUserId(userInfo);
 
