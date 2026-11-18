@@ -46,6 +46,7 @@ public enum ErrorCode {
     CLOTHES_EXTRACTION_INVALID_URL(HttpStatus.BAD_REQUEST, "올바르지 않거나 접근할 수 없는 URL입니다."),
     CLOTHES_EXTRACTION_FETCH_FAILED(HttpStatus.BAD_GATEWAY, "구매 링크의 페이지를 불러오지 못했습니다."),
     CLOTHES_EXTRACTION_NOT_FOUND(HttpStatus.UNPROCESSABLE_CONTENT, "구매 링크에서 의상 정보를 찾지 못했습니다."),
+    CLOTHES_EXTRACTION_RATE_LIMIT_EXCEEDED(HttpStatus.TOO_MANY_REQUESTS, "구매 링크 불러오기 요청 횟수를 초과했습니다."),
 
     // 피드
     FEED_CREATE_INVALID_REQUEST(HttpStatus.BAD_REQUEST, "피드 등록 요청이 올바르지 않습니다."),
