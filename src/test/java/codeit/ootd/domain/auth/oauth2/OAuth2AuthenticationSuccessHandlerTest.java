@@ -3,7 +3,9 @@ package codeit.ootd.domain.auth.oauth2;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.*;
 
+import codeit.ootd.domain.auth.cookie.RefreshTokenCookieFactory;
 import codeit.ootd.domain.auth.dto.response.SignInResult;
+import codeit.ootd.domain.auth.oauth2.handler.OAuth2AuthenticationSuccessHandler;
 import codeit.ootd.domain.auth.service.AuthService;
 import codeit.ootd.domain.user.entity.User;
 import codeit.ootd.domain.user.repository.UserRepository;

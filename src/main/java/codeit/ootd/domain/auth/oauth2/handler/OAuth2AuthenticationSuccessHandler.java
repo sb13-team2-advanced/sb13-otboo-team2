@@ -1,6 +1,7 @@
-package codeit.ootd.domain.auth.oauth2;
+package codeit.ootd.domain.auth.oauth2.handler;
 
 import codeit.ootd.domain.auth.dto.response.SignInResult;
+import codeit.ootd.domain.auth.cookie.RefreshTokenCookieFactory;
 import codeit.ootd.domain.auth.service.AuthService;
 import codeit.ootd.domain.user.entity.User;
 import codeit.ootd.domain.user.exception.UserNotFoundException;
