@@ -18,14 +18,21 @@ import codeit.ootd.domain.clothes.repository.ClothesAttributeDefinitionRepositor
 import codeit.ootd.domain.profile.entity.Profile;
 import codeit.ootd.domain.profile.repository.ProfileRepository;
 import codeit.ootd.domain.recommendation.algorithm.OutfitRecommender;
+import codeit.ootd.domain.recommendation.algorithm.RecommendationConditions;
 import codeit.ootd.domain.recommendation.dto.response.RecommendationClothesResponse;
 import codeit.ootd.domain.recommendation.dto.response.RecommendationResponse;
 import codeit.ootd.domain.recommendation.service.impl.RecommendationServiceImpl;
 import codeit.ootd.domain.weather.entity.Weather;
+import codeit.ootd.domain.weather.entity.WeatherForecast;
+import codeit.ootd.domain.weather.repository.WeatherForecastRepository;
 import codeit.ootd.domain.weather.repository.WeatherRepository;
 import codeit.ootd.global.exception.ErrorCode;
 import codeit.ootd.global.exception.OtbooException;
 
+import java.time.Clock;
+import java.time.Instant;
+import java.time.LocalDate;
+import java.time.ZoneOffset;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -36,6 +43,7 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
+import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 /**
@@ -44,12 +52,215 @@ import org.mockito.junit.jupiter.MockitoExtension;
 @ExtendWith(MockitoExtension.class)
 class RecommendationServiceTest {
     @Mock private WeatherRepository weatherRepository;
+    @Mock private WeatherForecastRepository forecastRepository;
     @Mock private ClothesRepository clothesRepository;
     @Mock private ClothesAttributeRepository attributeRepository;
     @Mock private ClothesAttributeDefinitionRepository definitionRepository;
     @Mock private ProfileRepository profileRepository;
     @Mock private OutfitRecommender recommender;
+    @Spy private Clock clock = Clock.fixed(Instant.parse("2026-11-18T06:00:00Z"), ZoneOffset.UTC);
     @InjectMocks private RecommendationServiceImpl service;
+
+    /**
+     * 한국 시간의 정시·30분 경계와 날짜 시작을 기준으로 조회 시작점이 반올림되는지 검증한다.
+     */
+    @ParameterizedTest
+    @CsvSource({
+            "2026-11-18T06:00:00Z, 2026-11-18T06:00:00Z",
+            "2026-11-18T06:29:59.999Z, 2026-11-18T06:00:00Z",
+            "2026-11-18T06:30:00Z, 2026-11-18T07:00:00Z",
+            "2026-11-18T06:59:59Z, 2026-11-18T07:00:00Z",
+            "2026-11-17T15:29:59Z, 2026-11-17T15:00:00Z",
+            "2026-11-17T15:30:00Z, 2026-11-17T16:00:00Z"
+    })
+    void 오늘은_요청_시각을_한_시간_단위로_반올림해_예보를_조회한다(String requestedAt,
+            String expectedStart) {
+        // given
+        UUID userId = UUID.randomUUID();
+        UUID weatherId = UUID.randomUUID();
+        UUID locationId = UUID.randomUUID();
+        given(clock.instant()).willReturn(Instant.parse(requestedAt));
+        given(weatherRepository.findById(weatherId)).willReturn(Optional.of(todayWeather(locationId)));
+        given(clothesRepository.findAllByUserId(userId)).willReturn(List.of(mock(Clothes.class)));
+
+        // when
+        RecommendationResponse response = service.recommend(userId, weatherId);
+
+        // then
+        verify(forecastRepository).findForecastsForRecommendation(locationId,
+                Instant.parse(expectedStart), Instant.parse("2026-11-18T15:00:00Z"));
+        verify(clock, times(1)).instant();
+        verifyNoInteractions(profileRepository, recommender);
+        assertThat(response.clothes()).isEmpty();
+    }
+
+    @Test
+    void 오늘은_지난_강수와_일별_집계값을_추천에_반영하지_않는다() {
+        // given
+        UUID userId = UUID.randomUUID();
+        UUID weatherId = UUID.randomUUID();
+        UUID locationId = UUID.randomUUID();
+        given(weatherRepository.findById(weatherId)).willReturn(Optional.of(todayWeather(locationId)));
+        given(clothesRepository.findAllByUserId(userId)).willReturn(List.of(mock(Clothes.class)));
+        given(forecastRepository.findForecastsForRecommendation(locationId,
+                Instant.parse("2026-11-18T06:00:00Z"), Instant.parse("2026-11-18T15:00:00Z")))
+                .willReturn(List.of(
+                        forecast(locationId, "2026-11-18T06:00:00Z", 24, 1.0, 10, 5, 1),
+                        forecast(locationId, "2026-11-18T09:00:00Z", 26, 0.0, 0, 0, 1),
+                        forecast(locationId, "2026-11-18T12:00:00Z", 28, 0.0, 0, 0, 1),
+                        forecast(locationId, "2026-11-18T15:00:00Z", 26, 0.0, 0, 0, 1)));
+
+        // when
+        service.recommend(userId, weatherId);
+
+        // then
+        verify(recommender).recommend(eq(RecommendationConditions.of(26, 0, 0, 0, 1)), anyList());
+    }
+
+    /**
+     * 남은 예보로 기온·풍속·강수 조건을 만든 뒤 사용자 민감도까지 함께 적용하는지 검증한다.
+     */
+    @ParameterizedTest
+    @CsvSource({"0.7, 0, 0", "0, 1, 0", "0, 0, 1"})
+    void 오늘의_남은_기온과_강수와_풍속에_민감도를_반영한다(double probability,
+            double rain, double snow) {
+        // given
+        UUID userId = UUID.randomUUID();
+        UUID weatherId = UUID.randomUUID();
+        UUID locationId = UUID.randomUUID();
+        Profile profile = new Profile(userId);
+        profile.update(null, null, 1);
+        given(weatherRepository.findById(weatherId)).willReturn(Optional.of(todayWeather(locationId)));
+        given(clothesRepository.findAllByUserId(userId)).willReturn(List.of(mock(Clothes.class)));
+        given(profileRepository.findByUserId(userId)).willReturn(Optional.of(profile));
+        given(forecastRepository.findForecastsForRecommendation(locationId,
+                Instant.parse("2026-11-18T06:00:00Z"), Instant.parse("2026-11-18T15:00:00Z")))
+                .willReturn(List.of(
+                        forecast(locationId, "2026-11-18T09:00:00Z", 12, null, 0, 0, 2),
+                        forecast(locationId, "2026-11-18T12:00:00Z", 16, probability, rain, snow, 6)));
+
+        // when
+        service.recommend(userId, weatherId);
+
+        // then
+        verify(recommender).recommend(argThat(conditions ->
+                conditions.temperature() == 8 && conditions.precipitationExpected()
+                        && conditions.windy()), anyList());
+    }
+
+    @Test
+    void 자정_예보로_오늘_마지막_강수_구간을_포함한다() {
+        // given
+        UUID userId = UUID.randomUUID();
+        UUID weatherId = UUID.randomUUID();
+        UUID locationId = UUID.randomUUID();
+        given(clock.instant()).willReturn(Instant.parse("2026-11-18T14:29:59Z"));
+        given(weatherRepository.findById(weatherId)).willReturn(Optional.of(todayWeather(locationId)));
+        given(clothesRepository.findAllByUserId(userId)).willReturn(List.of(mock(Clothes.class)));
+        given(forecastRepository.findForecastsForRecommendation(locationId,
+                Instant.parse("2026-11-18T14:00:00Z"), Instant.parse("2026-11-18T15:00:00Z")))
+                .willReturn(List.of(forecast(locationId, "2026-11-18T15:00:00Z", 25, null, 1, 0, 1)));
+
+        // when
+        service.recommend(userId, weatherId);
+
+        // then
+        verify(recommender).recommend(eq(RecommendationConditions.of(25, 0, 1, 0, 1)), anyList());
+    }
+
+    @Test
+    void 강수확률이_모두_없고_비눈_예보량도_없으면_강수_대비를_추가하지_않는다() {
+        // given
+        UUID userId = UUID.randomUUID();
+        UUID weatherId = UUID.randomUUID();
+        UUID locationId = UUID.randomUUID();
+        given(weatherRepository.findById(weatherId)).willReturn(Optional.of(todayWeather(locationId)));
+        given(clothesRepository.findAllByUserId(userId)).willReturn(List.of(mock(Clothes.class)));
+        given(forecastRepository.findForecastsForRecommendation(locationId,
+                Instant.parse("2026-11-18T06:00:00Z"), Instant.parse("2026-11-18T15:00:00Z")))
+                .willReturn(List.of(forecast(locationId, "2026-11-18T09:00:00Z", 25, null, 0, 0, 1)));
+
+        // when
+        service.recommend(userId, weatherId);
+
+        // then
+        verify(recommender).recommend(eq(RecommendationConditions.of(25, 0, 0, 0, 1)), anyList());
+    }
+
+    @Test
+    void 시작_시각에_끝난_구간만_있으면_빈_추천을_반환한다() {
+        // given
+        UUID userId = UUID.randomUUID();
+        UUID weatherId = UUID.randomUUID();
+        UUID locationId = UUID.randomUUID();
+        given(weatherRepository.findById(weatherId)).willReturn(Optional.of(todayWeather(locationId)));
+        given(clothesRepository.findAllByUserId(userId)).willReturn(List.of(mock(Clothes.class)));
+        given(forecastRepository.findForecastsForRecommendation(locationId,
+                Instant.parse("2026-11-18T06:00:00Z"), Instant.parse("2026-11-18T15:00:00Z")))
+                .willReturn(List.of(forecast(locationId, "2026-11-18T06:00:00Z", 25, 1.0, 1, 0, 1)));
+
+        // when
+        RecommendationResponse response = service.recommend(userId, weatherId);
+
+        // then
+        assertThat(response.clothes()).isEmpty();
+        verifyNoInteractions(profileRepository, recommender);
+    }
+
+    @ParameterizedTest
+    @CsvSource({"2026-11-18T14:30:00Z", "2026-11-18T14:59:59Z"})
+    void 반올림한_시각이_다음_날이면_오늘의_추천은_빈_목록이다(String requestedAt) {
+        // given
+        UUID userId = UUID.randomUUID();
+        UUID weatherId = UUID.randomUUID();
+        given(clock.instant()).willReturn(Instant.parse(requestedAt));
+        given(weatherRepository.findById(weatherId)).willReturn(Optional.of(todayWeather(UUID.randomUUID())));
+        given(clothesRepository.findAllByUserId(userId)).willReturn(List.of(mock(Clothes.class)));
+
+        // when
+        RecommendationResponse response = service.recommend(userId, weatherId);
+
+        // then
+        assertThat(response.clothes()).isEmpty();
+        verifyNoInteractions(forecastRepository, profileRepository, recommender);
+    }
+
+    @ParameterizedTest
+    @CsvSource({"2026-11-17", "2026-11-19"})
+    void 오늘이_아닌_날짜는_해당_날짜_전체의_날씨로_추천한다(String weatherDate) {
+        // given
+        UUID userId = UUID.randomUUID();
+        UUID weatherId = UUID.randomUUID();
+        Weather weather = new Weather(UUID.randomUUID(), LocalDate.parse(weatherDate), clock.instant(),
+                25, 25, 25, (short) 50, 800, 0.7, 1, 0, 1, (short) 8);
+        given(weatherRepository.findById(weatherId)).willReturn(Optional.of(weather));
+        given(clothesRepository.findAllByUserId(userId)).willReturn(List.of(mock(Clothes.class)));
+
+        // when
+        service.recommend(userId, weatherId);
+
+        // then
+        verify(recommender).recommend(eq(RecommendationConditions.of(25, 0.7, 1, 0, 1)), anyList());
+        verifyNoInteractions(forecastRepository);
+    }
+
+    /**
+     * 지난 강수와 낮은 기온이 들어 있는 일별 집계로 오늘 예보가 이를 대체하는지 검증한다.
+     */
+    private static Weather todayWeather(UUID locationId) {
+        return new Weather(locationId, LocalDate.of(2026, 11, 18), Instant.parse("2026-11-18T03:00:00Z"),
+                5, 0, 25, (short) 50, 500, 1.0, 10, 5, 8, (short) 8);
+    }
+
+    /**
+     * 지정한 시각의 예보와 직전 구간의 강수량을 가진 테스트 자료를 만든다.
+     */
+    private static WeatherForecast forecast(UUID locationId, String forecastAt, double temperature,
+            Double probability, double rain, double snow, double wind) {
+        return new WeatherForecast(locationId, Instant.parse(forecastAt),
+                Instant.parse("2026-11-18T03:00:00Z"), temperature, (short) 50, 800,
+                probability, rain, snow, wind);
+    }
 
     /**
      * 의상 속성이 참조하는 정의가 누락되면 추천을 중단하는지 검증한다.
@@ -108,7 +319,7 @@ class RecommendationServiceTest {
                 List.of(new ClothesAttributeWithDefDto(
                         definitionId, "두께", List.of("얇음", "보통", "두꺼움"), "보통")));
 
-        given(recommender.recommend(15.0, List.of(expected))).willReturn(List.of(expected));
+        given(recommender.recommend(RecommendationConditions.of(15.0, 0, 0, 0, 0), List.of(expected))).willReturn(List.of(expected));
 
         // when
         RecommendationResponse response = service.recommend(userId, weatherId);
@@ -117,7 +328,7 @@ class RecommendationServiceTest {
         assertThat(response.clothes()).containsExactly(expected);
         verify(clothesRepository).findAllByUserId(userId);
         verify(profileRepository).findByUserId(userId);
-        verify(recommender).recommend(15.0, List.of(expected));
+        verify(recommender).recommend(RecommendationConditions.of(15.0, 0, 0, 0, 0), List.of(expected));
     }
 
     @Test
@@ -174,7 +385,7 @@ class RecommendationServiceTest {
         given(profileRepository.findByUserId(userId)).willReturn(Optional.of(profile));
         RecommendationClothesResponse candidate = new RecommendationClothesResponse(
                 clothesId, "상의", null, ClothesType.TOP, List.of());
-        given(recommender.recommend(expectedTemperature, List.of(candidate))).willReturn(List.of(candidate));
+        given(recommender.recommend(RecommendationConditions.of(expectedTemperature, 0, 0, 0, 0), List.of(candidate))).willReturn(List.of(candidate));
 
         // when
         RecommendationResponse response = service.recommend(userId, weatherId);
@@ -184,7 +395,7 @@ class RecommendationServiceTest {
         assertThat(response.userId()).isEqualTo(userId);
         assertThat(response.weatherId()).isEqualTo(weatherId);
         verify(profileRepository).findByUserId(userId);
-        verify(recommender).recommend(expectedTemperature, List.of(candidate));
+        verify(recommender).recommend(RecommendationConditions.of(expectedTemperature, 0, 0, 0, 0), List.of(candidate));
     }
 
     @Test
@@ -203,6 +414,39 @@ class RecommendationServiceTest {
         service.recommend(userId, weatherId);
 
         // then
-        verify(recommender).recommend(eq(15.0), anyList());
+        verify(recommender).recommend(eq(RecommendationConditions.of(15.0, 0, 0, 0, 0)), anyList());
+    }
+
+    /**
+     * 사용자 민감도로 보정한 기온과 저장된 강수·풍속을 함께 추천 조건으로 전달하는지 검증한다.
+     */
+    @ParameterizedTest
+    @CsvSource({"1, 8.0", "3, 12.0", "5, 16.0"})
+    void 사용자_민감도와_날씨를_함께_추천에_반영한다(int sensitivity, double expectedTemperature) {
+        // given
+        UUID userId = UUID.randomUUID();
+        UUID weatherId = UUID.randomUUID();
+        Weather weather = mock(Weather.class);
+        Clothes clothes = mock(Clothes.class);
+        Profile profile = new Profile(userId);
+        profile.update(null, null, sensitivity);
+        given(weatherRepository.findById(weatherId)).willReturn(Optional.of(weather));
+        given(weather.getTemperatureAvg()).willReturn(14.0);
+        given(weather.getPrecipitationProbability()).willReturn(0.7);
+        given(weather.getRainAmount()).willReturn(1.0);
+        given(weather.getSnowAmount()).willReturn(0.5);
+        given(weather.getWindSpeed()).willReturn(4.0);
+        given(clothesRepository.findAllByUserId(userId)).willReturn(List.of(clothes));
+        given(profileRepository.findByUserId(userId)).willReturn(Optional.of(profile));
+
+        // when
+        service.recommend(userId, weatherId);
+
+        // then
+        verify(recommender).recommend(argThat(conditions ->
+                conditions.temperature() == expectedTemperature
+                        && conditions.precipitationExpected() && conditions.windy()), anyList());
+        verify(weather).getRainAmount();
+        verify(weather).getSnowAmount();
     }
 }

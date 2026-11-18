@@ -2,8 +2,9 @@ package codeit.ootd.global.security;
 
 import codeit.ootd.domain.auth.jwt.JwtProvider;
 import codeit.ootd.domain.auth.oauth2.CustomOAuth2UserService;
-import codeit.ootd.domain.auth.oauth2.OAuth2AuthenticationFailureHandler;
-import codeit.ootd.domain.auth.oauth2.OAuth2AuthenticationSuccessHandler;
+import codeit.ootd.domain.auth.oauth2.handler.OAuth2AuthenticationFailureHandler;
+import codeit.ootd.domain.auth.oauth2.handler.OAuth2AuthenticationSuccessHandler;
+import codeit.ootd.domain.auth.oauth2.linking.OAuth2LinkAuthorizationRequestRepository;
 import codeit.ootd.domain.auth.service.AuthSessionService;
 import codeit.ootd.domain.user.repository.UserRepository;
 import codeit.ootd.global.exception.ErrorCode;
@@ -45,7 +46,8 @@ public class SecurityConfig {
             JsonMapper jsonMapper,
             CustomOAuth2UserService customOAuth2UserService,
             OAuth2AuthenticationFailureHandler oAuth2FailureHandler,
-            OAuth2AuthenticationSuccessHandler oAuth2SuccessHandler
+            OAuth2AuthenticationSuccessHandler oAuth2SuccessHandler,
+            OAuth2LinkAuthorizationRequestRepository linkAuthorizationRequestRepository
     ) throws Exception {
 
         http.csrf(csrf -> csrf
@@ -64,6 +66,11 @@ public class SecurityConfig {
 
         // OAuth2 사용자 서비스 연결
         http.oauth2Login(oauth2 -> oauth2
+                .authorizationEndpoint(endpoint -> endpoint
+                        .authorizationRequestRepository(
+                                linkAuthorizationRequestRepository
+                        )
+                )
                 .userInfoEndpoint(userInfo -> userInfo
                         .userService(customOAuth2UserService)
                 )
@@ -97,6 +104,7 @@ public class SecurityConfig {
                 .requestMatchers("/error").permitAll()
                 .requestMatchers("/ws", "/ws/**").permitAll()
                 .requestMatchers(HttpMethod.GET, "/files/clothes/**").permitAll()
+                .requestMatchers(HttpMethod.GET, "/files/profiles/**").permitAll()
                 .requestMatchers(HttpMethod.GET, "/actuator/health/readiness").permitAll()
                 .requestMatchers(HttpMethod.POST, "/api/users").permitAll()
                 .requestMatchers(HttpMethod.POST, "/api/auth/sign-in").permitAll()

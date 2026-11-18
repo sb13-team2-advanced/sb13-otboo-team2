@@ -41,13 +41,26 @@ public class OAuth2UserInfoExtractor {
         Map<String, Object> profile =
                 nestedMap(account.get("profile"));
 
+        String providerUserId = requiredString(attributes.get("id"));
+        String nickname = optionalString(profile.get("nickname"));
+        String email = optionalString(account.get("email"));
+
+        if (email == null) {
+            String emailName = nickname != null
+                    ? nickname
+                    : "kakao";
+
+            email = emailName + "_" + providerUserId + "@kakao.com";
+        }
+
         return new OAuth2UserInfo(
                 OAuthProvider.KAKAO,
-                requiredString(attributes.get("id")),
-                optionalString(account.get("email")),
-                optionalString(profile.get("nickname"))
+                providerUserId,
+                email,
+                nickname
         );
     }
+
 
     private String requiredString(Object value) {
         String result = optionalString(value);

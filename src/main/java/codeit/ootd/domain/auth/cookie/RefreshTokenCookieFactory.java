@@ -1,4 +1,4 @@
-package codeit.ootd.domain.auth.oauth2;
+package codeit.ootd.domain.auth.cookie;
 
 import java.time.Duration;
 import org.springframework.beans.factory.annotation.Value;

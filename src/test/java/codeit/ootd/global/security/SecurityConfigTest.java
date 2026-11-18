@@ -245,6 +245,13 @@ class SecurityConfigTest {
     }
 
     @Test
+    @DisplayName("프로필 이미지 조회는 JWT 인증 없이 접근할 수 있다")
+    void profileImage_withoutAuthentication_shouldReturnOk() throws Exception {
+        mockMvc.perform(get("/files/profiles/test.jpg"))
+                .andExpect(status().isOk());
+    }
+
+    @Test
     @DisplayName("보호된 API는 인증 없이 접근하면 401을 반환한다")
     void protectedApi_withoutAuthentication_shouldReturn401() throws Exception {
         mockMvc.perform(get("/api/security-test/protected"))
@@ -256,6 +263,11 @@ class SecurityConfigTest {
 
         @GetMapping("/files/clothes/test.jpeg")
         ResponseEntity<Void> image() {
+            return ResponseEntity.ok().build();
+        }
+
+        @GetMapping("/files/profiles/test.jpg")
+        ResponseEntity<Void> profileImage() {
             return ResponseEntity.ok().build();
         }
 
@@ -280,6 +292,11 @@ class SecurityConfigTest {
         @Bean
         TestAuthController testAuthController() {
             return new TestAuthController();
+        }
+
+        @Bean
+        TestController testController() {
+            return new TestController();
         }
     }
 
