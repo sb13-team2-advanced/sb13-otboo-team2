@@ -4,6 +4,7 @@ import codeit.ootd.global.exception.ErrorCode;
 import codeit.ootd.global.exception.OtbooException;
 import java.io.IOException;
 import java.util.Locale;
+import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 import java.util.regex.Pattern;
@@ -29,7 +30,13 @@ public class S3FileStorage implements FileStorage {
 
     private static final String KEY_PREFIX = "images/";
     private static final Set<String> ALLOWED_DIRECTORIES = Set.of("clothes", "profiles");
-    private static final Set<String> ALLOWED_EXTENSIONS = Set.of("jpg", "jpeg", "png", "gif", "webp");
+    private static final Map<String, String> ALLOWED_CONTENT_TYPES = Map.of(
+            "jpg", "image/jpeg",
+            "jpeg", "image/jpeg",
+            "png", "image/png",
+            "gif", "image/gif",
+            "webp", "image/webp"
+    );
     private static final Pattern OBJECT_KEY_PATTERN = Pattern.compile(
             "images/(clothes|profiles)/[0-9a-f-]{36}\\.(jpg|jpeg|png|gif|webp)"
     );
@@ -68,7 +75,7 @@ public class S3FileStorage implements FileStorage {
         PutObjectRequest request = PutObjectRequest.builder()
                 .bucket(bucket)
                 .key(objectKey)
-                .contentType(file.getContentType())
+                .contentType(ALLOWED_CONTENT_TYPES.get(extension))
                 .build();
 
         try {
@@ -123,7 +130,7 @@ public class S3FileStorage implements FileStorage {
     }
 
     /**
-     * 기존 로컬 저장소와 동일하게 빈 파일, 콘텐츠 타입, 확장자를 검사한다.
+     * 빈 파일을 차단하고 확장자별 허용 MIME 타입과 일치하는지 검증한다.
      */
     private void validate(MultipartFile file) {
 
@@ -131,11 +138,10 @@ public class S3FileStorage implements FileStorage {
             throw new OtbooException(ErrorCode.FILE_EMPTY);
         }
 
-        String contentType = file.getContentType();
         String extension = extractExtension(file.getOriginalFilename());
-        if (contentType == null
-                || !contentType.startsWith("image/")
-                || !ALLOWED_EXTENSIONS.contains(extension)) {
+        String expectedContentType = ALLOWED_CONTENT_TYPES.get(extension);
+        if (expectedContentType == null
+                || !expectedContentType.equalsIgnoreCase(file.getContentType())) {
             throw new OtbooException(ErrorCode.FILE_INVALID_TYPE);
         }
     }

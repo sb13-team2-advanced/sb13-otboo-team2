@@ -15,6 +15,8 @@ import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.mockito.ArgumentCaptor;
 import org.springframework.mock.web.MockMultipartFile;
 import software.amazon.awssdk.core.sync.RequestBody;
@@ -84,6 +86,62 @@ class S3FileStorageTest {
                 .isInstanceOfSatisfying(OtbooException.class,
                         e -> assertThat(e.getErrorCode()).isEqualTo(ErrorCode.FILE_EMPTY));
 
+        verifyNoInteractions(s3Client);
+    }
+
+    @ParameterizedTest
+    @CsvSource({
+            "shirt.jpg, image/jpeg, image/jpeg",
+            "shirt.jpeg, image/jpeg, image/jpeg",
+            "shirt.png, image/png, image/png",
+            "shirt.gif, image/gif, image/gif",
+            "shirt.webp, image/webp, image/webp",
+            "shirt.PNG, IMAGE/PNG, image/png"
+    })
+    void 확장자와_MIME_타입이_일치하면_표준_콘텐츠_타입으로_업로드한다(
+            String filename, String contentType, String expectedContentType
+    ) {
+        // given
+        MockMultipartFile file = new MockMultipartFile(
+                "image", filename, contentType, new byte[]{1}
+        );
+
+        // when
+        String url = storage.upload(file, "profiles");
+
+        // then
+        ArgumentCaptor<PutObjectRequest> request =
+                ArgumentCaptor.forClass(PutObjectRequest.class);
+        verify(s3Client).putObject(request.capture(), any(RequestBody.class));
+        assertThat(request.getValue().contentType()).isEqualTo(expectedContentType);
+        assertThat(request.getValue().key()).startsWith("images/profiles/");
+        assertThat(url).isEqualTo(BASE_URL + "/" + request.getValue().key());
+    }
+
+    @ParameterizedTest
+    @CsvSource({
+            "shirt.png, image/svg+xml",
+            "shirt.png, image/jpeg",
+            "shirt.jpg, image/png",
+            "shirt.jpeg, image/jpg",
+            "shirt.gif, image/webp",
+            "shirt.webp, image/gif",
+            "shirt.svg, image/svg+xml",
+            "shirt.png,"
+    })
+    void 확장자와_MIME_타입이_일치하지_않으면_S3에_전송하지_않는다(
+            String filename, String contentType
+    ) {
+        // given
+        MockMultipartFile file = new MockMultipartFile(
+                "image", filename, contentType, new byte[]{1}
+        );
+
+        // when/then
+        assertThatThrownBy(() -> storage.upload(file, "clothes"))
+                .isInstanceOfSatisfying(OtbooException.class,
+                        e -> assertThat(e.getErrorCode())
+                                .isEqualTo(ErrorCode.FILE_INVALID_TYPE));
         verifyNoInteractions(s3Client);
     }
 
