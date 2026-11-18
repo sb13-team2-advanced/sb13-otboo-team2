@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.springframework.http.HttpHeaders;
 import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.mock.web.MockHttpServletResponse;
 import org.springframework.security.authentication.BadCredentialsException;
@@ -34,6 +35,13 @@ class OAuth2AuthenticationFailureHandlerTest {
                 "/#/auth/login?error=oauth_failed"
                         + "&error_message=user_not_exists"
         );
+        assertThat(response.getHeaders(HttpHeaders.SET_COOKIE))
+                .anySatisfy(cookie -> assertThat(cookie)
+                        .contains("OAUTH2_LINK_TOKEN=")
+                        .contains("Path=/oauth2/authorization")
+                        .contains("Max-Age=0")
+                );
+
     }
 
     @Test
@@ -57,4 +65,5 @@ class OAuth2AuthenticationFailureHandlerTest {
                         + "&error_message=oauth_failed"
         );
     }
+
 }
