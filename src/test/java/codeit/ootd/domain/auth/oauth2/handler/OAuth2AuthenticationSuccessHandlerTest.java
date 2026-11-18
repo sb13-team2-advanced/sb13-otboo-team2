@@ -158,7 +158,16 @@ class OAuth2AuthenticationSuccessHandlerTest {
 
         verifyNoInteractions(resolver, userRepository, authService);
 
-        assertThat(response.getHeader(HttpHeaders.SET_COOKIE)).isNull();
+        assertThat(response.getHeaders(HttpHeaders.SET_COOKIE))
+                .anySatisfy(cookie -> assertThat(cookie)
+                        .contains("OAUTH2_LINK_TOKEN=")
+                        .contains("Path=/oauth2/authorization")
+                        .contains("Max-Age=0")
+                );
+
+        assertThat(response.getHeaders(HttpHeaders.SET_COOKIE))
+                .noneMatch(cookie -> cookie.startsWith("REFRESH_TOKEN="));
+
         assertThat(response.getRedirectedUrl())
                 .isEqualTo("/#/auth/login?link_success=true");
     }

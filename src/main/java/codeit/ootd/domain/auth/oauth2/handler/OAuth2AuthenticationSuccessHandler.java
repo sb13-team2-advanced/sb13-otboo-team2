@@ -17,9 +17,11 @@ import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import java.io.IOException;
+import java.time.Duration;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpHeaders;
+import org.springframework.http.ResponseCookie;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.oauth2.core.OAuth2AuthenticationException;
 import org.springframework.security.oauth2.core.OAuth2Error;
@@ -50,10 +52,17 @@ public class OAuth2AuthenticationSuccessHandler
 
         OAuth2User principal = (OAuth2User) authentication.getPrincipal();
 
+        Object linkToken = request.getAttribute("otboo_link_token");
+
+        if (linkToken != null) {
+            clearLinkCookie(response);
+        }
+
         try {
             OAuthProvider provider = resolveProvider(
                     principal.getAttribute("otbooProvider")
             );
+
             String providerUserId =
                     principal.getAttribute("otbooProviderUserId");
 
@@ -63,10 +72,7 @@ public class OAuth2AuthenticationSuccessHandler
                 );
             }
 
-            Object linkToken = request.getAttribute("otboo_link_token");
-
             if (linkToken != null) {
-                // 소셜 계정 연동
                 if (!(linkToken instanceof String token)) {
                     throw new OAuth2AuthenticationException(
                             "invalid_link_request"
@@ -142,6 +148,22 @@ public class OAuth2AuthenticationSuccessHandler
             );
         }
     }
+
+    private void clearLinkCookie(HttpServletResponse response) {
+        ResponseCookie cookie = ResponseCookie
+                .from("OAUTH2_LINK_TOKEN", "")
+                .httpOnly(true)
+                .sameSite("Lax")
+                .path("/oauth2/authorization")
+                .maxAge(Duration.ZERO)
+                .build();
+
+        response.addHeader(
+                HttpHeaders.SET_COOKIE,
+                cookie.toString()
+        );
+    }
+
 
 
 }
