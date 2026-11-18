@@ -67,16 +67,6 @@ public class FeedCommentController {
             description = "피드 댓글 등록 실패",
             content = @Content(mediaType = "*/*", schema = @Schema(implementation = ErrorResponse.class))
     )
-    @ApiResponse(
-            responseCode = "200",
-            description = "피드 댓글 조회 성공",
-            content = @Content(mediaType = "*/*", schema = @Schema(implementation = CommentDtoCursorResponse.class))
-    )
-    @ApiResponse(
-            responseCode = "400",
-            description = "피드 댓글 등록 실패",
-            content = @Content(mediaType = "*/*", schema = @Schema(implementation = ErrorResponse.class))
-    )
     @GetMapping("/{feedId}/comments")
     public ResponseEntity<CommentDtoCursorResponse> list(
             @PathVariable UUID feedId,
