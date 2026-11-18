@@ -14,6 +14,7 @@ import codeit.ootd.domain.auth.oauth2.linking.OAuth2LinkRequestService;
 import codeit.ootd.domain.auth.service.AuthService;
 import codeit.ootd.domain.auth.service.SocialAccountService;
 import codeit.ootd.domain.user.entity.User;
+import codeit.ootd.domain.user.exception.DuplicateEmailException;
 import codeit.ootd.domain.user.repository.UserRepository;
 import codeit.ootd.global.exception.OtbooException;
 import java.time.Instant;
@@ -454,6 +455,40 @@ class OAuth2AuthenticationSuccessHandlerTest {
                 oauth2User.getAuthorities()
         );
     }
+
+    @Test
+    @DisplayName("기존 이메일과 중복되면 계정 연동 안내 오류를 반환한다")
+    void success_duplicateEmail_failsWithSpecificError() throws Exception {
+        // given
+        var request = new MockHttpServletRequest();
+        var response = new MockHttpServletResponse();
+
+        when(resolver.resolveUserId(any(OAuth2UserInfo.class)))
+                .thenThrow(new DuplicateEmailException());
+
+        // when
+        handler.onAuthenticationSuccess(
+                request,
+                response,
+                authentication("GOOGLE", "google-123")
+        );
+
+        // then
+        verify(failureHandler).onAuthenticationFailure(
+                eq(request),
+                eq(response),
+                argThat(exception ->
+                        exception instanceof OAuth2AuthenticationException oauthException
+                                && "email_already_exists".equals(
+                                oauthException.getError().getErrorCode()
+                        )
+                )
+        );
+
+        verify(userRepository, never()).findById(any());
+        verifyNoInteractions(authService, socialAccountService);
+    }
+
 
 
 }
