@@ -15,12 +15,21 @@ import codeit.ootd.domain.recommendation.dto.response.RecommendationClothesRespo
 import codeit.ootd.domain.recommendation.dto.response.RecommendationResponse;
 import codeit.ootd.domain.recommendation.service.RecommendationService;
 import codeit.ootd.domain.weather.entity.Weather;
+import codeit.ootd.domain.weather.entity.WeatherForecast;
+import codeit.ootd.domain.weather.repository.WeatherForecastRepository;
 import codeit.ootd.domain.weather.repository.WeatherRepository;
 import codeit.ootd.global.exception.ErrorCode;
 import codeit.ootd.global.exception.OtbooException;
 
+import java.time.Clock;
+import java.time.Instant;
+import java.time.LocalDate;
+import java.time.ZoneId;
+import java.time.temporal.ChronoUnit;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
+import java.util.Optional;
 import java.util.UUID;
 import java.util.function.Function;
 import java.util.stream.Collectors;
@@ -36,21 +45,27 @@ public class RecommendationServiceImpl implements RecommendationService {
 
     private static final int DEFAULT_TEMPERATURE_SENSITIVITY = 3;
     private static final double TEMPERATURE_ADJUSTMENT_PER_LEVEL = 2.0;
+    private static final ZoneId KOREA_ZONE = ZoneId.of("Asia/Seoul");
+    private static final int HALF_HOUR_MINUTES = 30;
 
     private final WeatherRepository weatherRepository;
+    private final WeatherForecastRepository forecastRepository;
     private final ClothesRepository clothesRepository;
     private final ClothesAttributeRepository attributeRepository;
     private final ClothesAttributeDefinitionRepository definitionRepository;
     private final ProfileRepository profileRepository;
     private final OutfitRecommender recommender;
+    private final Clock clock;
 
     /**
-     * 사용자 소유 의상과 속성을 일괄 조회하고 온도 민감도, 강수 예보와 풍속으로 추천한다.
+     * 오늘은 요청 시각을 한 시간 단위로 반올림한 이후의 예보와 사용자 온도 민감도로 추천한다.
+     * 다른 날짜는 일별 날씨를 사용하며 오늘의 남은 예보가 없으면 빈 추천을 반환한다.
      */
     @Transactional(readOnly = true)
     @Override
     public RecommendationResponse recommend(UUID userId, UUID weatherId) {
 
+        Instant requestedAt = clock.instant();
         Weather weather = weatherRepository.findById(weatherId)
                 .orElseThrow(() -> new OtbooException(ErrorCode.RECOMMENDATION_WEATHER_NOT_FOUND));
 
@@ -62,14 +77,71 @@ public class RecommendationServiceImpl implements RecommendationService {
 
         List<RecommendationClothesResponse> candidates = createCandidates(clothes);
 
-        double temperature = recommendationTemperature(userId, weather.getTemperatureAvg());
-
-        RecommendationConditions conditions = RecommendationConditions.of(temperature,
-                weather.getPrecipitationProbability(), weather.getRainAmount(),
-                weather.getSnowAmount(), weather.getWindSpeed());
-
         return new RecommendationResponse(weatherId, userId,
-                recommender.recommend(conditions, candidates));
+                recommendationConditions(userId, weather, requestedAt)
+                        .map(conditions -> recommender.recommend(conditions, candidates))
+                        .orElseGet(List::of));
+    }
+
+    /**
+     * 한국 시간 기준 30분 이상은 다음 정시로 반올림하고 오늘 자정까지의 예보를 집계한다.
+     * 강수는 직전 구간의 누적값이므로 시작 시각에 이미 종료된 구간은 제외한다.
+     * 자정 예보는 오늘 마지막 강수 구간과 남은 시간대의 기온·풍속 평가에 포함한다.
+     */
+    private Optional<RecommendationConditions> recommendationConditions(UUID userId, Weather weather,
+            Instant requestedAt) {
+
+        LocalDate today = requestedAt.atZone(KOREA_ZONE).toLocalDate();
+        if (!today.equals(weather.getWeatherDate())) {
+            return Optional.of(RecommendationConditions.of(
+                    recommendationTemperature(userId, weather.getTemperatureAvg()),
+                    weather.getPrecipitationProbability(), weather.getRainAmount(),
+                    weather.getSnowAmount(), weather.getWindSpeed()));
+        }
+
+        Instant start = requestedAt.atZone(KOREA_ZONE)
+                .plusMinutes(HALF_HOUR_MINUTES)
+                .truncatedTo(ChronoUnit.HOURS)
+                .toInstant();
+        Instant end = today.plusDays(1)
+                .atStartOfDay(KOREA_ZONE)
+                .toInstant();
+
+        if (!start.isBefore(end)) return Optional.empty();
+
+        List<WeatherForecast> forecasts = forecastRepository.findForecastsForRecommendation(weather.getLocationId(), start, end);
+
+        List<WeatherForecast> precipitationForecasts = forecasts.stream()
+                .filter(forecast -> forecast.getForecastAt().isAfter(start))
+                .toList();
+
+        if (precipitationForecasts.isEmpty()) return Optional.empty();
+
+        double temperature = forecasts.stream()
+                .mapToDouble(WeatherForecast::getTemperature)
+                .average().orElseThrow();
+
+        double windSpeed = forecasts.stream()
+                .mapToDouble(WeatherForecast::getWindSpeed)
+                .average().orElseThrow();
+
+        double probability = precipitationForecasts.stream()
+                .map(WeatherForecast::getPrecipitationProbability)
+                .filter(Objects::nonNull)
+                .mapToDouble(Double::doubleValue)
+                .max()
+                .orElse(0.0);
+
+        double rain = precipitationForecasts.stream()
+                .mapToDouble(WeatherForecast::getRainAmount)
+                .sum();
+
+        double snow = precipitationForecasts.stream()
+                .mapToDouble(WeatherForecast::getSnowAmount)
+                .sum();
+
+        return Optional.of(RecommendationConditions.of(recommendationTemperature(userId, temperature),
+                probability, rain, snow, windSpeed));
     }
 
     /**

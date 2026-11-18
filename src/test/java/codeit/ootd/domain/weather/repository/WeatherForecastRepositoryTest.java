@@ -26,6 +26,32 @@ class WeatherForecastRepositoryTest {
     @Autowired
     private WeatherForecastRepository forecastRepository;
 
+    /**
+     * 추천 조회가 현재 위치와 시작·종료 경계를 포함하고 경계 밖 예보는 제외하는지 검증한다.
+     */
+    @Test
+    void 추천_예보는_시작_시각과_자정을_포함하고_다른_위치는_제외한다() {
+        // given
+        WeatherLocation location = saveLocation("8828308281fffff");
+        WeatherLocation otherLocation = saveLocation("8828308283fffff");
+        Instant start = Instant.parse("2026-11-18T06:00:00Z");
+        Instant end = Instant.parse("2026-11-18T15:00:00Z");
+        WeatherForecast atEnd = saveForecast(location, "2026-11-18T15:00:00Z");
+        WeatherForecast atStart = saveForecast(location, "2026-11-18T06:00:00Z");
+        WeatherForecast during = saveForecast(location, "2026-11-18T09:00:00Z");
+        saveForecast(location, "2026-11-18T05:59:59Z");
+        saveForecast(location, "2026-11-18T15:00:01Z");
+        saveForecast(otherLocation, "2026-11-18T09:00:00Z");
+
+        // when
+        List<WeatherForecast> result = forecastRepository.findForecastsForRecommendation(
+                location.getId(), start, end);
+
+        // then
+        assertThat(result).extracting(WeatherForecast::getId)
+                .containsExactly(atStart.getId(), during.getId(), atEnd.getId());
+    }
+
     @Test
     @DisplayName("위치와 예보 시각으로 날씨 예보를 조회한다.")
     void findWeatherForecastByLocationAndForecastAt() {
