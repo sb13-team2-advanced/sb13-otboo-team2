@@ -128,4 +128,61 @@ class SocialSignupServiceImplTest {
                 .save(any(SocialAccount.class));
     }
 
+    @Test
+    @DisplayName("Kakao 닉네임이 없으면 기본 이름으로 회원가입한다")
+    void register_kakao_withoutName_usesDefaultName() {
+        // given
+        OAuth2UserInfo userInfo = new OAuth2UserInfo(
+                OAuthProvider.KAKAO,
+                "123456789",
+                "kakao_123456789@kakao.com",
+                null
+        );
+
+        UUID userId = UUID.randomUUID();
+
+        when(passwordEncoder.encode(any(String.class)))
+                .thenReturn("encoded-password");
+
+        when(userRepository.saveAndFlush(any(User.class)))
+                .thenAnswer(invocation -> {
+                    User user = invocation.getArgument(0);
+                    ReflectionTestUtils.setField(user, "id", userId);
+                    return user;
+                });
+
+        // when
+        UUID result = socialSignupService.register(userInfo);
+
+        // then
+        assertThat(result).isEqualTo(userId);
+
+        ArgumentCaptor<User> userCaptor =
+                ArgumentCaptor.forClass(User.class);
+
+        verify(userRepository).saveAndFlush(userCaptor.capture());
+
+        User savedUser = userCaptor.getValue();
+
+        assertThat(savedUser.getName())
+                .isEqualTo("카카오 사용자");
+        assertThat(savedUser.getEmail())
+                .isEqualTo("kakao_123456789@kakao.com");
+
+        ArgumentCaptor<SocialAccount> accountCaptor =
+                ArgumentCaptor.forClass(SocialAccount.class);
+
+        verify(socialAccountRepository)
+                .save(accountCaptor.capture());
+
+        SocialAccount savedAccount = accountCaptor.getValue();
+
+        assertThat(savedAccount.getUserId()).isEqualTo(userId);
+        assertThat(savedAccount.getProvider())
+                .isEqualTo(OAuthProvider.KAKAO);
+        assertThat(savedAccount.getProviderUserId())
+                .isEqualTo("123456789");
+    }
+
+
 }
