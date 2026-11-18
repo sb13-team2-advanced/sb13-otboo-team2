@@ -57,7 +57,24 @@ public class OAuth2LinkAuthorizationRequestRepository
             HttpServletRequest request,
             HttpServletResponse response
     ) {
-        return delegate.removeAuthorizationRequest(request, response);
+        OAuth2AuthorizationRequest authorizationRequest =
+                delegate.removeAuthorizationRequest(request, response);
+
+        if (authorizationRequest == null) {
+            return null;
+        }
+
+        String linkToken = authorizationRequest
+                .getAttributes()
+                .get(LINK_TOKEN_ATTRIBUTE) instanceof String token
+                ? token
+                : null;
+
+        if (linkToken != null) {
+            request.setAttribute(LINK_TOKEN_ATTRIBUTE, linkToken);
+        }
+
+        return authorizationRequest;
     }
 
     private String findLinkToken(HttpServletRequest request) {
@@ -72,8 +89,9 @@ public class OAuth2LinkAuthorizationRequestRepository
                         "OAUTH2_LINK_TOKEN".equals(cookie.getName())
                 )
                 .map(Cookie::getValue)
-                .filter(value -> !value.isBlank())
+                .filter(value -> value != null && !value.isBlank())
                 .findFirst()
                 .orElse(null);
     }
+
 }
