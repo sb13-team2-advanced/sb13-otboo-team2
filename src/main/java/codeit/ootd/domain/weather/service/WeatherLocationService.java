@@ -10,9 +10,11 @@ import com.uber.h3core.util.LatLng;
 import java.time.Instant;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class WeatherLocationService {
@@ -51,16 +53,29 @@ public class WeatherLocationService {
     ) {
         h3Service.validateCoordinates(latitude, longitude);       
 
-        KakaoRegionResponse.Region region = kakaoLocalClient.getAdministrativeRegion(
-            latitude,
-            longitude
-        );
+        List<String> locationNames;
 
-        List<String> locationNames = List.of(
-            region.region1DepthName(),
-            region.region2DepthName(),
-            region.region3DepthName()
-        );
+        try {
+            KakaoRegionResponse.Region region =
+                kakaoLocalClient.getAdministrativeRegion(
+                    latitude,
+                    longitude
+                );
+
+            locationNames = List.of(
+                region.region1DepthName(),
+                region.region2DepthName(),
+                region.region3DepthName()
+            );
+
+        } catch (RuntimeException e) {
+            log.warn(
+                "카카오 행정구역 조회 실패, 좌표로 대체: errorType={}",
+                e.getClass().getSimpleName()
+            );
+
+            locationNames = List.of("위치 정보가 없습니다.");
+        }
 
         return new WeatherAPILocation(
             latitude,
