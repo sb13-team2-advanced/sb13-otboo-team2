@@ -13,6 +13,7 @@ import codeit.ootd.domain.auth.jwt.JwtProvider;
 import codeit.ootd.domain.auth.oauth2.CustomOAuth2UserService;
 import codeit.ootd.domain.auth.oauth2.handler.OAuth2AuthenticationFailureHandler;
 import codeit.ootd.domain.auth.oauth2.handler.OAuth2AuthenticationSuccessHandler;
+import codeit.ootd.domain.auth.oauth2.linking.OAuth2LinkAuthorizationRequestRepository;
 import codeit.ootd.domain.auth.service.AuthSessionService;
 import codeit.ootd.domain.recommendation.dto.response.RecommendationResponse;
 import codeit.ootd.domain.recommendation.service.RecommendationService;
@@ -57,7 +58,8 @@ class RecommendationControllerTest {
     private OAuth2AuthenticationSuccessHandler oAuth2SuccessHandler;
     @MockitoBean
     private OAuth2AuthenticationFailureHandler oAuth2FailureHandler;
-
+    @MockitoBean
+    private OAuth2LinkAuthorizationRequestRepository linkAuthorizationRequestRepository;
 
     /**
      * 보안 필터에서 차단되어 MVC 요청으로 도달하지 않는 컨트롤러의 방어 로직을 검증한다.

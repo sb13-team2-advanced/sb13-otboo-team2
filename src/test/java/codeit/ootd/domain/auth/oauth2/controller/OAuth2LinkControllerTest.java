@@ -56,6 +56,6 @@ class OAuth2LinkControllerTest {
                 .contains("HttpOnly")
                 .contains("Secure")
                 .contains("SameSite=Lax")
-                .contains("Path=/login/oauth2/code");
+                .contains("Path=/oauth2/authorization");
     }
 }
