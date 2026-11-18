@@ -38,7 +38,7 @@ class OAuth2LinkAuthorizationRequestRepositoryTest {
         var saved = repository.loadAuthorizationRequest(request);
 
         assertThat(saved).isNotNull();
-        assertThat(saved.getAttribute("otboo_link_token"))
+        assertThat(saved.getAttributes().get("otboo_link_token"))
                 .isEqualTo("link-token");
     }
 
@@ -56,7 +56,8 @@ class OAuth2LinkAuthorizationRequestRepositoryTest {
         var saved = repository.loadAuthorizationRequest(request);
 
         assertThat(saved).isNotNull();
-        assertThat(saved.getAttribute("otboo_link_token")).isNull();
+        assertThat(saved.getAttributes().get("otboo_link_token"))
+                .isNull();
     }
 
     @Test

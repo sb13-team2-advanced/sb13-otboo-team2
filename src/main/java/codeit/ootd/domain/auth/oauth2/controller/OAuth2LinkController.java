@@ -55,7 +55,7 @@ public class OAuth2LinkController {
                 .httpOnly(true)
                 .secure(cookieSecure)
                 .sameSite("Lax")
-                .path("/login/oauth2/code")
+                .path("/oauth2/authorization")
                 .maxAge(Duration.ofMinutes(5))
                 .build();
 
