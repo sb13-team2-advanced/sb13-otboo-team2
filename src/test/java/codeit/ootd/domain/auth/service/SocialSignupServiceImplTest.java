@@ -1,6 +1,7 @@
 package codeit.ootd.domain.auth.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
 
@@ -12,6 +13,7 @@ import codeit.ootd.domain.auth.service.impl.SocialSignupServiceImpl;
 import codeit.ootd.domain.user.entity.User;
 import codeit.ootd.domain.user.entity.UserRole;
 import codeit.ootd.domain.user.entity.UserStatus;
+import codeit.ootd.domain.user.exception.DuplicateEmailException;
 import codeit.ootd.domain.user.repository.UserRepository;
 import java.util.UUID;
 import org.junit.jupiter.api.DisplayName;
@@ -101,4 +103,29 @@ class SocialSignupServiceImplTest {
         assertThat(savedAccount.getProviderUserId())
                 .isEqualTo("google-123");
     }
+
+    @Test
+    @DisplayName("기존 회원과 이메일이 중복되면 소셜 자동 회원가입을 거부한다")
+    void register_duplicateEmail_rejectsSignup() {
+        // given
+        OAuth2UserInfo userInfo = new OAuth2UserInfo(
+                OAuthProvider.GOOGLE,
+                "google-123",
+                "existing@example.com",
+                "구글 사용자"
+        );
+
+        when(userRepository.existsByEmailIgnoreCase(
+                "existing@example.com"
+        )).thenReturn(true);
+
+        // when & then
+        assertThatThrownBy(() -> socialSignupService.register(userInfo))
+                .isInstanceOf(DuplicateEmailException.class);
+
+        verify(userRepository, never()).saveAndFlush(any(User.class));
+        verify(socialAccountRepository, never())
+                .save(any(SocialAccount.class));
+    }
+
 }
