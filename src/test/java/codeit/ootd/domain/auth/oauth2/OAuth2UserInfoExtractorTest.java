@@ -146,5 +146,30 @@ class OAuth2UserInfoExtractorTest {
         assertThat(result.name()).isNull();
     }
 
+    @Test
+    @DisplayName("Kakao 이메일이 없으면 닉네임과 회원 ID로 가상 이메일을 생성한다")
+    void extractKakao_withoutEmail_createsVirtualEmail() {
+        // given
+        Map<String, Object> attributes = Map.of(
+                "id", 123456789L,
+                "kakao_account", Map.of(
+                        "profile", Map.of("nickname", "하정")
+                )
+        );
+
+        // when
+        OAuth2UserInfo result = extractor.extract(
+                OAuthProvider.KAKAO,
+                attributes
+        );
+
+        // then
+        assertThat(result.providerUserId()).isEqualTo("123456789");
+        assertThat(result.email())
+                .isEqualTo("하정_123456789@kakao.com");
+        assertThat(result.name()).isEqualTo("하정");
+    }
+
+
 
 }
