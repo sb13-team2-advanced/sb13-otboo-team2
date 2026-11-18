@@ -42,6 +42,11 @@ public class RedisClothesExtractionRateLimiter implements ClothesExtractionRateL
 
     @Override
     public void check(UUID userId) {
+        if (userId == null) {
+            // 사용자 없이 호출되면 모든 요청이 같은 키를 공유하게 되므로 횟수를 세지 않고 막는다.
+            throw new OtbooException(ErrorCode.AUTHENTICATION_REQUIRED);
+        }
+
         Long result;
         try {
             result = redisTemplate.execute(
