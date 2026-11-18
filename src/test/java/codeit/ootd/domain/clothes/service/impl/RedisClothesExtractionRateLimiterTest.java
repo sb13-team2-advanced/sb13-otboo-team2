@@ -7,6 +7,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 import codeit.ootd.global.exception.ErrorCode;
@@ -58,5 +59,14 @@ class RedisClothesExtractionRateLimiterTest {
                 .thenThrow(new RedisConnectionFailureException("연결 실패"));
 
         assertThatCode(() -> rateLimiter.check(userId)).doesNotThrowAnyException();
+    }
+
+    @Test
+    void 사용자_ID가_없으면_인증_오류를_던지고_Redis를_호출하지_않는다() {
+        assertThatThrownBy(() -> rateLimiter.check(null))
+                .isInstanceOfSatisfying(OtbooException.class, e ->
+                        assertThat(e.getErrorCode()).isEqualTo(ErrorCode.AUTHENTICATION_REQUIRED));
+
+        verifyNoInteractions(redisTemplate);
     }
 }
