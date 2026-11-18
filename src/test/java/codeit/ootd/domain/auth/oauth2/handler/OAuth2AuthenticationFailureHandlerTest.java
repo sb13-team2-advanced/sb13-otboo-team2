@@ -1,8 +1,7 @@
-package codeit.ootd.domain.auth.oauth2;
+package codeit.ootd.domain.auth.oauth2.handler;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import codeit.ootd.domain.auth.oauth2.handler.OAuth2AuthenticationFailureHandler;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.mock.web.MockHttpServletRequest;
