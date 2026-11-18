@@ -48,4 +48,55 @@ class ClothesTypeResolverTest {
         assertThat(resolver.resolve("  ")).isEqualTo(ClothesType.ETC);
         assertThat(resolver.resolve(null)).isEqualTo(ClothesType.ETC);
     }
+
+    @ParameterizedTest(name = "[{index}] {0} -> {1}")
+    @CsvSource(delimiter = '|', value = {
+            "니트 조끼|OUTER",
+            "오버핏 블루종|OUTER",
+            "라운드 카디건|OUTER",
+            "Wool Cardigan|OUTER",
+            "클래식 트렌치|OUTER",
+            "경량 바람막이|OUTER",
+            "양면 후리스|OUTER",
+            "Light Windbreaker|OUTER",
+            "쿨 반팔|TOP",
+            "여름 민소매|TOP",
+            "기본 나시|TOP",
+            "스트라이프 폴로|TOP",
+            "카라티 블랙|TOP",
+            "데일리 쇼츠|BOTTOM",
+            "조거 블랙|BOTTOM",
+            "카고 라이트|BOTTOM",
+            "클래식 구두|SHOES",
+            "플랫 슈즈|SHOES",
+            "여름 뮬|SHOES",
+            "워커 블랙|SHOES",
+            "숄더백 블랙|BAG",
+            "에코백|BAG",
+            "핸드백|BAG",
+            "클러치 블랙|BAG",
+            "가죽 장갑|ACCESSORY",
+            "실크 넥타이|ACCESSORY",
+            "뿔테 안경|ACCESSORY",
+            "울 넥워머|SCARF"
+    })
+    void 보강한_키워드로_종류를_정한다(String title, ClothesType expected) {
+        assertThat(resolver.resolve(title)).isEqualTo(expected);
+    }
+
+    @ParameterizedTest(name = "[{index}] {0} -> {1}")
+    @CsvSource(delimiter = '|', value = {
+            "브라운 울 코트|OUTER",
+            "브라운 앵클 부츠|SHOES",
+            "부츠컷 데님 팬츠|BOTTOM",
+            "버킷백 미니|BAG",
+            "캡슐 원피스|DRESS",
+            "Baggy Pants 청바지|BOTTOM",
+            "Dress Shirt 화이트|TOP",
+            "드레스 셔츠 화이트|TOP",
+            "베스트셀러 반팔 티셔츠|TOP"
+    })
+    void 키워드가_다른_단어의_일부로_걸리는_경우를_바로잡는다(String title, ClothesType expected) {
+        assertThat(resolver.resolve(title)).isEqualTo(expected);
+    }
 }
