@@ -59,6 +59,9 @@ public class CustomOAuth2UserService
                 userInfo.providerUserId()
         );
 
+        attributes.put("otbooEmail", userInfo.email());
+        attributes.put("otbooName", userInfo.name());
+
         return new DefaultOAuth2User(
                 providerUser.getAuthorities(),
                 attributes,
