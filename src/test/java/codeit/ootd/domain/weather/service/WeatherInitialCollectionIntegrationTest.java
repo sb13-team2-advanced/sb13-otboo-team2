@@ -1,7 +1,11 @@
 package codeit.ootd.domain.weather.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.assertj.core.data.Offset.offset;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -39,6 +43,7 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.testcontainers.service.connection.ServiceConnection;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
+import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
 import org.testcontainers.containers.PostgreSQLContainer;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
@@ -86,6 +91,9 @@ class WeatherInitialCollectionIntegrationTest {
 
     @MockitoBean
     private Clock clock;
+
+    @MockitoSpyBean
+    private WeatherService weatherService;
 
     private UUID locationId;
 
@@ -391,5 +399,60 @@ class WeatherInitialCollectionIntegrationTest {
             executor.shutdownNow();
             executor.awaitTermination(5, TimeUnit.SECONDS);
         }
+    }
+
+    @Test
+    @DisplayName("최초 수집 집계 실패 시 예보와 일별 날씨를 롤백하고 재시도를 예약한다")
+    void initialCollectionRollsBackWhenAggregationFails() {
+        prepareLocation();
+
+        when(openWeatherMapClient.getForecast(LATITUDE, LONGITUDE))
+            .thenReturn(forecastResponse());
+
+        when(openWeatherMapClient.getTodayHourlyHistory(
+            LATITUDE, LONGITUDE, NOW
+        )).thenThrow(new IllegalStateException("One Call 호출 실패"));
+
+        doThrow(new IllegalStateException("3일 차 집계 실패"))
+            .when(weatherService)
+            .calculateAndSaveDailyWeather(
+                any(WeatherLocation.class),
+                eq(TODAY.plusDays(2))
+            );
+
+        assertThatThrownBy(() ->
+            weatherQueryService.getWeathers(LATITUDE, LONGITUDE)
+        )
+            .isInstanceOf(IllegalStateException.class)
+            .hasMessage("3일 차 집계 실패");
+
+        List<WeatherForecast> forecasts =
+            forecastRepository.findForecastsForPeriod(
+                locationId,
+                TODAY.atStartOfDay(KOREA_ZONE).toInstant(),
+                TODAY.plusDays(6).atStartOfDay(KOREA_ZONE).toInstant()
+            );
+
+        assertThat(forecasts).isEmpty();
+
+        List<Weather> weathers =
+            weatherRepository
+                .findByLocationIdAndWeatherDateBetweenOrderByWeatherDateAsc(
+                    locationId,
+                    TODAY,
+                    TODAY.plusDays(5)
+                );
+
+        assertThat(weathers).isEmpty();
+
+        WeatherLocation failedLocation = locationRepository
+            .findById(locationId)
+            .orElseThrow();
+
+        assertThat(failedLocation.getLastCollectedAt()).isNull();
+        assertThat(failedLocation.isInitialCollectionInProgress()).isFalse();
+        assertThat(failedLocation.getInitialCollectionToken()).isNull();
+        assertThat(failedLocation.getNextRefreshAt())
+            .isEqualTo(NOW.plus(Duration.ofMinutes(10)));
     }
 }

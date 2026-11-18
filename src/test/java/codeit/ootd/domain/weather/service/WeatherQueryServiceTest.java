@@ -31,6 +31,9 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.http.HttpStatus;
+import org.springframework.web.client.HttpServerErrorException;
+import org.springframework.web.client.ResourceAccessException;
 
 @ExtendWith(MockitoExtension.class)
 class WeatherQueryServiceTest {
@@ -461,5 +464,101 @@ class WeatherQueryServiceTest {
         verifyNoInteractions(weatherForecastCollector);
         verifyNoInteractions(initialCollectionPersistenceService);
         verify(weatherService).getWeathers(latitude, longitude);
+    }
+
+    @Test
+    @DisplayName("Forecast5 타임아웃 발생 시 1분 뒤 재시도를 예약한다")
+    void getWeathersSchedulesOneMinuteRetryOnTimeout() {
+        double latitude = 37.5665;
+        double longitude = 126.9780;
+        UUID locationId = UUID.randomUUID();
+        Instant now = Instant.parse("2026-11-18T09:00:00Z");
+
+        when(weatherLocationService.findOrCreate(latitude, longitude))
+            .thenReturn(location);
+        when(location.getLastCollectedAt()).thenReturn(null);
+        when(location.getNextRefreshAt()).thenReturn(now);
+        when(location.getId()).thenReturn(locationId);
+        when(clock.instant()).thenReturn(now);
+        when(clock.withZone(KOREA_ZONE))
+            .thenReturn(Clock.fixed(now, KOREA_ZONE));
+
+        when(weatherLocationRepository.reserveInitialCollection(
+            eq(locationId),
+            eq(now),
+            eq(now.plus(Duration.ofMinutes(5))),
+            any(UUID.class)
+        )).thenReturn(1);
+
+        when(weatherForecastCollector.fetchForecast(location))
+            .thenThrow(new ResourceAccessException("OWM 연결 타임아웃"));
+
+        assertThatThrownBy(() ->
+            weatherQueryService.getWeathers(latitude, longitude)
+        )
+            .isInstanceOf(ResourceAccessException.class)
+            .hasMessage("OWM 연결 타임아웃");
+
+        ArgumentCaptor<UUID> tokenCaptor =
+            ArgumentCaptor.forClass(UUID.class);
+
+        verify(weatherLocationRepository).reserveInitialCollection(
+            eq(locationId),
+            eq(now),
+            eq(now.plus(Duration.ofMinutes(5))),
+            tokenCaptor.capture()
+        );
+
+        verify(weatherLocationRepository).scheduleInitialCollectionRetry(
+            locationId,
+            tokenCaptor.getValue(),
+            now.plus(Duration.ofMinutes(1))
+        );
+
+        verifyNoInteractions(initialCollectionPersistenceService);
+        verify(weatherService, never())
+            .getWeathers(latitude, longitude);
+    }
+
+    @Test
+    @DisplayName("Forecast5 서버 오류 발생 시 1분 뒤 재시도를 예약한다")
+    void getWeathersSchedulesOneMinuteRetryOnServerError() {
+        double latitude = 37.5665;
+        double longitude = 126.9780;
+        UUID locationId = UUID.randomUUID();
+        Instant now = Instant.parse("2026-11-18T09:00:00Z");
+
+        when(weatherLocationService.findOrCreate(latitude, longitude))
+            .thenReturn(location);
+        when(location.getLastCollectedAt()).thenReturn(null);
+        when(location.getNextRefreshAt()).thenReturn(now);
+        when(location.getId()).thenReturn(locationId);
+        when(clock.instant()).thenReturn(now);
+        when(clock.withZone(KOREA_ZONE))
+            .thenReturn(Clock.fixed(now, KOREA_ZONE));
+
+        when(weatherLocationRepository.reserveInitialCollection(
+            eq(locationId),
+            eq(now),
+            eq(now.plus(Duration.ofMinutes(5))),
+            any(UUID.class)
+        )).thenReturn(1);
+
+        when(weatherForecastCollector.fetchForecast(location))
+            .thenThrow(new HttpServerErrorException(
+                HttpStatus.SERVICE_UNAVAILABLE
+            ));
+
+        assertThatThrownBy(() ->
+            weatherQueryService.getWeathers(latitude, longitude)
+        ).isInstanceOf(HttpServerErrorException.class);
+
+        verify(weatherLocationRepository).scheduleInitialCollectionRetry(
+            eq(locationId),
+            any(UUID.class),
+            eq(now.plus(Duration.ofMinutes(1)))
+        );
+
+        verifyNoInteractions(initialCollectionPersistenceService);
     }
 }
