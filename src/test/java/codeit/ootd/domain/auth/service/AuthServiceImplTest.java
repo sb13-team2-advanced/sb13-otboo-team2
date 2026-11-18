@@ -996,6 +996,36 @@ class AuthServiceImplTest {
         );
     }
 
+    @Test
+    @DisplayName("소셜 전용 회원은 임시 비밀번호를 발급할 수 없다")
+    void resetPassword_socialUser_rejectsRequest() {
+        // given
+        String email = "social@example.com";
+
+        User user = User.createSocial(
+                "소셜 사용자",
+                email,
+                "encoded-password"
+        );
+
+        when(userRepository.findByEmailIgnoreCase(email))
+                .thenReturn(Optional.of(user));
+
+        // when & then
+        assertThatThrownBy(() -> authService.resetPassword(email))
+                .isInstanceOf(
+                        SocialAccountPasswordResetNotAllowedException.class
+                );
+
+        verifyNoInteractions(
+                temporaryPasswordGenerator,
+                temporaryPasswordMailSender
+        );
+
+        assertThat(user.getTemporaryPassword()).isNull();
+        assertThat(user.getTemporaryPasswordExpiresAt()).isNull();
+    }
+
 
 
 }
