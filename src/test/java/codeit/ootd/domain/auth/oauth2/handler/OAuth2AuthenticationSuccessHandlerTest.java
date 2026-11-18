@@ -291,4 +291,85 @@ class OAuth2AuthenticationSuccessHandlerTest {
         );
     }
 
+    @Test
+    @DisplayName("소셜 계정 연동 성공 시 연동 요청 쿠키를 삭제한다")
+    void success_linkAccount_clearsLinkCookie() throws Exception {
+        // given
+        UUID userId = UUID.randomUUID();
+
+        var request = new MockHttpServletRequest();
+        var response = new MockHttpServletResponse();
+
+        request.setAttribute("otboo_link_token", "link-token");
+
+        when(linkRequestService.consume(
+                "link-token",
+                OAuthProvider.GOOGLE
+        )).thenReturn(new OAuth2LinkRequest(
+                userId,
+                OAuthProvider.GOOGLE,
+                Instant.now().plusSeconds(300)
+        ));
+
+        // when
+        handler.onAuthenticationSuccess(
+                request,
+                response,
+                authentication("GOOGLE", "google-123")
+        );
+
+        // then
+        verify(socialAccountService).linkAccount(
+                userId,
+                OAuthProvider.GOOGLE,
+                "google-123"
+        );
+
+        assertThat(response.getHeaders(HttpHeaders.SET_COOKIE))
+                .anySatisfy(cookie -> assertThat(cookie)
+                        .contains("OAUTH2_LINK_TOKEN=")
+                        .contains("Path=/oauth2/authorization")
+                        .contains("Max-Age=0")
+                );
+    }
+
+    @Test
+    @DisplayName("소셜 계정 연동 실패 시에도 연동 요청 쿠키를 삭제한다")
+    void success_invalidLinkToken_clearsLinkCookie() throws Exception {
+        // given
+        var request = new MockHttpServletRequest();
+        var response = new MockHttpServletResponse();
+
+        request.setAttribute("otboo_link_token", "invalid-token");
+
+        when(linkRequestService.consume(
+                "invalid-token",
+                OAuthProvider.GOOGLE
+        )).thenThrow(mock(OtbooException.class));
+
+        // when
+        handler.onAuthenticationSuccess(
+                request,
+                response,
+                authentication("GOOGLE", "google-123")
+        );
+
+        // then
+        verifyNoInteractions(socialAccountService);
+
+        verify(failureHandler).onAuthenticationFailure(
+                eq(request),
+                eq(response),
+                any()
+        );
+
+        assertThat(response.getHeaders(HttpHeaders.SET_COOKIE))
+                .anySatisfy(cookie -> assertThat(cookie)
+                        .contains("OAUTH2_LINK_TOKEN=")
+                        .contains("Path=/oauth2/authorization")
+                        .contains("Max-Age=0")
+                );
+    }
+
+
 }
