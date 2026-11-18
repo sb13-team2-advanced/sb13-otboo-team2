@@ -17,6 +17,7 @@ import codeit.ootd.domain.user.entity.User;
 import codeit.ootd.domain.user.repository.UserRepository;
 import codeit.ootd.global.exception.OtbooException;
 import java.time.Instant;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -73,15 +74,23 @@ class OAuth2AuthenticationSuccessHandlerTest {
         );
     }
 
+
     @Test
-    @DisplayName("일반 소셜 로그인 시 기존 사용자에게 JWT를 발급한다")
+    @DisplayName("소셜 로그인 성공 시 사용자 정보를 전달하고 JWT를 발급한다")
     void success_normalLogin_issuesTokens() throws Exception {
+        // given
         UUID userId = UUID.randomUUID();
         User user = mock(User.class);
         SignInResult result = mock(SignInResult.class);
 
-        when(resolver.resolveUserId(any(OAuth2UserInfo.class)))
-                .thenReturn(userId);
+        OAuth2UserInfo userInfo = new OAuth2UserInfo(
+                OAuthProvider.GOOGLE,
+                "google-123",
+                "google@example.com",
+                "구글 사용자"
+        );
+
+        when(resolver.resolveUserId(userInfo)).thenReturn(userId);
         when(userRepository.findById(userId))
                 .thenReturn(Optional.of(user));
         when(authService.issueTokensForAuthenticatedUser(user))
@@ -90,20 +99,20 @@ class OAuth2AuthenticationSuccessHandlerTest {
 
         var response = new MockHttpServletResponse();
 
+        // when
         handler.onAuthenticationSuccess(
                 new MockHttpServletRequest(),
                 response,
-                authentication("GOOGLE", "google-123")
-        );
-
-        verify(resolver).resolveUserId(
-                new OAuth2UserInfo(
-                        OAuthProvider.GOOGLE,
+                authentication(
+                        "GOOGLE",
                         "google-123",
-                        null,
-                        null
+                        "google@example.com",
+                        "구글 사용자"
                 )
         );
+
+        // then
+        verify(resolver).resolveUserId(userInfo);
         verify(authService).issueTokensForAuthenticatedUser(user);
         verifyNoInteractions(linkRequestService, socialAccountService);
 
@@ -118,6 +127,7 @@ class OAuth2AuthenticationSuccessHandlerTest {
         assertThat(response.getRedirectedUrl())
                 .isEqualTo("/#/auth/login?oauth_success=true");
     }
+
 
     @Test
     @DisplayName("정상 계정 연동 시 소셜 계정을 연결하고 JWT는 발급하지 않는다")
@@ -246,26 +256,6 @@ class OAuth2AuthenticationSuccessHandlerTest {
                 authService,
                 resolver,
                 userRepository
-        );
-    }
-
-    private Authentication authentication(
-            String provider,
-            String providerUserId
-    ) {
-        OAuth2User oauth2User = new DefaultOAuth2User(
-                List.of(new SimpleGrantedAuthority("ROLE_USER")),
-                Map.of(
-                        "otbooProvider", provider,
-                        "otbooProviderUserId", providerUserId
-                ),
-                "otbooProviderUserId"
-        );
-
-        return new UsernamePasswordAuthenticationToken(
-                oauth2User,
-                null,
-                oauth2User.getAuthorities()
         );
     }
 
@@ -426,5 +416,44 @@ class OAuth2AuthenticationSuccessHandlerTest {
         assertThat(response.getHeaders(HttpHeaders.SET_COOKIE))
                 .noneMatch(cookie -> cookie.startsWith("REFRESH_TOKEN="));
     }
+
+    private Authentication authentication(
+            String provider,
+            String providerUserId
+    ) {
+        return authentication(
+                provider,
+                providerUserId,
+                null,
+                null
+        );
+    }
+
+    private Authentication authentication(
+            String provider,
+            String providerUserId,
+            String email,
+            String name
+    ) {
+        Map<String, Object> attributes = new HashMap<>();
+
+        attributes.put("otbooProvider", provider);
+        attributes.put("otbooProviderUserId", providerUserId);
+        attributes.put("otbooEmail", email);
+        attributes.put("otbooName", name);
+
+        OAuth2User oauth2User = new DefaultOAuth2User(
+                List.of(new SimpleGrantedAuthority("ROLE_USER")),
+                attributes,
+                "otbooProviderUserId"
+        );
+
+        return new UsernamePasswordAuthenticationToken(
+                oauth2User,
+                null,
+                oauth2User.getAuthorities()
+        );
+    }
+
 
 }
