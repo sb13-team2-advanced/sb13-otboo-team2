@@ -2,6 +2,7 @@ package codeit.ootd.global.security;
 
 import codeit.ootd.domain.auth.jwt.JwtProvider;
 import codeit.ootd.domain.auth.oauth2.CustomOAuth2UserService;
+import codeit.ootd.domain.auth.oauth2.OAuth2AuthenticationFailureHandler;
 import codeit.ootd.domain.auth.service.AuthSessionService;
 import codeit.ootd.domain.user.repository.UserRepository;
 import codeit.ootd.global.exception.ErrorCode;
@@ -41,7 +42,8 @@ public class SecurityConfig {
             AuthSessionService authSessionService,
             UserRepository userRepository,
             JsonMapper jsonMapper,
-            CustomOAuth2UserService customOAuth2UserService
+            CustomOAuth2UserService customOAuth2UserService,
+            OAuth2AuthenticationFailureHandler oAuth2FailureHandler
     ) throws Exception {
 
         http.csrf(csrf -> csrf
@@ -63,6 +65,7 @@ public class SecurityConfig {
                 .userInfoEndpoint(userInfo -> userInfo
                         .userService(customOAuth2UserService)
                 )
+                .failureHandler(oAuth2FailureHandler)
         );
 
         // 기존 API 접근 권한 설정
