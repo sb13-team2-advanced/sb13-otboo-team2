@@ -2,8 +2,8 @@ package codeit.ootd.domain.auth.oauth2;
 
 import codeit.ootd.domain.auth.entity.OAuthProvider;
 import java.util.HashMap;
+import java.util.Locale;
 import java.util.Map;
-import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.oauth2.client.userinfo.DefaultOAuth2UserService;
 import org.springframework.security.oauth2.client.userinfo.OAuth2UserRequest;
@@ -20,7 +20,6 @@ public class CustomOAuth2UserService
 
     private final DefaultOAuth2UserService delegate;
     private final OAuth2UserInfoExtractor extractor;
-    private final OAuth2AccountResolver resolver;
 
     @Override
     public OAuth2User loadUser(OAuth2UserRequest request)
@@ -33,7 +32,7 @@ public class CustomOAuth2UserService
 
         try {
             provider = OAuthProvider.valueOf(
-                    registrationId.toUpperCase(java.util.Locale.ROOT)
+                    registrationId.toUpperCase(Locale.ROOT)
             );
         } catch (IllegalArgumentException e) {
             throw new OAuth2AuthenticationException(
@@ -48,17 +47,22 @@ public class CustomOAuth2UserService
                 providerUser.getAttributes()
         );
 
-        UUID userId = resolver.resolveUserId(userInfo);
-
         Map<String, Object> attributes =
                 new HashMap<>(providerUser.getAttributes());
 
-        attributes.put("otbooUserId", userId.toString());
+        attributes.put(
+                "otbooProvider",
+                userInfo.provider().name()
+        );
+        attributes.put(
+                "otbooProviderUserId",
+                userInfo.providerUserId()
+        );
 
         return new DefaultOAuth2User(
                 providerUser.getAuthorities(),
                 attributes,
-                "otbooUserId"
+                "otbooProviderUserId"
         );
     }
 }

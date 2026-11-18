@@ -31,9 +31,6 @@ class CustomOAuth2UserServiceTest {
     @Mock
     private OAuth2UserInfoExtractor extractor;
 
-    @Mock
-    private OAuth2AccountResolver resolver;
-
     @InjectMocks
     private CustomOAuth2UserService userService;
 
@@ -82,7 +79,8 @@ class CustomOAuth2UserServiceTest {
 
         assertThat(result.getName()).isEqualTo("google-123");
 
-        verifyNoInteractions(resolver);
+        verify(delegate).loadUser(request);
+        verify(extractor).extract(OAuthProvider.GOOGLE, attributes);
     }
 
     @Test
@@ -126,7 +124,8 @@ class CustomOAuth2UserServiceTest {
         assertThat((String) result.getAttribute("otbooProviderUserId"))
                 .isEqualTo("123456789");
 
-        verifyNoInteractions(resolver);
+        verify(delegate).loadUser(request);
+        verify(extractor).extract(OAuthProvider.KAKAO, attributes);
     }
 
     @Test
@@ -148,7 +147,7 @@ class CustomOAuth2UserServiceTest {
                         ).isEqualTo("unsupported_oauth_provider")
                 );
 
-        verifyNoInteractions(delegate, extractor, resolver);
+        verifyNoInteractions(delegate, extractor);
     }
 
 
