@@ -7,6 +7,7 @@ import codeit.ootd.domain.auth.entity.OAuthProvider;
 import java.util.UUID;
 
 import codeit.ootd.domain.auth.oauth2.linking.OAuth2LinkRequestService;
+import codeit.ootd.domain.auth.oauth2.linking.OAuth2LinkStartResponse;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
