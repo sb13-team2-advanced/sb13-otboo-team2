@@ -62,7 +62,7 @@ class ClothesTypeResolverTest {
             "쿨 반팔|TOP",
             "여름 민소매|TOP",
             "기본 나시|TOP",
-            "스트라이프 폴로|TOP",
+            "스트라이프 폴로티|TOP",
             "카라티 블랙|TOP",
             "데일리 쇼츠|BOTTOM",
             "조거 블랙|BOTTOM",
@@ -97,6 +97,22 @@ class ClothesTypeResolverTest {
             "베스트셀러 반팔 티셔츠|TOP"
     })
     void 키워드가_다른_단어의_일부로_걸리는_경우를_바로잡는다(String title, ClothesType expected) {
+        assertThat(resolver.resolve(title)).isEqualTo(expected);
+    }
+
+    @ParameterizedTest(name = "[{index}] {0} -> {1}")
+    @CsvSource(delimiter = '|', value = {
+            "폴로 랄프로렌 가죽 벨트|ACCESSORY",
+            "폴로 랄프로렌 선글라스|ACCESSORY",
+            "Polo Ralph Lauren 가죽 벨트|ACCESSORY",
+            "폴로 랄프로렌 코튼 폴로티|TOP",
+            "기모 플리스 팬츠|BOTTOM",
+            "플리스 조거 팬츠|BOTTOM",
+            "바람막이 조거 팬츠|BOTTOM",
+            "후리스 바지|BOTTOM",
+            "플리스 후드 집업|OUTER"
+    })
+    void 브랜드명과_소재_단어가_다른_종류를_덮어쓰지_않는다(String title, ClothesType expected) {
         assertThat(resolver.resolve(title)).isEqualTo(expected);
     }
 }
