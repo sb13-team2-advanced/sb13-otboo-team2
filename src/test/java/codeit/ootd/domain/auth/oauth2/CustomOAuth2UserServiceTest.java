@@ -38,11 +38,9 @@ class CustomOAuth2UserServiceTest {
     private CustomOAuth2UserService userService;
 
     @Test
-    @DisplayName("Google 인증 성공 시 연동된 OTBOO 사용자 ID를 반환한다")
+    @DisplayName("Google 인증 성공 시 소셜 제공자와 사용자 ID를 전달한다")
     void load_user_success() {
         // given
-        UUID userId = UUID.randomUUID();
-
         OAuth2UserRequest request = mock(OAuth2UserRequest.class);
         ClientRegistration registration = mock(ClientRegistration.class);
 
@@ -71,22 +69,25 @@ class CustomOAuth2UserServiceTest {
         when(delegate.loadUser(request)).thenReturn(providerUser);
         when(extractor.extract(OAuthProvider.GOOGLE, attributes))
                 .thenReturn(userInfo);
-        when(resolver.resolveUserId(userInfo)).thenReturn(userId);
 
         // when
         OAuth2User result = userService.loadUser(request);
 
         // then
-        String otbooUserId = result.getAttribute("otbooUserId");
-        assertThat(otbooUserId).isEqualTo(userId.toString());
+        assertThat((String) result.getAttribute("otbooProvider"))
+                .isEqualTo("GOOGLE");
 
-        verify(delegate).loadUser(request);
-        verify(resolver).resolveUserId(userInfo);
+        assertThat((String) result.getAttribute("otbooProviderUserId"))
+                .isEqualTo("google-123");
+
+        assertThat(result.getName()).isEqualTo("google-123");
+
+        verifyNoInteractions(resolver);
     }
 
     @Test
-    @DisplayName("연동되지 않은 Kakao 계정은 OAuth2 로그인을 거부한다")
-    void load_user_fails_when_account_not_linked() {
+    @DisplayName("미연동 Kakao 계정도 소셜 인증 정보를 전달한다")
+    void load_user_unlinkedKakao_returnsProviderInfo() {
         // given
         OAuth2UserRequest request = mock(OAuth2UserRequest.class);
         ClientRegistration registration = mock(ClientRegistration.class);
@@ -115,18 +116,17 @@ class CustomOAuth2UserServiceTest {
         when(extractor.extract(OAuthProvider.KAKAO, attributes))
                 .thenReturn(userInfo);
 
-        when(resolver.resolveUserId(userInfo)).thenThrow(
-                new OAuth2AuthenticationException("user_not_exists")
-        );
+        // when
+        OAuth2User result = userService.loadUser(request);
 
-        // when & then
-        assertThatThrownBy(() -> userService.loadUser(request))
-                .isInstanceOfSatisfying(
-                        OAuth2AuthenticationException.class,
-                        exception -> assertThat(
-                                exception.getError().getErrorCode()
-                        ).isEqualTo("user_not_exists")
-                );
+        // then
+        assertThat((String) result.getAttribute("otbooProvider"))
+                .isEqualTo("KAKAO");
+
+        assertThat((String) result.getAttribute("otbooProviderUserId"))
+                .isEqualTo("123456789");
+
+        verifyNoInteractions(resolver);
     }
 
     @Test
