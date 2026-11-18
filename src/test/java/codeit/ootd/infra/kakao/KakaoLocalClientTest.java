@@ -33,7 +33,10 @@ class KakaoLocalClientTest {
         RestClient.Builder builder = RestClient.builder();
 
         server = MockRestServiceServer.bindTo(builder).build();
-        client = new KakaoLocalClient(builder, "test-key");
+        client = new KakaoLocalClient(
+            builder.baseUrl("https://dapi.kakao.com").build(),
+            "test-key"
+        );
     }
 
     @Test

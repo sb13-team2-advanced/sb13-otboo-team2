@@ -4,7 +4,6 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
-import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
@@ -15,6 +14,8 @@ import static org.mockito.Mockito.when;
 import codeit.ootd.domain.weather.dto.response.WeatherDto;
 import codeit.ootd.domain.weather.entity.WeatherLocation;
 import codeit.ootd.domain.weather.repository.WeatherLocationRepository;
+import codeit.ootd.infra.weather.OwmHourlyForecastConverter.ThreeHourForecast;
+import codeit.ootd.infra.weather.dto.OwmForecastResponse;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
@@ -34,6 +35,9 @@ import org.mockito.junit.jupiter.MockitoExtension;
 @ExtendWith(MockitoExtension.class)
 class WeatherQueryServiceTest {
 
+    private static final ZoneId KOREA_ZONE =
+        ZoneId.of("Asia/Seoul");
+
     @Mock
     private WeatherLocationService weatherLocationService;
 
@@ -47,6 +51,9 @@ class WeatherQueryServiceTest {
     private WeatherLocationRepository weatherLocationRepository;
 
     @Mock
+    private WeatherInitialCollectionPersistenceService initialCollectionPersistenceService;
+
+    @Mock
     private Clock clock;
 
     @Mock
@@ -56,16 +63,28 @@ class WeatherQueryServiceTest {
     private WeatherQueryService weatherQueryService;
 
     @Test
-    @DisplayName("최초 수집 시 Forecast5와 One Call을 수집하고 6일간 집계한다")
+    @DisplayName("최초 수집 시 Forecast5와 One Call을 조회하고 저장 서비스에 전달한다")
     void getWeathersCollectsInitialWeather() {
         double latitude = 37.5665;
         double longitude = 126.9780;
         UUID locationId = UUID.randomUUID();
         Instant now = Instant.parse("2026-10-28T09:00:00Z");
 
-        Clock fixedClock = Clock.fixed(
-            now,
-            ZoneId.of("Asia/Seoul")
+        Clock fixedClock = Clock.fixed(now, KOREA_ZONE);
+
+        OwmForecastResponse response = mock(OwmForecastResponse.class);
+
+        List<ThreeHourForecast> historicalForecasts = List.of(
+            new ThreeHourForecast(
+                now.minus(Duration.ofHours(3)),
+                15.0,
+                (short) 65,
+                800,
+                0.2,
+                0.0,
+                0.0,
+                2.0
+            )
         );
 
         when(weatherLocationService.findOrCreate(latitude, longitude))
@@ -74,8 +93,7 @@ class WeatherQueryServiceTest {
         when(location.getNextRefreshAt()).thenReturn(now);
         when(location.getId()).thenReturn(locationId);
         when(clock.instant()).thenReturn(now);
-        when(clock.withZone(ZoneId.of("Asia/Seoul")))
-            .thenReturn(fixedClock);
+        when(clock.withZone(KOREA_ZONE)).thenReturn(fixedClock);
 
         when(weatherLocationRepository.reserveInitialCollection(
             eq(locationId),
@@ -83,6 +101,12 @@ class WeatherQueryServiceTest {
             eq(now.plus(Duration.ofMinutes(5))),
             any(UUID.class)
         )).thenReturn(1);
+
+        when(weatherForecastCollector.fetchForecast(location))
+            .thenReturn(response);
+
+        when(weatherForecastCollector.fetchHistoricalForecasts(location))
+            .thenReturn(historicalForecasts);
 
         weatherQueryService.getWeathers(latitude, longitude);
 
@@ -96,40 +120,30 @@ class WeatherQueryServiceTest {
             tokenCaptor.capture()
         );
 
-        verify(weatherForecastCollector).collectForecasts(location);
-        verify(weatherForecastCollector).collectHistoricalForecasts(location);
+        verify(weatherForecastCollector).fetchForecast(location);
+        verify(weatherForecastCollector).fetchHistoricalForecasts(location);
 
-        LocalDate today = LocalDate.of(2026, 10, 28);
-
-        for (int day = 0; day < 6; day++) {
-            verify(weatherService).calculateAndSaveDailyWeather(
-                location,
-                today.plusDays(day)
-            );
-        }
-
-        verify(weatherLocationRepository).completeInitialCollection(
+        verify(initialCollectionPersistenceService).save(
             locationId,
             tokenCaptor.getValue(),
-            now,
-            now.plus(Duration.ofHours(2))
+            response,
+            historicalForecasts,
+            LocalDate.of(2026, 10, 28)
         );
 
         verify(weatherService).getWeathers(latitude, longitude);
     }
 
     @Test
-    @DisplayName("One Call 수집에 실패해도 Forecast5 데이터로 일별 집계를 완료한다")
+    @DisplayName("One Call 조회에 실패해도 Forecast5 데이터로 저장을 진행한다")
     void getWeathersContinuesWhenOneCallFails() {
         double latitude = 37.5665;
         double longitude = 126.9780;
         UUID locationId = UUID.randomUUID();
         Instant now = Instant.parse("2026-11-13T09:00:00Z");
 
-        Clock fixedClock = Clock.fixed(
-            now,
-            ZoneId.of("Asia/Seoul")
-        );
+        Clock fixedClock = Clock.fixed(now, KOREA_ZONE);
+        OwmForecastResponse response = mock(OwmForecastResponse.class);
 
         when(weatherLocationService.findOrCreate(latitude, longitude))
             .thenReturn(location);
@@ -137,8 +151,7 @@ class WeatherQueryServiceTest {
         when(location.getNextRefreshAt()).thenReturn(now);
         when(location.getId()).thenReturn(locationId);
         when(clock.instant()).thenReturn(now);
-        when(clock.withZone(ZoneId.of("Asia/Seoul")))
-            .thenReturn(fixedClock);
+        when(clock.withZone(KOREA_ZONE)).thenReturn(fixedClock);
 
         when(weatherLocationRepository.reserveInitialCollection(
             eq(locationId),
@@ -147,23 +160,15 @@ class WeatherQueryServiceTest {
             any(UUID.class)
         )).thenReturn(1);
 
-        doThrow(new IllegalStateException("One Call 호출 제한 초과"))
-            .when(weatherForecastCollector)
-            .collectHistoricalForecasts(location);
+        when(weatherForecastCollector.fetchForecast(location))
+            .thenReturn(response);
+
+        when(weatherForecastCollector.fetchHistoricalForecasts(location))
+            .thenThrow(
+                new IllegalStateException("One Call 호출 제한 초과")
+            );
 
         weatherQueryService.getWeathers(latitude, longitude);
-
-        verify(weatherForecastCollector).collectForecasts(location);
-        verify(weatherForecastCollector).collectHistoricalForecasts(location);
-
-        LocalDate today = LocalDate.of(2026, 11, 13);
-
-        for (int day = 0; day < 6; day++) {
-            verify(weatherService).calculateAndSaveDailyWeather(
-                location,
-                today.plusDays(day)
-            );
-        }
 
         ArgumentCaptor<UUID> tokenCaptor =
             ArgumentCaptor.forClass(UUID.class);
@@ -175,11 +180,15 @@ class WeatherQueryServiceTest {
             tokenCaptor.capture()
         );
 
-        verify(weatherLocationRepository).completeInitialCollection(
+        verify(weatherForecastCollector).fetchForecast(location);
+        verify(weatherForecastCollector).fetchHistoricalForecasts(location);
+
+        verify(initialCollectionPersistenceService).save(
             locationId,
             tokenCaptor.getValue(),
-            now,
-            now.plus(Duration.ofHours(2))
+            response,
+            List.of(),
+            LocalDate.of(2026, 11, 13)
         );
 
         verify(weatherLocationRepository, never())
@@ -210,21 +219,19 @@ class WeatherQueryServiceTest {
 
         verifyNoInteractions(weatherForecastCollector);
         verifyNoInteractions(weatherLocationRepository);
+        verifyNoInteractions(initialCollectionPersistenceService);
         verify(weatherService).getWeathers(latitude, longitude);
     }
 
     @Test
-    @DisplayName("Forecast5 최초 수집에 실패하면 10분 뒤 재시도를 예약한다")
+    @DisplayName("Forecast5 최초 조회에 실패하면 10분 뒤 재시도를 예약한다")
     void getWeathersSchedulesRetryWhenCollectionFails() {
         double latitude = 37.5665;
         double longitude = 126.9780;
         UUID locationId = UUID.randomUUID();
         Instant now = Instant.parse("2026-10-28T09:00:00Z");
 
-        Clock fixedClock = Clock.fixed(
-            now,
-            ZoneId.of("Asia/Seoul")
-        );
+        Clock fixedClock = Clock.fixed(now, KOREA_ZONE);
 
         when(weatherLocationService.findOrCreate(latitude, longitude))
             .thenReturn(location);
@@ -232,8 +239,7 @@ class WeatherQueryServiceTest {
         when(location.getNextRefreshAt()).thenReturn(now);
         when(location.getId()).thenReturn(locationId);
         when(clock.instant()).thenReturn(now);
-        when(clock.withZone(ZoneId.of("Asia/Seoul")))
-            .thenReturn(fixedClock);
+        when(clock.withZone(KOREA_ZONE)).thenReturn(fixedClock);
 
         when(weatherLocationRepository.reserveInitialCollection(
             eq(locationId),
@@ -242,9 +248,8 @@ class WeatherQueryServiceTest {
             any(UUID.class)
         )).thenReturn(1);
 
-        doThrow(new RuntimeException("OWM API 호출 실패"))
-            .when(weatherForecastCollector)
-            .collectForecasts(location);
+        when(weatherForecastCollector.fetchForecast(location))
+            .thenThrow(new RuntimeException("OWM API 호출 실패"));
 
         assertThatThrownBy(
             () -> weatherQueryService.getWeathers(latitude, longitude)
@@ -262,14 +267,18 @@ class WeatherQueryServiceTest {
             tokenCaptor.capture()
         );
 
+        verify(weatherForecastCollector).fetchForecast(location);
+
+        verify(weatherForecastCollector, never())
+            .fetchHistoricalForecasts(location);
+
         verify(weatherLocationRepository).scheduleInitialCollectionRetry(
             locationId,
             tokenCaptor.getValue(),
             now.plus(Duration.ofMinutes(10))
         );
 
-        verify(weatherForecastCollector, never())
-            .collectHistoricalForecasts(location);
+        verifyNoInteractions(initialCollectionPersistenceService);
 
         verify(weatherService, never())
             .getWeathers(latitude, longitude);
@@ -296,6 +305,7 @@ class WeatherQueryServiceTest {
 
         verifyNoInteractions(weatherForecastCollector);
         verifyNoInteractions(weatherLocationRepository);
+        verifyNoInteractions(initialCollectionPersistenceService);
         verify(weatherService).getWeathers(latitude, longitude);
     }
 
@@ -338,6 +348,7 @@ class WeatherQueryServiceTest {
 
         verify(weatherLocationRepository).findById(locationId);
         verifyNoInteractions(weatherForecastCollector);
+        verifyNoInteractions(initialCollectionPersistenceService);
         verify(weatherService).getWeathers(latitude, longitude);
     }
 
@@ -382,6 +393,7 @@ class WeatherQueryServiceTest {
 
         verify(weatherLocationRepository).findById(locationId);
         verifyNoInteractions(weatherForecastCollector);
+        verifyNoInteractions(initialCollectionPersistenceService);
         verify(weatherService).getWeathers(latitude, longitude);
     }
 
@@ -415,9 +427,6 @@ class WeatherQueryServiceTest {
         when(latest.getLastCollectedAt()).thenReturn(null);
         when(latest.isInitialCollectionInProgress()).thenReturn(true);
 
-        when(weatherService.getWeathers(latitude, longitude))
-            .thenReturn(List.of());
-
         List<WeatherDto> result =
             weatherQueryService.getWeathers(latitude, longitude);
 
@@ -425,6 +434,7 @@ class WeatherQueryServiceTest {
 
         verify(weatherLocationRepository, times(4)).findById(locationId);
         verifyNoInteractions(weatherForecastCollector);
+        verifyNoInteractions(initialCollectionPersistenceService);
         verify(weatherService).getWeathers(latitude, longitude);
     }
 
@@ -449,6 +459,7 @@ class WeatherQueryServiceTest {
 
         verifyNoInteractions(weatherLocationRepository);
         verifyNoInteractions(weatherForecastCollector);
+        verifyNoInteractions(initialCollectionPersistenceService);
         verify(weatherService).getWeathers(latitude, longitude);
     }
 }

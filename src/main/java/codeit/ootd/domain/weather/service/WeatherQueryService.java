@@ -3,6 +3,8 @@ package codeit.ootd.domain.weather.service;
 import codeit.ootd.domain.weather.dto.response.WeatherDto;
 import codeit.ootd.domain.weather.entity.WeatherLocation;
 import codeit.ootd.domain.weather.repository.WeatherLocationRepository;
+import codeit.ootd.infra.weather.OwmHourlyForecastConverter.ThreeHourForecast;
+import codeit.ootd.infra.weather.dto.OwmForecastResponse;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
@@ -21,7 +23,6 @@ public class WeatherQueryService {
 
     private static final ZoneId KOREA_ZONE = ZoneId.of("Asia/Seoul");
 
-    private static final Duration REFRESH_INTERVAL = Duration.ofHours(2);
     private static final Duration RETRY_INTERVAL = Duration.ofMinutes(10);
     private static final Duration RESERVATION_DURATION = Duration.ofMinutes(5);
     private static final long[] WAIT_INTERVALS_MS = {500, 500, 1000, 1000};
@@ -30,6 +31,7 @@ public class WeatherQueryService {
     private final WeatherForecastCollector weatherForecastCollector;
     private final WeatherService weatherService;
     private final WeatherLocationRepository weatherLocationRepository;
+    private final WeatherInitialCollectionPersistenceService initialCollectionPersistenceService;
     private final Clock clock;
 
     public List<WeatherDto> getWeathers(
@@ -115,32 +117,30 @@ public class WeatherQueryService {
         UUID token
     ) {
 
-        weatherForecastCollector.collectForecasts(location);
+        OwmForecastResponse response =
+            weatherForecastCollector.fetchForecast(location);
+
+        List<ThreeHourForecast> historicalForecasts;
 
         try {
-            weatherForecastCollector.collectHistoricalForecasts(location);
+            historicalForecasts =
+                weatherForecastCollector.fetchHistoricalForecasts(location);
         } catch (RuntimeException e) {
             log.warn(
-                "One Call 과거 날씨 수집 실패, Forecast5 데이터로 진행: cellId={}, errorType{}",
+                "One Call 과거 날씨 수집 실패, Forecast5 데이터로 진행: cellId={}, errorType={}",
                 location.getCellId(),
                 e.getClass().getSimpleName()
             );
+
+            historicalForecasts = List.of();
         }
 
-        for (int day = 0; day < 6; day++) {
-            weatherService.calculateAndSaveDailyWeather(
-                location,
-                today.plusDays(day)
-            );
-        }
-
-        Instant completedAt = clock.instant();
-
-        weatherLocationRepository.completeInitialCollection(
+        initialCollectionPersistenceService.save(
             location.getId(),
             token,
-            completedAt,
-            completedAt.plus(REFRESH_INTERVAL)
+            response,
+            historicalForecasts,
+            today
         );
     }
 }
