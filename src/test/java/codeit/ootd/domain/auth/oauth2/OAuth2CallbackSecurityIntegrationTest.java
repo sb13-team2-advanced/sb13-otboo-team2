@@ -2,6 +2,7 @@ package codeit.ootd.domain.auth.oauth2;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
@@ -29,6 +30,7 @@ import org.springframework.security.oauth2.client.endpoint.OAuth2AuthorizationCo
 import org.springframework.security.oauth2.client.userinfo.DefaultOAuth2UserService;
 import org.springframework.security.oauth2.client.userinfo.OAuth2UserRequest;
 import org.springframework.security.oauth2.core.OAuth2AccessToken;
+import org.springframework.security.oauth2.core.OAuth2AuthenticationException;
 import org.springframework.security.oauth2.core.endpoint.OAuth2AccessTokenResponse;
 import org.springframework.security.oauth2.core.user.DefaultOAuth2User;
 import org.springframework.security.oauth2.core.user.OAuth2User;
@@ -74,6 +76,9 @@ class OAuth2CallbackSecurityIntegrationTest {
 
     @MockitoBean
     private AuthService authService;
+
+    @MockitoBean
+    private OAuth2AccountResolver resolver;
 
     @Test
     @DisplayName("변조된 OAuth2 state로 콜백 요청 시 계정 연동을 차단한다")
@@ -221,6 +226,176 @@ class OAuth2CallbackSecurityIntegrationTest {
                             .expiresIn(3600)
                             .build();
         }
+    }
+
+    @Test
+    @DisplayName("이미 사용한 OAuth2 state로는 계정을 다시 연동할 수 없다")
+    void callback_reusedState_doesNotLinkAgain() throws Exception {
+        // given
+        UUID userId = UUID.randomUUID();
+
+        var start = mockMvc.perform(
+                get("/oauth2/authorization/google")
+                        .cookie(new Cookie(
+                                "OAUTH2_LINK_TOKEN",
+                                "test-link-token"
+                        ))
+        ).andReturn();
+
+        MockHttpSession session =
+                (MockHttpSession) start.getRequest().getSession(false);
+
+        assertThat(session).isNotNull();
+
+        String encodedState = UriComponentsBuilder
+                .fromUriString(start.getResponse().getRedirectedUrl())
+                .build()
+                .getQueryParams()
+                .getFirst("state");
+
+        assertThat(encodedState).isNotNull();
+
+        String state = URLDecoder.decode(
+                encodedState,
+                StandardCharsets.UTF_8
+        );
+
+        OAuth2User providerUser = new DefaultOAuth2User(
+                List.of(new SimpleGrantedAuthority("OAUTH2_USER")),
+                Map.of(
+                        "sub", "google-123",
+                        "email", "google@example.com",
+                        "name", "테스트 사용자"
+                ),
+                "sub"
+        );
+
+        when(delegate.loadUser(any(OAuth2UserRequest.class)))
+                .thenReturn(providerUser);
+
+        when(linkRequestService.consume(
+                "test-link-token",
+                OAuthProvider.GOOGLE
+        )).thenReturn(new OAuth2LinkRequest(
+                userId,
+                OAuthProvider.GOOGLE,
+                Instant.now().plusSeconds(300)
+        ));
+
+        // when: 첫 번째 정상 콜백
+        var first = mockMvc.perform(
+                get("/login/oauth2/code/google")
+                        .session(session)
+                        .param("code", "first-code")
+                        .param("state", state)
+        ).andReturn();
+
+        assertThat(first.getResponse().getRedirectedUrl())
+                .isEqualTo("/#/auth/login?link_success=true");
+
+        // when: 같은 state로 두 번째 콜백
+        var second = mockMvc.perform(
+                get("/login/oauth2/code/google")
+                        .session(session)
+                        .param("code", "second-code")
+                        .param("state", state)
+        ).andReturn();
+
+        // then
+        assertThat(second.getResponse().getRedirectedUrl())
+                .isEqualTo(
+                        "/#/auth/login?error=oauth_failed"
+                                + "&error_message=oauth_failed"
+                );
+
+        verify(socialAccountService, times(1)).linkAccount(
+                userId,
+                OAuthProvider.GOOGLE,
+                "google-123"
+        );
+
+        verify(linkRequestService, times(1)).consume(
+                "test-link-token",
+                OAuthProvider.GOOGLE
+        );
+    }
+
+    @Test
+    @DisplayName("연동 토큰 없는 미연동 소셜 계정은 일반 로그인을 거부한다")
+    void callback_unlinkedAccountWithoutToken_failsLogin() throws Exception {
+        // given: 연동 쿠키 없이 일반 Google 로그인 시작
+        var start = mockMvc.perform(
+                get("/oauth2/authorization/google")
+        ).andReturn();
+
+        MockHttpSession session =
+                (MockHttpSession) start.getRequest().getSession(false);
+
+        assertThat(session).isNotNull();
+
+        String encodedState = UriComponentsBuilder
+                .fromUriString(start.getResponse().getRedirectedUrl())
+                .build()
+                .getQueryParams()
+                .getFirst("state");
+
+        assertThat(encodedState).isNotNull();
+
+        String state = URLDecoder.decode(
+                encodedState,
+                StandardCharsets.UTF_8
+        );
+
+        OAuth2User providerUser = new DefaultOAuth2User(
+                List.of(new SimpleGrantedAuthority("OAUTH2_USER")),
+                Map.of(
+                        "sub", "unlinked-google-123",
+                        "email", "unlinked@example.com",
+                        "name", "미연동 사용자"
+                ),
+                "sub"
+        );
+
+        when(delegate.loadUser(any(OAuth2UserRequest.class)))
+                .thenReturn(providerUser);
+
+        when(resolver.resolveUserId(any(OAuth2UserInfo.class)))
+                .thenThrow(
+                        new OAuth2AuthenticationException("user_not_exists")
+                );
+
+        // when
+        var callback = mockMvc.perform(
+                get("/login/oauth2/code/google")
+                        .session(session)
+                        .param("code", "test-code")
+                        .param("state", state)
+        ).andReturn();
+
+        // then
+        assertThat(callback.getResponse().getRedirectedUrl())
+                .isEqualTo(
+                        "/#/auth/login?error=oauth_failed"
+                                + "&error_message=user_not_exists"
+                );
+
+        verify(resolver).resolveUserId(
+                new OAuth2UserInfo(
+                        OAuthProvider.GOOGLE,
+                        "unlinked-google-123",
+                        null,
+                        null
+                )
+        );
+
+        verifyNoInteractions(
+                linkRequestService,
+                socialAccountService,
+                authService
+        );
+
+        assertThat(callback.getResponse().getHeaders(HttpHeaders.SET_COOKIE))
+                .noneMatch(cookie -> cookie.startsWith("REFRESH_TOKEN="));
     }
 
 
