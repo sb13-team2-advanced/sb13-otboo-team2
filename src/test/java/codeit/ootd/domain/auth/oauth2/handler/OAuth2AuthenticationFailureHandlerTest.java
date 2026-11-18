@@ -1,4 +1,4 @@
-package codeit.ootd.domain.auth.oauth2;
+package codeit.ootd.domain.auth.oauth2.handler;
 
 import static org.assertj.core.api.Assertions.assertThat;
 

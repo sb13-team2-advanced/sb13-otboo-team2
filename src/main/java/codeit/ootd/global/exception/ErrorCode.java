@@ -30,6 +30,8 @@ public enum ErrorCode {
     // 소셜 계정 연동
     SOCIAL_ACCOUNT_ALREADY_LINKED(HttpStatus.CONFLICT, "이미 다른 사용자에게 연동된 소셜 계정입니다."),
     OAUTH_PROVIDER_ALREADY_LINKED(HttpStatus.CONFLICT, "이미 해당 제공자의 계정이 연동되어 있습니다."),
+    OAUTH2_LINK_TOKEN_INVALID(HttpStatus.BAD_REQUEST, "유효하지 않은 소셜 계정 연동 요청입니다."),
+    OAUTH2_LINK_TOKEN_EXPIRED(HttpStatus.BAD_REQUEST, "소셜 계정 연동 요청이 만료되었습니다."),
 
     // 의상
     CLOTHES_ATTRIBUTE_DEFINITION_NOT_FOUND(HttpStatus.NOT_FOUND, "의상 속성 정의를 찾을 수 없습니다."),

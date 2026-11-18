@@ -2,8 +2,8 @@ package codeit.ootd.global.security;
 
 import codeit.ootd.domain.auth.jwt.JwtProvider;
 import codeit.ootd.domain.auth.oauth2.CustomOAuth2UserService;
-import codeit.ootd.domain.auth.oauth2.OAuth2AuthenticationFailureHandler;
-import codeit.ootd.domain.auth.oauth2.OAuth2AuthenticationSuccessHandler;
+import codeit.ootd.domain.auth.oauth2.handler.OAuth2AuthenticationFailureHandler;
+import codeit.ootd.domain.auth.oauth2.handler.OAuth2AuthenticationSuccessHandler;
 import codeit.ootd.domain.auth.service.AuthSessionService;
 import codeit.ootd.domain.user.repository.UserRepository;
 import codeit.ootd.global.exception.ErrorCode;
