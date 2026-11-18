@@ -81,6 +81,9 @@ dependencies {
     implementation 'com.github.ben-manes.caffeine:caffeine'
     implementation 'org.springframework.boot:spring-boot-starter-data-redis'
 
+    // S3
+    implementation platform('software.amazon.awssdk:bom:2.46.7')
+    implementation 'software.amazon.awssdk:s3'
 
     // Mail
     implementation 'org.springframework.boot:spring-boot-starter-mail'
