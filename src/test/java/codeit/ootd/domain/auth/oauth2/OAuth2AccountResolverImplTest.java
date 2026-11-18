@@ -23,9 +23,9 @@ class OAuth2AccountResolverImplTest {
         socialAccountService = mock(SocialAccountService.class);
         socialSignupService = mock(SocialSignupService.class);
 
-        // GREEN 단계에서 생성자에 SocialSignupService 추가 예정
         resolver = new OAuth2AccountResolverImpl(
-                socialAccountService
+                socialAccountService,
+                socialSignupService
         );
     }
 
