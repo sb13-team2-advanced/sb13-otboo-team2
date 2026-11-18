@@ -7,8 +7,11 @@ import codeit.ootd.domain.auth.dto.response.SignInResponse;
 import codeit.ootd.domain.auth.dto.response.SignInResult;
 import codeit.ootd.domain.auth.dto.response.TokenRefreshResponse;
 import codeit.ootd.domain.auth.dto.response.TokenRefreshResult;
+import codeit.ootd.domain.auth.oauth2.RefreshTokenCookieFactory;
 import codeit.ootd.domain.auth.service.AuthService;
 import codeit.ootd.domain.auth.service.PasswordResetRateLimiter;
+import codeit.ootd.global.exception.ErrorCode;
+import codeit.ootd.global.exception.OtbooException;
 import io.swagger.v3.oas.annotations.Parameter;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
@@ -35,6 +38,7 @@ public class AuthController implements AuthApiDocs {
 
     private final AuthService authService;
     private final PasswordResetRateLimiter passwordResetRateLimiter;
+    private final RefreshTokenCookieFactory refreshTokenCookieFactory;
 
     @Value("${auth.cookie.secure:true}")
     private boolean cookieSecure;
@@ -52,8 +56,9 @@ public class AuthController implements AuthApiDocs {
                 request.password()
         );
 
+
         ResponseCookie refreshTokenCookie =
-                createRefreshTokenCookie(result.refreshToken());
+                refreshTokenCookieFactory.create(result.refreshToken());
 
         return ResponseEntity.ok()
                 .header(HttpHeaders.SET_COOKIE, refreshTokenCookie.toString())
@@ -83,15 +88,19 @@ public class AuthController implements AuthApiDocs {
         return ResponseEntity.noContent().build();
     }
 
-    @Override
     @PostMapping("/refresh")
     public ResponseEntity<TokenRefreshResponse> refresh(
-            @CookieValue("REFRESH_TOKEN") String refreshToken
+            @CookieValue(value = "REFRESH_TOKEN", required = false)
+            String refreshToken
     ) {
+        if (refreshToken == null || refreshToken.isBlank()) {
+            throw new OtbooException(ErrorCode.AUTHENTICATION_REQUIRED);
+        }
+
         TokenRefreshResult result = authService.refresh(refreshToken);
 
         ResponseCookie cookie =
-                createRefreshTokenCookie(result.refreshToken());
+                refreshTokenCookieFactory.create(result.refreshToken());
 
         return ResponseEntity.ok()
                 .header(HttpHeaders.SET_COOKIE, cookie.toString())
@@ -109,31 +118,10 @@ public class AuthController implements AuthApiDocs {
             authService.signOut(refreshToken);
         }
 
-        ResponseCookie cookie = deleteRefreshTokenCookie();
+        ResponseCookie cookie = refreshTokenCookieFactory.delete();
 
         return ResponseEntity.noContent()
                 .header(HttpHeaders.SET_COOKIE, cookie.toString())
-                .build();
-    }
-
-    private ResponseCookie createRefreshTokenCookie(String token) {
-        return buildRefreshTokenCookie(token, Duration.ofDays(7));
-    }
-
-    private ResponseCookie deleteRefreshTokenCookie() {
-        return buildRefreshTokenCookie("", Duration.ZERO);
-    }
-
-    private ResponseCookie buildRefreshTokenCookie(
-            String token,
-            Duration maxAge
-    ) {
-        return ResponseCookie.from("REFRESH_TOKEN", token)
-                .httpOnly(true)
-                .secure(cookieSecure)
-                .sameSite("Lax")
-                .path("/api/auth")
-                .maxAge(maxAge)
                 .build();
     }
 }

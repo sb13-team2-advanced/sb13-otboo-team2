@@ -299,6 +299,13 @@ class SecurityConfigTest {
 
     }
 
-
+    @Test
+    @DisplayName("비인증 사용자가 보호된 API에 접근하면 401을 반환한다")
+    void unauthenticated_api_returns_401() throws Exception {
+        mockMvc.perform(get("/api/recommendations")
+                        .param("weatherId", UUID.randomUUID().toString()))
+                .andExpect(status().isUnauthorized());
+    }
 }
+
 
