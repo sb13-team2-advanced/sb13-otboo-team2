@@ -124,25 +124,4 @@ public class AuthController implements AuthApiDocs {
                 .header(HttpHeaders.SET_COOKIE, cookie.toString())
                 .build();
     }
-
-    private ResponseCookie createRefreshTokenCookie(String token) {
-        return buildRefreshTokenCookie(token, Duration.ofDays(7));
-    }
-
-    private ResponseCookie deleteRefreshTokenCookie() {
-        return buildRefreshTokenCookie("", Duration.ZERO);
-    }
-
-    private ResponseCookie buildRefreshTokenCookie(
-            String token,
-            Duration maxAge
-    ) {
-        return ResponseCookie.from("REFRESH_TOKEN", token)
-                .httpOnly(true)
-                .secure(cookieSecure)
-                .sameSite("Lax")
-                .path("/api/auth")
-                .maxAge(maxAge)
-                .build();
-    }
 }

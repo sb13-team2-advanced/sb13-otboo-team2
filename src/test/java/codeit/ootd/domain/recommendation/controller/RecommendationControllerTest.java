@@ -11,6 +11,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import codeit.ootd.domain.auth.jwt.JwtProvider;
 import codeit.ootd.domain.auth.oauth2.CustomOAuth2UserService;
+import codeit.ootd.domain.auth.oauth2.OAuth2AuthenticationFailureHandler;
+import codeit.ootd.domain.auth.oauth2.OAuth2AuthenticationSuccessHandler;
 import codeit.ootd.domain.auth.service.AuthSessionService;
 import codeit.ootd.domain.recommendation.dto.response.RecommendationResponse;
 import codeit.ootd.domain.recommendation.service.RecommendationService;
@@ -51,6 +53,10 @@ class RecommendationControllerTest {
     private UserRepository userRepository;
     @MockitoBean
     private CustomOAuth2UserService customOAuth2UserService;
+    @MockitoBean
+    private OAuth2AuthenticationSuccessHandler oAuth2SuccessHandler;
+    @MockitoBean
+    private OAuth2AuthenticationFailureHandler oAuth2FailureHandler;
 
 
     /**
