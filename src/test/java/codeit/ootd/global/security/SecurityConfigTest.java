@@ -246,16 +246,9 @@ class SecurityConfigTest {
 
     @Test
     @DisplayName("프로필 이미지 조회는 JWT 인증 없이 접근할 수 있다")
-    void profileImage_withoutAuthentication_shouldNotReturn401() throws Exception {
+    void profileImage_withoutAuthentication_shouldReturnOk() throws Exception {
         mockMvc.perform(get("/files/profiles/test.jpg"))
-                .andExpect(result -> {
-                    int status = result.getResponse().getStatus();
-
-                    assertThat(status)
-                            .as("프로필 이미지 조회는 인증 오류가 발생하면 안 된다")
-                            .isNotEqualTo(401)
-                            .isNotEqualTo(403);
-                });
+                .andExpect(status().isOk());
     }
 
     @Test
@@ -299,6 +292,11 @@ class SecurityConfigTest {
         @Bean
         TestAuthController testAuthController() {
             return new TestAuthController();
+        }
+
+        @Bean
+        TestController testController() {
+            return new TestController();
         }
     }
 
