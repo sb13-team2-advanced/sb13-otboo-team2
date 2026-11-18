@@ -10,6 +10,7 @@ import codeit.ootd.domain.clothes.repository.ClothesRepository;
 import codeit.ootd.domain.profile.entity.Profile;
 import codeit.ootd.domain.profile.repository.ProfileRepository;
 import codeit.ootd.domain.recommendation.algorithm.OutfitRecommender;
+import codeit.ootd.domain.recommendation.algorithm.RecommendationConditions;
 import codeit.ootd.domain.recommendation.dto.response.RecommendationClothesResponse;
 import codeit.ootd.domain.recommendation.dto.response.RecommendationResponse;
 import codeit.ootd.domain.recommendation.service.RecommendationService;
@@ -44,7 +45,7 @@ public class RecommendationServiceImpl implements RecommendationService {
     private final OutfitRecommender recommender;
 
     /**
-     * 사용자 소유 의상과 속성을 일괄 조회하고 프로필의 온도 민감도로 보정한 평균 기온으로 추천한다.
+     * 사용자 소유 의상과 속성을 일괄 조회하고 온도 민감도, 강수 예보와 풍속으로 추천한다.
      */
     @Transactional(readOnly = true)
     @Override
@@ -63,8 +64,12 @@ public class RecommendationServiceImpl implements RecommendationService {
 
         double temperature = recommendationTemperature(userId, weather.getTemperatureAvg());
 
+        RecommendationConditions conditions = RecommendationConditions.of(temperature,
+                weather.getPrecipitationProbability(), weather.getRainAmount(),
+                weather.getSnowAmount(), weather.getWindSpeed());
+
         return new RecommendationResponse(weatherId, userId,
-                recommender.recommend(temperature, candidates));
+                recommender.recommend(conditions, candidates));
     }
 
     /**

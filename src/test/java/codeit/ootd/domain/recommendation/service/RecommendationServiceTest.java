@@ -18,6 +18,7 @@ import codeit.ootd.domain.clothes.repository.ClothesAttributeDefinitionRepositor
 import codeit.ootd.domain.profile.entity.Profile;
 import codeit.ootd.domain.profile.repository.ProfileRepository;
 import codeit.ootd.domain.recommendation.algorithm.OutfitRecommender;
+import codeit.ootd.domain.recommendation.algorithm.RecommendationConditions;
 import codeit.ootd.domain.recommendation.dto.response.RecommendationClothesResponse;
 import codeit.ootd.domain.recommendation.dto.response.RecommendationResponse;
 import codeit.ootd.domain.recommendation.service.impl.RecommendationServiceImpl;
@@ -108,7 +109,7 @@ class RecommendationServiceTest {
                 List.of(new ClothesAttributeWithDefDto(
                         definitionId, "두께", List.of("얇음", "보통", "두꺼움"), "보통")));
 
-        given(recommender.recommend(15.0, List.of(expected))).willReturn(List.of(expected));
+        given(recommender.recommend(RecommendationConditions.of(15.0, 0, 0, 0, 0), List.of(expected))).willReturn(List.of(expected));
 
         // when
         RecommendationResponse response = service.recommend(userId, weatherId);
@@ -117,7 +118,7 @@ class RecommendationServiceTest {
         assertThat(response.clothes()).containsExactly(expected);
         verify(clothesRepository).findAllByUserId(userId);
         verify(profileRepository).findByUserId(userId);
-        verify(recommender).recommend(15.0, List.of(expected));
+        verify(recommender).recommend(RecommendationConditions.of(15.0, 0, 0, 0, 0), List.of(expected));
     }
 
     @Test
@@ -174,7 +175,7 @@ class RecommendationServiceTest {
         given(profileRepository.findByUserId(userId)).willReturn(Optional.of(profile));
         RecommendationClothesResponse candidate = new RecommendationClothesResponse(
                 clothesId, "상의", null, ClothesType.TOP, List.of());
-        given(recommender.recommend(expectedTemperature, List.of(candidate))).willReturn(List.of(candidate));
+        given(recommender.recommend(RecommendationConditions.of(expectedTemperature, 0, 0, 0, 0), List.of(candidate))).willReturn(List.of(candidate));
 
         // when
         RecommendationResponse response = service.recommend(userId, weatherId);
@@ -184,7 +185,7 @@ class RecommendationServiceTest {
         assertThat(response.userId()).isEqualTo(userId);
         assertThat(response.weatherId()).isEqualTo(weatherId);
         verify(profileRepository).findByUserId(userId);
-        verify(recommender).recommend(expectedTemperature, List.of(candidate));
+        verify(recommender).recommend(RecommendationConditions.of(expectedTemperature, 0, 0, 0, 0), List.of(candidate));
     }
 
     @Test
@@ -203,6 +204,39 @@ class RecommendationServiceTest {
         service.recommend(userId, weatherId);
 
         // then
-        verify(recommender).recommend(eq(15.0), anyList());
+        verify(recommender).recommend(eq(RecommendationConditions.of(15.0, 0, 0, 0, 0)), anyList());
+    }
+
+    /**
+     * 사용자 민감도로 보정한 기온과 저장된 강수·풍속을 함께 추천 조건으로 전달하는지 검증한다.
+     */
+    @ParameterizedTest
+    @CsvSource({"1, 8.0", "3, 12.0", "5, 16.0"})
+    void 사용자_민감도와_날씨를_함께_추천에_반영한다(int sensitivity, double expectedTemperature) {
+        // given
+        UUID userId = UUID.randomUUID();
+        UUID weatherId = UUID.randomUUID();
+        Weather weather = mock(Weather.class);
+        Clothes clothes = mock(Clothes.class);
+        Profile profile = new Profile(userId);
+        profile.update(null, null, sensitivity);
+        given(weatherRepository.findById(weatherId)).willReturn(Optional.of(weather));
+        given(weather.getTemperatureAvg()).willReturn(14.0);
+        given(weather.getPrecipitationProbability()).willReturn(0.7);
+        given(weather.getRainAmount()).willReturn(1.0);
+        given(weather.getSnowAmount()).willReturn(0.5);
+        given(weather.getWindSpeed()).willReturn(4.0);
+        given(clothesRepository.findAllByUserId(userId)).willReturn(List.of(clothes));
+        given(profileRepository.findByUserId(userId)).willReturn(Optional.of(profile));
+
+        // when
+        service.recommend(userId, weatherId);
+
+        // then
+        verify(recommender).recommend(argThat(conditions ->
+                conditions.temperature() == expectedTemperature
+                        && conditions.precipitationExpected() && conditions.windy()), anyList());
+        verify(weather).getRainAmount();
+        verify(weather).getSnowAmount();
     }
 }
