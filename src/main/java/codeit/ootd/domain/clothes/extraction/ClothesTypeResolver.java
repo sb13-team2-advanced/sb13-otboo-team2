@@ -15,6 +15,7 @@ import org.springframework.stereotype.Component;
  * <ul>
  *   <li>예외 문구: "부츠컷"처럼 정해 둔 문구가 제목에 있으면 키워드 매칭 전에 종류를 바로 정한다.</li>
  *   <li>무시 단어: "브라운"처럼 키워드("브라")와 겹치는 무관한 단어는 지우고 키워드를 찾는다.</li>
+ *   <li>약한 아우터 키워드: "플리스"처럼 소재 단어는 다른 키워드가 하나도 없을 때만 아우터로 본다.</li>
  * </ul>
  */
 @Component
@@ -25,6 +26,10 @@ public class ClothesTypeResolver {
     private static final Map<String, ClothesType> PHRASE_OVERRIDES = new LinkedHashMap<>();
 
     private static final List<String> IGNORED_WORDS = List.of("브라운", "캡슐", "baggy", "베스트셀러");
+
+    // 소재·기능 단어라 "플리스 팬츠"처럼 다른 종류와 같이 쓰이면 지는 아우터 키워드. 다른 키워드가 없을 때만 쓴다.
+    private static final List<String> WEAK_OUTER_KEYWORDS =
+            List.of("플리스", "후리스", "바람막이", "fleece", "windbreaker");
 
     static {
         KEYWORDS.put(ClothesType.SOCKS, List.of("양말", "socks"));
@@ -39,14 +44,14 @@ public class ClothesTypeResolver {
         KEYWORDS.put(ClothesType.DRESS, List.of("원피스", "드레스", "dress"));
         KEYWORDS.put(ClothesType.OUTER,
                 List.of("자켓", "재킷", "코트", "점퍼", "패딩", "가디건", "집업", "블레이저", "무스탕",
-                        "조끼", "블루종", "카디건", "트렌치", "바람막이", "후리스", "플리스", "아노락",
-                        "jacket", "coat", "parka", "cardigan", "windbreaker", "fleece"));
+                        "조끼", "블루종", "카디건", "트렌치", "아노락",
+                        "jacket", "coat", "parka", "cardigan"));
         KEYWORDS.put(ClothesType.BOTTOM,
                 List.of("바지", "팬츠", "슬랙스", "데님", "치마", "스커트", "레깅스",
                         "쇼츠", "숏츠", "조거", "카고", "pants", "jeans", "skirt", "shorts"));
         KEYWORDS.put(ClothesType.TOP,
                 List.of("티셔츠", "셔츠", "맨투맨", "후드", "니트", "블라우스", "스웨터",
-                        "반팔", "긴팔", "민소매", "나시", "카라티", "폴로", "t-shirt", "shirt", "hoodie", "sweater"));
+                        "반팔", "긴팔", "민소매", "나시", "카라티", "폴로티", "t-shirt", "shirt", "hoodie", "sweater"));
         KEYWORDS.put(ClothesType.ACCESSORY,
                 List.of("벨트", "시계", "목걸이", "반지", "귀걸이", "팔찌", "선글라스",
                         "장갑", "넥타이", "안경", "belt", "watch"));
@@ -73,7 +78,11 @@ public class ClothesTypeResolver {
                 .filter(entry -> entry.getValue().stream().anyMatch(cleaned::contains))
                 .map(Map.Entry::getKey)
                 .findFirst()
-                .orElse(ClothesType.ETC);
+                .orElseGet(() -> matchesWeakOuter(cleaned) ? ClothesType.OUTER : ClothesType.ETC);
+    }
+
+    private boolean matchesWeakOuter(String text) {
+        return WEAK_OUTER_KEYWORDS.stream().anyMatch(text::contains);
     }
 
     private String removeIgnoredWords(String text) {
