@@ -1,5 +1,6 @@
 package codeit.ootd.domain.auth.service.impl;
 
+import codeit.ootd.domain.auth.entity.OAuthProvider;
 import codeit.ootd.domain.auth.entity.SocialAccount;
 import codeit.ootd.domain.auth.oauth2.OAuth2UserInfo;
 import codeit.ootd.domain.auth.repository.SocialAccountRepository;
@@ -37,6 +38,15 @@ public class SocialSignupServiceImpl implements SocialSignupService {
             throw new DuplicateEmailException();
         }
 
+        // 제공자 이름이 없으면 기본 이름 사용
+        String name = userInfo.name();
+
+        if (name == null || name.isBlank()) {
+            name = userInfo.provider() == OAuthProvider.KAKAO
+                    ? "카카오 사용자"
+                    : "Google 사용자";
+        }
+
         String randomPassword =
                 UUID.randomUUID().toString() + UUID.randomUUID();
 
@@ -44,7 +54,7 @@ public class SocialSignupServiceImpl implements SocialSignupService {
                 passwordEncoder.encode(randomPassword);
 
         User user = User.create(
-                userInfo.name(),
+                name,
                 email,
                 encodedPassword
         );
