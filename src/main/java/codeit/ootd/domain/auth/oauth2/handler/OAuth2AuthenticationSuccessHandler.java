@@ -121,16 +121,19 @@ public class OAuth2AuthenticationSuccessHandler
 
         } catch (OAuth2AuthenticationException e) {
             failureHandler.onAuthenticationFailure(request, response, e);
+
         } catch (OtbooException e) {
+            String errorCode = linkToken != null
+                    ? "oauth_link_failed"
+                    : "oauth_failed";
+
             failureHandler.onAuthenticationFailure(
                     request,
                     response,
-                    new OAuth2AuthenticationException(
-                            new OAuth2Error("oauth_link_failed"),
-                            e.getMessage()
-                    )
+                    new OAuth2AuthenticationException(errorCode)
             );
         }
+
     }
 
     private OAuthProvider resolveProvider(Object rawProvider) {

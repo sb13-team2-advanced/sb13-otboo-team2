@@ -26,11 +26,13 @@ public class OAuth2AuthenticationFailureHandler
 
         String errorMessage = "oauth_failed";
 
-        if (exception instanceof OAuth2AuthenticationException oauthException
-                && "user_not_exists".equals(
-                oauthException.getError().getErrorCode()
-        )) {
-            errorMessage = "user_not_exists";
+        if (exception instanceof OAuth2AuthenticationException oauthException) {
+            String errorCode = oauthException.getError().getErrorCode();
+
+            if ("user_not_exists".equals(errorCode)
+                    || "oauth_link_failed".equals(errorCode)) {
+                errorMessage = errorCode;
+            }
         }
 
         ResponseCookie cookie = ResponseCookie
