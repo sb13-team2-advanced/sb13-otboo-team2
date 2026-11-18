@@ -7,6 +7,7 @@ import codeit.ootd.domain.auth.dto.response.SignInResponse;
 import codeit.ootd.domain.auth.dto.response.SignInResult;
 import codeit.ootd.domain.auth.dto.response.TokenRefreshResponse;
 import codeit.ootd.domain.auth.dto.response.TokenRefreshResult;
+import codeit.ootd.domain.auth.oauth2.RefreshTokenCookieFactory;
 import codeit.ootd.domain.auth.service.AuthService;
 import codeit.ootd.domain.auth.service.PasswordResetRateLimiter;
 import codeit.ootd.global.exception.ErrorCode;
@@ -37,6 +38,7 @@ public class AuthController implements AuthApiDocs {
 
     private final AuthService authService;
     private final PasswordResetRateLimiter passwordResetRateLimiter;
+    private final RefreshTokenCookieFactory refreshTokenCookieFactory;
 
     @Value("${auth.cookie.secure:true}")
     private boolean cookieSecure;
@@ -54,8 +56,9 @@ public class AuthController implements AuthApiDocs {
                 request.password()
         );
 
+
         ResponseCookie refreshTokenCookie =
-                createRefreshTokenCookie(result.refreshToken());
+                refreshTokenCookieFactory.create(result.refreshToken());
 
         return ResponseEntity.ok()
                 .header(HttpHeaders.SET_COOKIE, refreshTokenCookie.toString())
@@ -97,7 +100,7 @@ public class AuthController implements AuthApiDocs {
         TokenRefreshResult result = authService.refresh(refreshToken);
 
         ResponseCookie cookie =
-                createRefreshTokenCookie(result.refreshToken());
+                refreshTokenCookieFactory.create(result.refreshToken());
 
         return ResponseEntity.ok()
                 .header(HttpHeaders.SET_COOKIE, cookie.toString())
@@ -115,7 +118,7 @@ public class AuthController implements AuthApiDocs {
             authService.signOut(refreshToken);
         }
 
-        ResponseCookie cookie = deleteRefreshTokenCookie();
+        ResponseCookie cookie = refreshTokenCookieFactory.delete();
 
         return ResponseEntity.noContent()
                 .header(HttpHeaders.SET_COOKIE, cookie.toString())
