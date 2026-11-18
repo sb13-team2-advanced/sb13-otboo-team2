@@ -53,7 +53,7 @@ public class SocialSignupServiceImpl implements SocialSignupService {
         String encodedPassword =
                 passwordEncoder.encode(randomPassword);
 
-        User user = User.create(
+        User user = User.createSocial(
                 name,
                 email,
                 encodedPassword

@@ -10,6 +10,7 @@ import codeit.ootd.domain.auth.entity.SocialAccount;
 import codeit.ootd.domain.auth.oauth2.OAuth2UserInfo;
 import codeit.ootd.domain.auth.repository.SocialAccountRepository;
 import codeit.ootd.domain.auth.service.impl.SocialSignupServiceImpl;
+import codeit.ootd.domain.user.entity.SignupType;
 import codeit.ootd.domain.user.entity.User;
 import codeit.ootd.domain.user.entity.UserRole;
 import codeit.ootd.domain.user.entity.UserStatus;
@@ -88,6 +89,8 @@ class SocialSignupServiceImplTest {
         assertThat(savedUser.getStatus())
                 .isEqualTo(UserStatus.ACTIVE);
         assertThat(savedUser.isLocked()).isFalse();
+        assertThat(savedUser.getSignupType())
+                .isEqualTo(SignupType.SOCIAL);
 
         ArgumentCaptor<SocialAccount> accountCaptor =
                 ArgumentCaptor.forClass(SocialAccount.class);
