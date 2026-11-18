@@ -3,6 +3,7 @@ package codeit.ootd.domain.auth.oauth2.linking;
 import static org.assertj.core.api.Assertions.*;
 
 import jakarta.servlet.http.Cookie;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.mock.web.MockHttpServletResponse;
@@ -76,4 +77,38 @@ class OAuth2LinkAuthorizationRequestRepositoryTest {
         assertThat(repository.loadAuthorizationRequest(request))
                 .isNull();
     }
+
+    @Test
+    @DisplayName("OAuth2 인증 요청 제거 시 연동 토큰을 콜백 요청에 전달한다")
+    void remove_linkRequest_exposesTokenToCallback() {
+        // given
+        var request = new MockHttpServletRequest();
+        var response = new MockHttpServletResponse();
+
+        request.setCookies(
+                new Cookie("OAUTH2_LINK_TOKEN", "link-token")
+        );
+
+        repository.saveAuthorizationRequest(
+                authorizationRequest(),
+                request,
+                response
+        );
+
+        request.setParameter("state", "test-state");
+
+        // when
+        var removed = repository.removeAuthorizationRequest(
+                request,
+                response
+        );
+
+        // then
+        assertThat(removed).isNotNull();
+        assertThat(request.getAttribute("otboo_link_token"))
+                .isEqualTo("link-token");
+        assertThat(repository.loadAuthorizationRequest(request))
+                .isNull();
+    }
+
 }
