@@ -66,4 +66,35 @@ class OAuth2AuthenticationFailureHandlerTest {
         );
     }
 
+    @Test
+    @DisplayName("소셜 계정 연동 실패는 oauth_link_failed 오류 코드로 전달한다")
+    void authenticationFailure_linkError_redirectsToLogin()
+            throws Exception {
+        // given
+        var request = new MockHttpServletRequest();
+        var response = new MockHttpServletResponse();
+
+        OAuth2AuthenticationException exception =
+                new OAuth2AuthenticationException(
+                        "oauth_link_failed"
+                );
+
+        // when
+        handler.onAuthenticationFailure(
+                request,
+                response,
+                exception
+        );
+
+        // then
+        assertThat(response.getStatus()).isEqualTo(302);
+
+        assertThat(response.getRedirectedUrl())
+                .isEqualTo(
+                        "/#/auth/login?error=oauth_failed"
+                                + "&error_message=oauth_link_failed"
+                );
+    }
+
+
 }

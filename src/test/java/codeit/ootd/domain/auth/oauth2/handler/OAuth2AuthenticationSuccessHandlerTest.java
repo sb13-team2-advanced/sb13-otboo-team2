@@ -380,5 +380,51 @@ class OAuth2AuthenticationSuccessHandlerTest {
                 );
     }
 
+    @Test
+    @DisplayName("일반 소셜 로그인 중 도메인 예외는 oauth_failed로 처리한다")
+    void success_normalLogin_domainError_failsLogin() throws Exception {
+        // given
+        UUID userId = UUID.randomUUID();
+        User user = mock(User.class);
+
+        var request = new MockHttpServletRequest();
+        var response = new MockHttpServletResponse();
+
+        when(resolver.resolveUserId(any(OAuth2UserInfo.class)))
+                .thenReturn(userId);
+
+        when(userRepository.findById(userId))
+                .thenReturn(Optional.of(user));
+
+        when(authService.issueTokensForAuthenticatedUser(user))
+                .thenThrow(mock(OtbooException.class));
+
+        // when
+        handler.onAuthenticationSuccess(
+                request,
+                response,
+                authentication("GOOGLE", "google-123")
+        );
+
+        // then
+        verify(failureHandler).onAuthenticationFailure(
+                eq(request),
+                eq(response),
+                argThat(exception ->
+                        exception instanceof OAuth2AuthenticationException oauthException
+                                && "oauth_failed".equals(
+                                oauthException.getError().getErrorCode()
+                        )
+                )
+        );
+
+        verifyNoInteractions(
+                linkRequestService,
+                socialAccountService
+        );
+
+        assertThat(response.getHeaders(HttpHeaders.SET_COOKIE))
+                .noneMatch(cookie -> cookie.startsWith("REFRESH_TOKEN="));
+    }
 
 }
