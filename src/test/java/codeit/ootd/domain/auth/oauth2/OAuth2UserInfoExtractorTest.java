@@ -10,6 +10,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.EnumSource;
 import org.junit.jupiter.params.provider.ValueSource;
+import org.springframework.security.oauth2.core.OAuth2AuthenticationException;
 
 class OAuth2UserInfoExtractorTest {
 
@@ -155,4 +156,28 @@ class OAuth2UserInfoExtractorTest {
                 .isEqualTo("kakao_123456789@kakao.com");
         assertThat(result.name()).isNull();
     }
+
+    @Test
+    @DisplayName("Google 이메일이 없으면 인증 오류가 발생한다")
+    void extract_googleWithoutEmail_throwsException() {
+        // given
+        Map<String, Object> attributes = Map.of(
+                "sub", "google-123",
+                "name", "구글 사용자"
+        );
+
+        // when & then
+        assertThatThrownBy(() ->
+                extractor.extract(OAuthProvider.GOOGLE, attributes)
+        )
+                .isInstanceOf(OAuth2AuthenticationException.class)
+                .satisfies(exception -> {
+                    OAuth2AuthenticationException oauthException =
+                            (OAuth2AuthenticationException) exception;
+
+                    assertThat(oauthException.getError().getErrorCode())
+                            .isEqualTo("email_required");
+                });
+    }
+
 }
