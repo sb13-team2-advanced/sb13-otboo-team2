@@ -5,6 +5,7 @@ import codeit.ootd.domain.auth.oauth2.OAuth2UserInfo;
 import codeit.ootd.domain.auth.repository.SocialAccountRepository;
 import codeit.ootd.domain.auth.service.SocialSignupService;
 import codeit.ootd.domain.user.entity.User;
+import codeit.ootd.domain.user.exception.DuplicateEmailException;
 import codeit.ootd.domain.user.repository.UserRepository;
 import java.util.Objects;
 import java.util.UUID;
@@ -29,16 +30,22 @@ public class SocialSignupServiceImpl implements SocialSignupService {
                 "소셜 사용자 정보는 필수입니다."
         );
 
+        String email = userInfo.email();
+
+        // 기존 이메일과 중복되면 자동 회원가입 거부
+        if (userRepository.existsByEmailIgnoreCase(email)) {
+            throw new DuplicateEmailException();
+        }
+
         String randomPassword =
-                UUID.randomUUID().toString()
-                        + UUID.randomUUID();
+                UUID.randomUUID().toString() + UUID.randomUUID();
 
         String encodedPassword =
                 passwordEncoder.encode(randomPassword);
 
         User user = User.create(
                 userInfo.name(),
-                userInfo.email(),
+                email,
                 encodedPassword
         );
 
@@ -54,4 +61,5 @@ public class SocialSignupServiceImpl implements SocialSignupService {
 
         return savedUser.getId();
     }
+
 }
