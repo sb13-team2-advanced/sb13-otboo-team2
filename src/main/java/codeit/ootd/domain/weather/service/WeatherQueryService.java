@@ -15,6 +15,8 @@ import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
+import org.springframework.web.client.HttpServerErrorException;
+import org.springframework.web.client.ResourceAccessException;
 
 @Slf4j
 @Service
@@ -24,6 +26,7 @@ public class WeatherQueryService {
     private static final ZoneId KOREA_ZONE = ZoneId.of("Asia/Seoul");
 
     private static final Duration RETRY_INTERVAL = Duration.ofMinutes(10);
+    private static final Duration TRANSIENT_RETRY_INTERVAL = Duration.ofMinutes(1);
     private static final Duration RESERVATION_DURATION = Duration.ofMinutes(5);
     private static final long[] WAIT_INTERVALS_MS = {500, 500, 1000, 1000};
 
@@ -67,10 +70,16 @@ public class WeatherQueryService {
                     } catch (RuntimeException e) {
                         Instant failedAt = clock.instant();
 
+                        Duration retryInterval =
+                            e instanceof ResourceAccessException
+                                || e instanceof HttpServerErrorException
+                                ? TRANSIENT_RETRY_INTERVAL
+                                : RETRY_INTERVAL;
+
                         weatherLocationRepository.scheduleInitialCollectionRetry(
                             location.getId(),
                             token,
-                            failedAt.plus(RETRY_INTERVAL)
+                            failedAt.plus(retryInterval)
                         );
 
                         throw e;
