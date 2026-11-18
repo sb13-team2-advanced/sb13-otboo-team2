@@ -1,7 +1,7 @@
 package codeit.ootd.domain.auth.oauth2;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.AssertionsForClassTypes.assertThatThrownBy;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import codeit.ootd.domain.auth.entity.OAuthProvider;
 import java.util.Map;
@@ -67,7 +67,7 @@ class OAuth2UserInfoExtractorTest {
     }
 
     @Test
-    @DisplayName("Kakao 이메일이 제공되지 않아도 사용자 ID와 닉네임을 추출한다")
+    @DisplayName("Kakao 이메일이 없으면 닉네임과 회원 ID로 가상 이메일을 생성한다")
     void extract_kakao_without_email() {
         // given
         Map<String, Object> attributes = Map.of(
@@ -86,16 +86,22 @@ class OAuth2UserInfoExtractorTest {
         );
 
         // then
+        assertThat(result.provider()).isEqualTo(OAuthProvider.KAKAO);
         assertThat(result.providerUserId()).isEqualTo("123456789");
-        assertThat(result.email()).isNull();
+        assertThat(result.email())
+                .isEqualTo("카카오 사용자_123456789@kakao.com");
         assertThat(result.name()).isEqualTo("카카오 사용자");
     }
 
-
     @ParameterizedTest
-    @EnumSource(value = OAuthProvider.class, names = {"GOOGLE", "KAKAO"})
+    @EnumSource(
+            value = OAuthProvider.class,
+            names = {"GOOGLE", "KAKAO"}
+    )
     @DisplayName("필수 소셜 사용자 ID가 없으면 예외를 발생시킨다")
-    void extract_missingProviderUserId_throwsException(OAuthProvider provider) {
+    void extract_missingProviderUserId_throwsException(
+            OAuthProvider provider
+    ) {
         // given
         Map<String, Object> attributes = Map.of();
 
@@ -108,7 +114,9 @@ class OAuth2UserInfoExtractorTest {
     @ParameterizedTest
     @ValueSource(strings = {"", "   "})
     @DisplayName("소셜 사용자 ID가 빈 문자열 또는 공백이면 예외를 발생시킨다")
-    void extract_blankProviderUserId_throwsException(String providerUserId) {
+    void extract_blankProviderUserId_throwsException(
+            String providerUserId
+    ) {
         // given
         Map<String, Object> attributes = Map.of(
                 "sub", providerUserId
@@ -116,13 +124,14 @@ class OAuth2UserInfoExtractorTest {
 
         // when & then
         assertThatThrownBy(() ->
-                extractor.extract(OAuthProvider.GOOGLE, attributes))
+                extractor.extract(OAuthProvider.GOOGLE, attributes)
+        )
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessage("소셜 사용자 ID가 없습니다.");
     }
 
     @Test
-    @DisplayName("Kakao 사용자 정보의 중첩 구조가 잘못되면 선택 정보를 무시한다")
+    @DisplayName("Kakao 중첩 정보가 잘못되면 기본 이름으로 가상 이메일을 생성한다")
     void extract_kakao_invalidNestedAttributes_success() {
         // given
         Map<String, Object> attributes = Map.of(
@@ -142,34 +151,8 @@ class OAuth2UserInfoExtractorTest {
 
         // then
         assertThat(result.providerUserId()).isEqualTo("123456789");
-        assertThat(result.email()).isNull();
+        assertThat(result.email())
+                .isEqualTo("kakao_123456789@kakao.com");
         assertThat(result.name()).isNull();
     }
-
-    @Test
-    @DisplayName("Kakao 이메일이 없으면 닉네임과 회원 ID로 가상 이메일을 생성한다")
-    void extractKakao_withoutEmail_createsVirtualEmail() {
-        // given
-        Map<String, Object> attributes = Map.of(
-                "id", 123456789L,
-                "kakao_account", Map.of(
-                        "profile", Map.of("nickname", "하정")
-                )
-        );
-
-        // when
-        OAuth2UserInfo result = extractor.extract(
-                OAuthProvider.KAKAO,
-                attributes
-        );
-
-        // then
-        assertThat(result.providerUserId()).isEqualTo("123456789");
-        assertThat(result.email())
-                .isEqualTo("하정_123456789@kakao.com");
-        assertThat(result.name()).isEqualTo("하정");
-    }
-
-
-
 }
