@@ -180,4 +180,33 @@ class OAuth2UserInfoExtractorTest {
                 });
     }
 
+    @Test
+    @DisplayName("Kakao 닉네임에 공백과 특수문자가 있으면 가상 이메일에 안전한 형태로 반영한다")
+    void extract_kakaoNicknameWithSpecialCharacters_normalizesEmail() {
+        // given
+        Map<String, Object> attributes = Map.of(
+                "id", 123456789L,
+                "kakao_account", Map.of(
+                        "profile", Map.of(
+                                "nickname", "하트 ♡"
+                        )
+                )
+        );
+
+        // when
+        OAuth2UserInfo result = extractor.extract(
+                OAuthProvider.KAKAO,
+                attributes
+        );
+
+        // then
+        assertThat(result.email())
+                .isEqualTo("하트_123456789@kakao.com");
+
+        // 실제 사용자 이름은 유지
+        assertThat(result.name())
+                .isEqualTo("하트 ♡");
+    }
+
+
 }
