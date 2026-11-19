@@ -63,10 +63,27 @@ public class OAuth2UserInfoExtractor {
 
         if (email == null) {
             String emailName = nickname != null
-                    ? nickname
+                    ? nickname.replaceAll("[^가-힣a-zA-Z0-9]", "")
                     : "kakao";
 
-            email = emailName + "_" + providerUserId + "@kakao.com";
+            if (emailName.isBlank()) {
+                emailName = "kakao";
+            }
+
+            String suffix = "_" + providerUserId + "@kakao.com";
+            int maxNameLength = 100 - suffix.length();
+
+            if (maxNameLength <= 0) {
+                throw new IllegalArgumentException(
+                        "Kakao 사용자 ID가 너무 깁니다."
+                );
+            }
+
+            if (emailName.length() > maxNameLength) {
+                emailName = emailName.substring(0, maxNameLength);
+            }
+
+            email = emailName + suffix;
         }
 
         return new OAuth2UserInfo(
@@ -76,7 +93,6 @@ public class OAuth2UserInfoExtractor {
                 nickname
         );
     }
-
 
     private String requiredString(Object value) {
         String result = optionalString(value);

@@ -90,7 +90,7 @@ class OAuth2UserInfoExtractorTest {
         assertThat(result.provider()).isEqualTo(OAuthProvider.KAKAO);
         assertThat(result.providerUserId()).isEqualTo("123456789");
         assertThat(result.email())
-                .isEqualTo("카카오 사용자_123456789@kakao.com");
+                .isEqualTo("카카오사용자_123456789@kakao.com");
         assertThat(result.name()).isEqualTo("카카오 사용자");
     }
 
