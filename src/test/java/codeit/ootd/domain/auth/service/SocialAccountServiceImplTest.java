@@ -187,6 +187,9 @@ class SocialAccountServiceImplTest {
         // given
         UUID userId = UUID.randomUUID();
 
+        given(userRepository.existsById(userId))
+                .willReturn(true);
+
         given(socialAccountRepository.existsByUserIdAndProvider(
                 userId, OAuthProvider.GOOGLE
         )).willReturn(true);

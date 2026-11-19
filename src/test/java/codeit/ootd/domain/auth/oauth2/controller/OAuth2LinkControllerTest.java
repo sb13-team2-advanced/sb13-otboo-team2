@@ -8,6 +8,7 @@ import java.util.UUID;
 
 import codeit.ootd.domain.auth.oauth2.linking.OAuth2LinkRequestService;
 import codeit.ootd.domain.auth.oauth2.linking.OAuth2LinkStartResponse;
+import codeit.ootd.domain.auth.service.SocialAccountService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -18,12 +19,15 @@ class OAuth2LinkControllerTest {
 
     private OAuth2LinkRequestService linkRequestService;
     private OAuth2LinkController controller;
+    private SocialAccountService socialAccountService;
 
     @BeforeEach
     void setUp() {
         linkRequestService = mock(OAuth2LinkRequestService.class);
+        socialAccountService = mock(SocialAccountService.class);
         controller = new OAuth2LinkController(
                 linkRequestService,
+                socialAccountService,
                 true
         );
     }
