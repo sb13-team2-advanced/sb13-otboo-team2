@@ -409,7 +409,7 @@ class OAuth2CallbackSecurityIntegrationTest {
         );
 
         assertThat(callback.getResponse().getRedirectedUrl())
-                .isEqualTo("/#/auth/login?oauth_success=true");
+                .isEqualTo("/#/recommendations");
 
         assertThat(
                 callback.getResponse().getHeaders(HttpHeaders.SET_COOKIE)

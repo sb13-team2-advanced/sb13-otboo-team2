@@ -119,9 +119,7 @@ public class OAuth2AuthenticationSuccessHandler
                     cookieFactory.create(result.refreshToken()).toString()
             );
 
-            response.sendRedirect(
-                    "/#/auth/login?oauth_success=true"
-            );
+            response.sendRedirect("/#/recommendations");
 
         } catch (OAuth2AuthenticationException e) {
             failureHandler.onAuthenticationFailure(request, response, e);

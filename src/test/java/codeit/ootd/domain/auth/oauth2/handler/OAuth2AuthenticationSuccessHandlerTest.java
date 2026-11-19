@@ -126,7 +126,7 @@ class OAuth2AuthenticationSuccessHandlerTest {
 
         assertThat(response.getStatus()).isEqualTo(302);
         assertThat(response.getRedirectedUrl())
-                .isEqualTo("/#/auth/login?oauth_success=true");
+                .isEqualTo("/#/recommendations");
     }
 
 
