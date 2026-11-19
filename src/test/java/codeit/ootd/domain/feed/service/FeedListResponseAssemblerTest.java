@@ -130,10 +130,9 @@ class FeedListResponseAssemblerTest {
                 org.mockito.ArgumentMatchers.<Iterable<UUID>>any()
         )).willReturn(List.of(pants, shirt));
 
-        given(clothesAttributeRepository.findAllByClothesId(shirtId))
-                .willReturn(List.of());
-        given(clothesAttributeRepository.findAllByClothesId(pantsId))
-                .willReturn(List.of());
+        given(clothesAttributeRepository.findAllByClothesIdIn(
+                org.mockito.ArgumentMatchers.<UUID>anyCollection()
+        )).willReturn(List.of());
 
         List<FeedLike> likes = likedByMe
                 ? List.of(new FeedLike(feedId, viewerId))
