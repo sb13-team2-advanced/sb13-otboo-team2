@@ -180,7 +180,7 @@ class OAuth2AuthenticationSuccessHandlerTest {
                 .noneMatch(cookie -> cookie.startsWith("REFRESH_TOKEN="));
 
         assertThat(response.getRedirectedUrl())
-                .isEqualTo("/#/auth/login?link_success=true");
+                .isEqualTo("/#/settings?link_success=true");
     }
 
     @Test

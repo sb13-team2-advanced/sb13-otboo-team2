@@ -3,6 +3,8 @@ package codeit.ootd.domain.auth.oauth2.handler;
 import codeit.ootd.domain.auth.dto.response.SignInResult;
 import codeit.ootd.domain.auth.cookie.RefreshTokenCookieFactory;
 import codeit.ootd.domain.auth.entity.OAuthProvider;
+import codeit.ootd.domain.auth.exception.OAuthProviderAlreadyLinkedException;
+import codeit.ootd.domain.auth.exception.SocialAccountAlreadyLinkedException;
 import codeit.ootd.domain.auth.oauth2.OAuth2AccountResolver;
 import codeit.ootd.domain.auth.oauth2.OAuth2UserInfo;
 import codeit.ootd.domain.auth.oauth2.linking.OAuth2LinkRequest;
@@ -92,7 +94,7 @@ public class OAuth2AuthenticationSuccessHandler
                 );
 
                 response.sendRedirect(
-                        "/#/auth/login?link_success=true"
+                        "/#/settings?link_success=true"
                 );
                 return;
             }
@@ -124,8 +126,7 @@ public class OAuth2AuthenticationSuccessHandler
         } catch (OAuth2AuthenticationException e) {
             failureHandler.onAuthenticationFailure(request, response, e);
 
-        } catch (
-                DuplicateEmailException e) {
+        } catch (DuplicateEmailException e) {
             failureHandler.onAuthenticationFailure(
                     request,
                     response,
@@ -135,52 +136,71 @@ public class OAuth2AuthenticationSuccessHandler
                             e
                     )
             );
-
-        } catch (OtbooException e) {
-            String errorCode = linkToken != null
-                    ? "oauth_link_failed"
-                    : "oauth_failed";
-
+        } catch (SocialAccountAlreadyLinkedException e) {
             failureHandler.onAuthenticationFailure(
                     request,
                     response,
-                    new OAuth2AuthenticationException(errorCode)
+                    new OAuth2AuthenticationException(
+                            new OAuth2Error("social_account_already_linked"),
+                            "이미 다른 계정에 연동된 소셜 계정입니다.",
+                            e
+                    )
+            );
+        } catch (OAuthProviderAlreadyLinkedException e) {
+            failureHandler.onAuthenticationFailure(
+                    request,
+                    response,
+                    new OAuth2AuthenticationException(
+                            new OAuth2Error("oauth_provider_already_linked"),
+                            "이미 해당 소셜 로그인 제공자가 연동되어 있습니다.",
+                            e
+                    )
+            );
+        } catch(OtbooException e){
+                String errorCode = linkToken != null
+                        ? "oauth_link_failed"
+                        : "oauth_failed";
+
+                failureHandler.onAuthenticationFailure(
+                        request,
+                        response,
+                        new OAuth2AuthenticationException(errorCode)
+                );
+            }
+
+        }
+
+        private OAuthProvider resolveProvider (Object rawProvider){
+            if (!(rawProvider instanceof String providerName)) {
+                throw new OAuth2AuthenticationException(
+                        "unsupported_oauth_provider"
+                );
+            }
+
+            try {
+                return OAuthProvider.valueOf(providerName);
+            } catch (IllegalArgumentException e) {
+                throw new OAuth2AuthenticationException(
+                        "unsupported_oauth_provider"
+                );
+            }
+        }
+
+        private void clearLinkCookie (HttpServletResponse response){
+            ResponseCookie cookie = ResponseCookie
+                    .from("OAUTH2_LINK_TOKEN", "")
+                    .httpOnly(true)
+                    .sameSite("Lax")
+                    .path("/oauth2/authorization")
+                    .maxAge(Duration.ZERO)
+                    .build();
+
+            response.addHeader(
+                    HttpHeaders.SET_COOKIE,
+                    cookie.toString()
             );
         }
 
+
     }
-
-    private OAuthProvider resolveProvider(Object rawProvider) {
-        if (!(rawProvider instanceof String providerName)) {
-            throw new OAuth2AuthenticationException(
-                    "unsupported_oauth_provider"
-            );
-        }
-
-        try {
-            return OAuthProvider.valueOf(providerName);
-        } catch (IllegalArgumentException e) {
-            throw new OAuth2AuthenticationException(
-                    "unsupported_oauth_provider"
-            );
-        }
-    }
-
-    private void clearLinkCookie(HttpServletResponse response) {
-        ResponseCookie cookie = ResponseCookie
-                .from("OAUTH2_LINK_TOKEN", "")
-                .httpOnly(true)
-                .sameSite("Lax")
-                .path("/oauth2/authorization")
-                .maxAge(Duration.ZERO)
-                .build();
-
-        response.addHeader(
-                HttpHeaders.SET_COOKIE,
-                cookie.toString()
-        );
-    }
-
-
-}
 
