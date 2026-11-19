@@ -50,6 +50,10 @@ public class User extends BaseTimeEntity {
     @Column(name = "temporary_password_expires_at")
     private Instant temporaryPasswordExpiresAt;
 
+    @Enumerated(EnumType.STRING)
+    @Column(name = "signup_type", nullable = false, length = 20)
+    private SignupType signupType;
+
     public static User create(
             String name,
             String email,
@@ -64,7 +68,18 @@ public class User extends BaseTimeEntity {
         user.role = UserRole.USER;
         user.locked = false;
         user.status = UserStatus.ACTIVE;
+        user.signupType = SignupType.LOCAL;
 
+        return user;
+    }
+
+    public static User createSocial(
+            String name,
+            String email,
+            String encodedPassword
+    ) {
+        User user = create(name, email, encodedPassword);
+        user.signupType = SignupType.SOCIAL;
         return user;
     }
 

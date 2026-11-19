@@ -1,0 +1,191 @@
+package codeit.ootd.domain.auth.service;
+
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.*;
+
+import codeit.ootd.domain.auth.entity.OAuthProvider;
+import codeit.ootd.domain.auth.entity.SocialAccount;
+import codeit.ootd.domain.auth.oauth2.OAuth2UserInfo;
+import codeit.ootd.domain.auth.repository.SocialAccountRepository;
+import codeit.ootd.domain.auth.service.impl.SocialSignupServiceImpl;
+import codeit.ootd.domain.user.entity.SignupType;
+import codeit.ootd.domain.user.entity.User;
+import codeit.ootd.domain.user.entity.UserRole;
+import codeit.ootd.domain.user.entity.UserStatus;
+import codeit.ootd.domain.user.exception.DuplicateEmailException;
+import codeit.ootd.domain.user.repository.UserRepository;
+import java.util.UUID;
+import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
+import org.mockito.InjectMocks;
+import org.mockito.Mock;
+import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.test.util.ReflectionTestUtils;
+
+@ExtendWith(MockitoExtension.class)
+class SocialSignupServiceImplTest {
+
+    @Mock
+    private UserRepository userRepository;
+
+    @Mock
+    private SocialAccountRepository socialAccountRepository;
+
+    @Mock
+    private PasswordEncoder passwordEncoder;
+
+    @InjectMocks
+    private SocialSignupServiceImpl socialSignupService;
+
+    @Test
+    @DisplayName("최초 Google 로그인 시 사용자와 소셜 계정을 생성한다")
+    void register_google_createsUserAndSocialAccount() {
+        // given
+        OAuth2UserInfo userInfo = new OAuth2UserInfo(
+                OAuthProvider.GOOGLE,
+                "google-123",
+                "google@example.com",
+                "구글 사용자"
+        );
+
+        UUID userId = UUID.randomUUID();
+
+        when(passwordEncoder.encode(any(String.class)))
+                .thenReturn("encoded-password");
+
+        when(userRepository.saveAndFlush(any(User.class)))
+                .thenAnswer(invocation -> {
+                    User user = invocation.getArgument(0);
+                    ReflectionTestUtils.setField(user, "id", userId);
+                    return user;
+                });
+
+        // when
+        UUID result = socialSignupService.register(userInfo);
+
+        // then
+        assertThat(result).isEqualTo(userId);
+
+        ArgumentCaptor<User> userCaptor =
+                ArgumentCaptor.forClass(User.class);
+
+        verify(userRepository).saveAndFlush(userCaptor.capture());
+
+        User savedUser = userCaptor.getValue();
+
+        assertThat(savedUser.getEmail())
+                .isEqualTo("google@example.com");
+        assertThat(savedUser.getName())
+                .isEqualTo("구글 사용자");
+        assertThat(savedUser.getPassword())
+                .isEqualTo("encoded-password");
+        assertThat(savedUser.getRole())
+                .isEqualTo(UserRole.USER);
+        assertThat(savedUser.getStatus())
+                .isEqualTo(UserStatus.ACTIVE);
+        assertThat(savedUser.isLocked()).isFalse();
+        assertThat(savedUser.getSignupType())
+                .isEqualTo(SignupType.SOCIAL);
+
+        ArgumentCaptor<SocialAccount> accountCaptor =
+                ArgumentCaptor.forClass(SocialAccount.class);
+
+        verify(socialAccountRepository)
+                .save(accountCaptor.capture());
+
+        SocialAccount savedAccount = accountCaptor.getValue();
+
+        assertThat(savedAccount.getUserId()).isEqualTo(userId);
+        assertThat(savedAccount.getProvider())
+                .isEqualTo(OAuthProvider.GOOGLE);
+        assertThat(savedAccount.getProviderUserId())
+                .isEqualTo("google-123");
+    }
+
+    @Test
+    @DisplayName("기존 회원과 이메일이 중복되면 소셜 자동 회원가입을 거부한다")
+    void register_duplicateEmail_rejectsSignup() {
+        // given
+        OAuth2UserInfo userInfo = new OAuth2UserInfo(
+                OAuthProvider.GOOGLE,
+                "google-123",
+                "existing@example.com",
+                "구글 사용자"
+        );
+
+        when(userRepository.existsByEmailIgnoreCase(
+                "existing@example.com"
+        )).thenReturn(true);
+
+        // when & then
+        assertThatThrownBy(() -> socialSignupService.register(userInfo))
+                .isInstanceOf(DuplicateEmailException.class);
+
+        verify(userRepository, never()).saveAndFlush(any(User.class));
+        verify(socialAccountRepository, never())
+                .save(any(SocialAccount.class));
+    }
+
+    @Test
+    @DisplayName("Kakao 닉네임이 없으면 기본 이름으로 회원가입한다")
+    void register_kakao_withoutName_usesDefaultName() {
+        // given
+        OAuth2UserInfo userInfo = new OAuth2UserInfo(
+                OAuthProvider.KAKAO,
+                "123456789",
+                "kakao_123456789@kakao.com",
+                null
+        );
+
+        UUID userId = UUID.randomUUID();
+
+        when(passwordEncoder.encode(any(String.class)))
+                .thenReturn("encoded-password");
+
+        when(userRepository.saveAndFlush(any(User.class)))
+                .thenAnswer(invocation -> {
+                    User user = invocation.getArgument(0);
+                    ReflectionTestUtils.setField(user, "id", userId);
+                    return user;
+                });
+
+        // when
+        UUID result = socialSignupService.register(userInfo);
+
+        // then
+        assertThat(result).isEqualTo(userId);
+
+        ArgumentCaptor<User> userCaptor =
+                ArgumentCaptor.forClass(User.class);
+
+        verify(userRepository).saveAndFlush(userCaptor.capture());
+
+        User savedUser = userCaptor.getValue();
+
+        assertThat(savedUser.getName())
+                .isEqualTo("카카오 사용자");
+        assertThat(savedUser.getEmail())
+                .isEqualTo("kakao_123456789@kakao.com");
+
+        ArgumentCaptor<SocialAccount> accountCaptor =
+                ArgumentCaptor.forClass(SocialAccount.class);
+
+        verify(socialAccountRepository)
+                .save(accountCaptor.capture());
+
+        SocialAccount savedAccount = accountCaptor.getValue();
+
+        assertThat(savedAccount.getUserId()).isEqualTo(userId);
+        assertThat(savedAccount.getProvider())
+                .isEqualTo(OAuthProvider.KAKAO);
+        assertThat(savedAccount.getProviderUserId())
+                .isEqualTo("123456789");
+    }
+
+
+}

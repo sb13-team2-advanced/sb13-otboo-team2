@@ -30,7 +30,8 @@ public class OAuth2AuthenticationFailureHandler
             String errorCode = oauthException.getError().getErrorCode();
 
             if ("user_not_exists".equals(errorCode)
-                    || "oauth_link_failed".equals(errorCode)) {
+                    || "oauth_link_failed".equals(errorCode)|| "email_already_exists".equals(errorCode)
+                    || "email_required".equals(errorCode)) {
                 errorMessage = errorCode;
             }
         }

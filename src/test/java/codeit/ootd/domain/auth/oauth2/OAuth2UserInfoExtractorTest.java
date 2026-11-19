@@ -10,6 +10,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.EnumSource;
 import org.junit.jupiter.params.provider.ValueSource;
+import org.springframework.security.oauth2.core.OAuth2AuthenticationException;
 
 class OAuth2UserInfoExtractorTest {
 
@@ -89,7 +90,7 @@ class OAuth2UserInfoExtractorTest {
         assertThat(result.provider()).isEqualTo(OAuthProvider.KAKAO);
         assertThat(result.providerUserId()).isEqualTo("123456789");
         assertThat(result.email())
-                .isEqualTo("카카오 사용자_123456789@kakao.com");
+                .isEqualTo("카카오사용자_123456789@kakao.com");
         assertThat(result.name()).isEqualTo("카카오 사용자");
     }
 
@@ -155,4 +156,57 @@ class OAuth2UserInfoExtractorTest {
                 .isEqualTo("kakao_123456789@kakao.com");
         assertThat(result.name()).isNull();
     }
+
+    @Test
+    @DisplayName("Google 이메일이 없으면 인증 오류가 발생한다")
+    void extract_googleWithoutEmail_throwsException() {
+        // given
+        Map<String, Object> attributes = Map.of(
+                "sub", "google-123",
+                "name", "구글 사용자"
+        );
+
+        // when & then
+        assertThatThrownBy(() ->
+                extractor.extract(OAuthProvider.GOOGLE, attributes)
+        )
+                .isInstanceOf(OAuth2AuthenticationException.class)
+                .satisfies(exception -> {
+                    OAuth2AuthenticationException oauthException =
+                            (OAuth2AuthenticationException) exception;
+
+                    assertThat(oauthException.getError().getErrorCode())
+                            .isEqualTo("email_required");
+                });
+    }
+
+    @Test
+    @DisplayName("Kakao 닉네임에 공백과 특수문자가 있으면 가상 이메일에 안전한 형태로 반영한다")
+    void extract_kakaoNicknameWithSpecialCharacters_normalizesEmail() {
+        // given
+        Map<String, Object> attributes = Map.of(
+                "id", 123456789L,
+                "kakao_account", Map.of(
+                        "profile", Map.of(
+                                "nickname", "하트 ♡"
+                        )
+                )
+        );
+
+        // when
+        OAuth2UserInfo result = extractor.extract(
+                OAuthProvider.KAKAO,
+                attributes
+        );
+
+        // then
+        assertThat(result.email())
+                .isEqualTo("하트_123456789@kakao.com");
+
+        // 실제 사용자 이름은 유지
+        assertThat(result.name())
+                .isEqualTo("하트 ♡");
+    }
+
+
 }
