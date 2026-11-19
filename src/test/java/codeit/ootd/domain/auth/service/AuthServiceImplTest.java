@@ -8,6 +8,7 @@ import codeit.ootd.domain.auth.exception.AccountLockedException;
 import codeit.ootd.domain.auth.exception.InvalidAuthSessionException;
 import codeit.ootd.domain.auth.exception.InvalidCredentialsException;
 import codeit.ootd.domain.auth.exception.InvalidRefreshTokenException;
+import codeit.ootd.domain.auth.exception.SocialAccountPasswordResetNotAllowedException;
 import codeit.ootd.domain.auth.jwt.JwtProvider;
 import codeit.ootd.domain.auth.service.impl.AuthServiceImpl;
 import codeit.ootd.domain.user.entity.User;

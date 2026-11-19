@@ -26,6 +26,7 @@ public enum ErrorCode {
     INVALID_AUTH_SESSION(HttpStatus.UNAUTHORIZED, "유효하지 않거나 만료된 인증 세션입니다."),
     ACCOUNT_LOCKED(HttpStatus.FORBIDDEN, "잠긴 계정입니다."),
     ACCOUNT_INACTIVE(HttpStatus.FORBIDDEN, "활성화되지 않은 계정입니다."),
+    SOCIAL_ACCOUNT_PASSWORD_RESET_NOT_ALLOWED(HttpStatus.FORBIDDEN, "소셜 로그인으로 가입한 계정은 비밀번호를 초기화할 수 없습니다."),
 
     // 소셜 계정 연동
     SOCIAL_ACCOUNT_ALREADY_LINKED(HttpStatus.CONFLICT, "이미 다른 사용자에게 연동된 소셜 계정입니다."),
