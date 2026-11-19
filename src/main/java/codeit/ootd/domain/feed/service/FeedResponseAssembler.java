@@ -93,14 +93,7 @@ public class FeedResponseAssembler {
                 .distinct()
                 .toList();
 
-        Map<UUID, OotdDto> ootdsByClothesId = clothesIds.isEmpty()
-                ? Map.of()
-                : clothesRepository.findAllById(clothesIds)
-                .stream()
-                .collect(Collectors.toMap(
-                        Clothes::getId,
-                        this::toOotdDto
-                ));
+        Map<UUID, OotdDto> ootdsByClothesId = toOotdDtosByClothesId(clothesIds);
 
         Set<UUID> likedFeedIds = feedLikeRepository
                 .findAllByUserIdAndFeedIdIn(userId, feedIds)
@@ -161,12 +154,52 @@ public class FeedResponseAssembler {
     @Transactional(readOnly = true)
     public OotdDto toOotdDto(Clothes clothes) {
         List<ClothesAttribute> attributes =
-                clothesAttributeRepository.findAllByClothesId(
-                        clothes.getId()
-                );
+                clothesAttributeRepository.findAllByClothesId(clothes.getId());
 
+        return toOotdDto(
+                clothes,
+                attributes,
+                findDefinitionsById(attributes)
+        );
+    }
+
+    private Map<UUID, OotdDto> toOotdDtosByClothesId(List<UUID> clothesIds) {
+        if (clothesIds.isEmpty()) {
+            return Map.of();
+        }
+
+        List<Clothes> clothes = clothesRepository.findAllById(clothesIds);
+        List<ClothesAttribute> attributes =
+                clothesAttributeRepository.findAllByClothesIdIn(clothesIds);
+
+        Map<UUID, List<ClothesAttribute>> attributesByClothesId =
+                attributes.stream()
+                        .collect(Collectors.groupingBy(
+                                ClothesAttribute::getClothesId
+                        ));
+
+        Map<UUID, ClothesAttributeDefinition> definitionsById =
+                findDefinitionsById(attributes);
+
+        return clothes.stream()
+                .collect(Collectors.toMap(
+                        Clothes::getId,
+                        item -> toOotdDto(
+                                item,
+                                attributesByClothesId.getOrDefault(
+                                        item.getId(),
+                                        List.of()
+                                ),
+                                definitionsById
+                        )
+                ));
+    }
+
+    private Map<UUID, ClothesAttributeDefinition> findDefinitionsById(
+            List<ClothesAttribute> attributes
+    ) {
         if (attributes.isEmpty()) {
-            return ootdMapper.toDto(clothes, List.of());
+            return Map.of();
         }
 
         List<UUID> definitionIds = attributes.stream()
@@ -174,36 +207,34 @@ public class FeedResponseAssembler {
                 .distinct()
                 .toList();
 
-        Map<UUID, ClothesAttributeDefinition> definitionsById =
-                clothesAttributeDefinitionRepository
-                        .findAllById(definitionIds)
-                        .stream()
-                        .collect(Collectors.toMap(
-                                ClothesAttributeDefinition::getId,
-                                Function.identity()
-                        ));
+        return clothesAttributeDefinitionRepository.findAllById(definitionIds)
+                .stream()
+                .collect(Collectors.toMap(
+                        ClothesAttributeDefinition::getId,
+                        Function.identity()
+                ));
+    }
 
-        List<ClothesAttributeWithDefDto> attributeDtos =
-                attributes.stream()
-                        .map(attribute -> {
-                            ClothesAttributeDefinition definition =
-                                    definitionsById.get(
-                                            attribute.getDefinitionId()
-                                    );
+    private OotdDto toOotdDto(
+            Clothes clothes,
+            List<ClothesAttribute> attributes,
+            Map<UUID, ClothesAttributeDefinition> definitionsById
+    ) {
+        List<ClothesAttributeWithDefDto> attributeDtos = attributes.stream()
+                .map(attribute -> {
+                    ClothesAttributeDefinition definition =
+                            definitionsById.get(attribute.getDefinitionId());
 
-                            if (definition == null) {
-                                throw new IllegalStateException(
-                                        "의상 속성 정의를 찾을 수 없습니다: "
-                                                + attribute.getDefinitionId()
-                                );
-                            }
+                    if (definition == null) {
+                        throw new IllegalStateException(
+                                "의상 속성 정의를 찾을 수 없습니다: "
+                                        + attribute.getDefinitionId()
+                        );
+                    }
 
-                            return ootdMapper.toAttributeDto(
-                                    attribute,
-                                    definition
-                            );
-                        })
-                        .toList();
+                    return ootdMapper.toAttributeDto(attribute, definition);
+                })
+                .toList();
 
         return ootdMapper.toDto(clothes, attributeDtos);
     }
