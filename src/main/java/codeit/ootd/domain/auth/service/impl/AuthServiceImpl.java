@@ -8,16 +8,20 @@ import codeit.ootd.domain.auth.exception.AccountLockedException;
 import codeit.ootd.domain.auth.exception.InvalidAuthSessionException;
 import codeit.ootd.domain.auth.exception.InvalidCredentialsException;
 import codeit.ootd.domain.auth.exception.InvalidRefreshTokenException;
+import codeit.ootd.domain.auth.exception.SocialAccountPasswordResetNotAllowedException;
 import codeit.ootd.domain.auth.jwt.JwtProvider;
 import codeit.ootd.domain.auth.service.AuthService;
 import codeit.ootd.domain.auth.service.AuthSessionService;
 import codeit.ootd.domain.auth.service.RefreshTokenService;
 import codeit.ootd.domain.auth.service.TemporaryPasswordGenerator;
+import codeit.ootd.domain.auth.service.TemporaryPasswordMailSender;
 import codeit.ootd.domain.user.dto.response.UserDto;
+import codeit.ootd.domain.user.entity.SignupType;
 import codeit.ootd.domain.user.entity.User;
 import codeit.ootd.domain.user.entity.UserStatus;
 import codeit.ootd.domain.user.exception.UserNotFoundException;
 import codeit.ootd.domain.user.repository.UserRepository;
+import codeit.ootd.global.util.EmailNormalizer;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -40,16 +44,32 @@ public class AuthServiceImpl implements AuthService {
     private final JwtProvider jwtProvider;
     private final TemporaryPasswordGenerator temporaryPasswordGenerator;
     private final Clock clock;
+    private final TemporaryPasswordMailSender temporaryPasswordMailSender;
 
     @Override
     public User authenticate(String email, String password) {
 
-        User user = userRepository.findByEmail(email)
+        String normalizedEmail = EmailNormalizer.normalize(email);
+
+        User user = userRepository.findByEmailIgnoreCase(normalizedEmail)
                 .orElseThrow(InvalidCredentialsException::new);
 
-        if (!passwordEncoder.matches(password, user.getPassword())) {
-            throw new InvalidCredentialsException();
+        boolean matchesOriginalPassword =
+                passwordEncoder.matches(password, user.getPassword());
+
+        if (!matchesOriginalPassword) {
+            boolean validTemporaryPassword =
+                    user.hasValidTemporaryPassword(clock.instant());
+
+            if (!validTemporaryPassword
+                    || !passwordEncoder.matches(
+                    password,
+                    user.getTemporaryPassword()
+            )) {
+                throw new InvalidCredentialsException();
+            }
         }
+
 
         if (user.isLocked()) {
             throw new AccountLockedException();
@@ -66,22 +86,43 @@ public class AuthServiceImpl implements AuthService {
     @Transactional
     public SignInResult signIn(String email, String password) {
         User user = authenticate(email, password);
+        return issueTokens(user);
+    }
 
-        AuthSession session = authSessionService.createSession(user.getId());
+    @Override
+    @Transactional
+    public SignInResult issueTokensForAuthenticatedUser(User user) {
+        validateAccountStatus(user);
+        return issueTokens(user);
+    }
+
+    private void validateAccountStatus(User user) {
+        if (user.isLocked()) {
+            throw new AccountLockedException();
+        }
+
+        if (user.getStatus() != UserStatus.ACTIVE) {
+            throw new AccountInactiveException();
+        }
+    }
+
+    private SignInResult issueTokens(User user) {
+        AuthSession session =
+                authSessionService.createSession(user.getId());
 
         String accessToken = jwtProvider.generateAccessToken(
                 user.getId(),
                 session.getId()
         );
 
-        String refreshToken = refreshTokenService.issue(session.getId());
+        String refreshToken =
+                refreshTokenService.issue(session.getId());
 
         return new SignInResult(
                 UserDto.from(user),
                 accessToken,
                 refreshToken
         );
-
     }
 
     @Override
@@ -144,7 +185,9 @@ public class AuthServiceImpl implements AuthService {
     @Override
     @Transactional
     public void resetPassword(String email) {
-        User user = userRepository.findByEmail(email)
+        String normalizedEmail = EmailNormalizer.normalize(email);
+
+        User user = userRepository.findByEmailIgnoreCase(normalizedEmail)
                 .orElseThrow(UserNotFoundException::new);
 
         if (user.isLocked()) {
@@ -155,6 +198,10 @@ public class AuthServiceImpl implements AuthService {
             throw new AccountInactiveException();
         }
 
+        if (user.getSignupType() == SignupType.SOCIAL) {
+            throw new SocialAccountPasswordResetNotAllowedException();
+        }
+
         String temporaryPassword = temporaryPasswordGenerator.generate();
         String encodedPassword = passwordEncoder.encode(temporaryPassword);
 
@@ -163,7 +210,14 @@ public class AuthServiceImpl implements AuthService {
                 clock.instant().plus(Duration.ofMinutes(3))
         );
 
-        log.info("임시 비밀번호 발급 정보 저장 완료: userId={}", user.getId());
+        temporaryPasswordMailSender.send(
+                user.getEmail(),
+                temporaryPassword
+        );
+
+        log.info("임시 비밀번호 발급 및 이메일 발송 처리 완료: userId={}",
+                user.getId());
     }
+
 
 }

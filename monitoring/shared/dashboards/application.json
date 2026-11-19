@@ -1,0 +1,507 @@
+{
+  "uid": "otboo-application-monitoring",
+  "title": "otboo-application-monitoring",
+  "description": "Spring Boot JVM and HTTP metrics collected by the ECS ADOT sidecar and stored in AMP.",
+  "schemaVersion": 39,
+  "version": 1,
+  "editable": true,
+  "timezone": "Asia/Seoul",
+  "refresh": "1m",
+  "time": {
+    "from": "now-1h",
+    "to": "now"
+  },
+  "tags": [
+    "otboo",
+    "ecs",
+    "jvm",
+    "http"
+  ],
+  "links": [
+    {
+      "title": "ECS CPU / memory",
+      "type": "link",
+      "url": "/d/otboo-ecs-monitoring",
+      "keepTime": true
+    }
+  ],
+  "panels": [
+    {
+      "id": 1,
+      "title": "Metrics collection status",
+      "type": "stat",
+      "gridPos": {
+        "h": 5,
+        "w": 6,
+        "x": 0,
+        "y": 0
+      },
+      "datasource": {
+        "type": "grafana-amazonprometheus-datasource",
+        "uid": "otboo-amp"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "none",
+          "min": 0,
+          "max": 1,
+          "mappings": [
+            {
+              "type": "value",
+              "options": {
+                "0": {
+                  "text": "DOWN / NO DATA",
+                  "color": "red"
+                },
+                "1": {
+                  "text": "UP",
+                  "color": "green"
+                }
+              }
+            }
+          ],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "red",
+                "value": null
+              },
+              {
+                "color": "green",
+                "value": 1
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "grafana-amazonprometheus-datasource",
+            "uid": "otboo-amp"
+          },
+          "expr": "max(up{job=\"otboo\",aws_ecs_task_family=\"otboo-backend\",aws_ecs_cluster_arn=\"arn:aws:ecs:ap-northeast-2:121246721746:cluster/otboo-dev-cluster\"}) or vector(0)",
+          "editorMode": "code",
+          "range": false,
+          "instant": true,
+          "legendFormat": ""
+        }
+      ],
+      "options": {
+        "colorMode": "background",
+        "graphMode": "none",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        }
+      },
+      "description": "1 means at least one application target is being scraped. 0 means all current scrapes failed or no up series exists. Check ADOT logs and /actuator/prometheus."
+    },
+    {
+      "id": 2,
+      "title": "Healthy application targets",
+      "type": "stat",
+      "gridPos": {
+        "h": 5,
+        "w": 6,
+        "x": 6,
+        "y": 0
+      },
+      "datasource": {
+        "type": "grafana-amazonprometheus-datasource",
+        "uid": "otboo-amp"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "min": 0
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "grafana-amazonprometheus-datasource",
+            "uid": "otboo-amp"
+          },
+          "expr": "sum(up{job=\"otboo\",aws_ecs_task_family=\"otboo-backend\",aws_ecs_cluster_arn=\"arn:aws:ecs:ap-northeast-2:121246721746:cluster/otboo-dev-cluster\"}) or vector(0)",
+          "editorMode": "code",
+          "range": false,
+          "instant": true,
+          "legendFormat": ""
+        }
+      ]
+    },
+    {
+      "id": 3,
+      "title": "HTTP requests per second",
+      "type": "stat",
+      "gridPos": {
+        "h": 5,
+        "w": 6,
+        "x": 12,
+        "y": 0
+      },
+      "datasource": {
+        "type": "grafana-amazonprometheus-datasource",
+        "uid": "otboo-amp"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "reqps",
+          "min": 0
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "grafana-amazonprometheus-datasource",
+            "uid": "otboo-amp"
+          },
+          "expr": "sum(rate(http_server_requests_seconds_count{job=\"otboo\",aws_ecs_task_family=\"otboo-backend\",aws_ecs_cluster_arn=\"arn:aws:ecs:ap-northeast-2:121246721746:cluster/otboo-dev-cluster\",uri!~\"/actuator.*\"}[5m]))",
+          "editorMode": "code",
+          "range": false,
+          "instant": true,
+          "legendFormat": ""
+        }
+      ],
+      "description": "Uses a 5m rate window and excludes /actuator endpoints. No traffic samples can show No data; this is not a collection failure."
+    },
+    {
+      "id": 4,
+      "title": "HTTP 5xx error ratio",
+      "type": "stat",
+      "gridPos": {
+        "h": 5,
+        "w": 6,
+        "x": 18,
+        "y": 0
+      },
+      "datasource": {
+        "type": "grafana-amazonprometheus-datasource",
+        "uid": "otboo-amp"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percentunit",
+          "min": 0
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "grafana-amazonprometheus-datasource",
+            "uid": "otboo-amp"
+          },
+          "expr": "(sum(rate(http_server_requests_seconds_count{job=\"otboo\",aws_ecs_task_family=\"otboo-backend\",aws_ecs_cluster_arn=\"arn:aws:ecs:ap-northeast-2:121246721746:cluster/otboo-dev-cluster\",uri!~\"/actuator.*\",status=~\"5..\"}[5m])) or (0 * sum(rate(http_server_requests_seconds_count{job=\"otboo\",aws_ecs_task_family=\"otboo-backend\",aws_ecs_cluster_arn=\"arn:aws:ecs:ap-northeast-2:121246721746:cluster/otboo-dev-cluster\",uri!~\"/actuator.*\"}[5m])))) / clamp_min(sum(rate(http_server_requests_seconds_count{job=\"otboo\",aws_ecs_task_family=\"otboo-backend\",aws_ecs_cluster_arn=\"arn:aws:ecs:ap-northeast-2:121246721746:cluster/otboo-dev-cluster\",uri!~\"/actuator.*\"}[5m])), 1e-9)",
+          "editorMode": "code",
+          "range": false,
+          "instant": true,
+          "legendFormat": ""
+        }
+      ],
+      "description": "Uses a 5m rate window and excludes /actuator endpoints. No traffic samples can show No data; this is not a collection failure."
+    },
+    {
+      "id": 5,
+      "title": "JVM heap used / max",
+      "type": "timeseries",
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 5
+      },
+      "datasource": {
+        "type": "grafana-amazonprometheus-datasource",
+        "uid": "otboo-amp"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "bytes",
+          "min": 0
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "grafana-amazonprometheus-datasource",
+            "uid": "otboo-amp"
+          },
+          "expr": "sum by (aws_ecs_task_id) (jvm_memory_used_bytes{job=\"otboo\",aws_ecs_task_family=\"otboo-backend\",aws_ecs_cluster_arn=\"arn:aws:ecs:ap-northeast-2:121246721746:cluster/otboo-dev-cluster\",area=\"heap\"})",
+          "editorMode": "code",
+          "range": true,
+          "instant": false,
+          "legendFormat": "{{aws_ecs_task_id}} used"
+        },
+        {
+          "refId": "B",
+          "datasource": {
+            "type": "grafana-amazonprometheus-datasource",
+            "uid": "otboo-amp"
+          },
+          "expr": "sum by (aws_ecs_task_id) (jvm_memory_max_bytes{job=\"otboo\",aws_ecs_task_family=\"otboo-backend\",aws_ecs_cluster_arn=\"arn:aws:ecs:ap-northeast-2:121246721746:cluster/otboo-dev-cluster\",area=\"heap\"} > 0)",
+          "editorMode": "code",
+          "range": true,
+          "legendFormat": "{{aws_ecs_task_id}} max"
+        }
+      ],
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      }
+    },
+    {
+      "id": 6,
+      "title": "GC pause time per second",
+      "type": "timeseries",
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 5
+      },
+      "datasource": {
+        "type": "grafana-amazonprometheus-datasource",
+        "uid": "otboo-amp"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percentunit",
+          "min": 0
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "grafana-amazonprometheus-datasource",
+            "uid": "otboo-amp"
+          },
+          "expr": "sum by (aws_ecs_task_id) (rate(jvm_gc_pause_seconds_sum{job=\"otboo\",aws_ecs_task_family=\"otboo-backend\",aws_ecs_cluster_arn=\"arn:aws:ecs:ap-northeast-2:121246721746:cluster/otboo-dev-cluster\"}[5m]))",
+          "editorMode": "code",
+          "range": true,
+          "instant": false,
+          "legendFormat": "{{aws_ecs_task_id}}"
+        }
+      ],
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      }
+    },
+    {
+      "id": 7,
+      "title": "HTTP request rate by status",
+      "type": "timeseries",
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 13
+      },
+      "datasource": {
+        "type": "grafana-amazonprometheus-datasource",
+        "uid": "otboo-amp"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "reqps",
+          "min": 0
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "grafana-amazonprometheus-datasource",
+            "uid": "otboo-amp"
+          },
+          "expr": "sum by (status) (rate(http_server_requests_seconds_count{job=\"otboo\",aws_ecs_task_family=\"otboo-backend\",aws_ecs_cluster_arn=\"arn:aws:ecs:ap-northeast-2:121246721746:cluster/otboo-dev-cluster\",uri!~\"/actuator.*\"}[5m]))",
+          "editorMode": "code",
+          "range": true,
+          "instant": false,
+          "legendFormat": "{{status}}"
+        }
+      ],
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "description": "Uses a 5m rate window and excludes /actuator endpoints. No traffic samples can show No data; this is not a collection failure."
+    },
+    {
+      "id": 8,
+      "title": "HTTP mean response time (5m)",
+      "type": "timeseries",
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 13
+      },
+      "datasource": {
+        "type": "grafana-amazonprometheus-datasource",
+        "uid": "otboo-amp"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "min": 0
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "grafana-amazonprometheus-datasource",
+            "uid": "otboo-amp"
+          },
+          "expr": "sum(rate(http_server_requests_seconds_sum{job=\"otboo\",aws_ecs_task_family=\"otboo-backend\",aws_ecs_cluster_arn=\"arn:aws:ecs:ap-northeast-2:121246721746:cluster/otboo-dev-cluster\",uri!~\"/actuator.*\"}[5m])) / clamp_min(sum(rate(http_server_requests_seconds_count{job=\"otboo\",aws_ecs_task_family=\"otboo-backend\",aws_ecs_cluster_arn=\"arn:aws:ecs:ap-northeast-2:121246721746:cluster/otboo-dev-cluster\",uri!~\"/actuator.*\"}[5m])), 1e-9)",
+          "editorMode": "code",
+          "range": true,
+          "instant": false,
+          "legendFormat": ""
+        }
+      ],
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "description": "Uses a 5m rate window and excludes /actuator endpoints. No traffic samples can show No data; this is not a collection failure."
+    },
+    {
+      "id": 9,
+      "title": "HTTP 5xx error ratio (5m)",
+      "type": "timeseries",
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 21
+      },
+      "datasource": {
+        "type": "grafana-amazonprometheus-datasource",
+        "uid": "otboo-amp"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percentunit",
+          "min": 0
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "grafana-amazonprometheus-datasource",
+            "uid": "otboo-amp"
+          },
+          "expr": "(sum(rate(http_server_requests_seconds_count{job=\"otboo\",aws_ecs_task_family=\"otboo-backend\",aws_ecs_cluster_arn=\"arn:aws:ecs:ap-northeast-2:121246721746:cluster/otboo-dev-cluster\",uri!~\"/actuator.*\",status=~\"5..\"}[5m])) or (0 * sum(rate(http_server_requests_seconds_count{job=\"otboo\",aws_ecs_task_family=\"otboo-backend\",aws_ecs_cluster_arn=\"arn:aws:ecs:ap-northeast-2:121246721746:cluster/otboo-dev-cluster\",uri!~\"/actuator.*\"}[5m])))) / clamp_min(sum(rate(http_server_requests_seconds_count{job=\"otboo\",aws_ecs_task_family=\"otboo-backend\",aws_ecs_cluster_arn=\"arn:aws:ecs:ap-northeast-2:121246721746:cluster/otboo-dev-cluster\",uri!~\"/actuator.*\"}[5m])), 1e-9)",
+          "editorMode": "code",
+          "range": true,
+          "instant": false,
+          "legendFormat": ""
+        }
+      ],
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "description": "Uses a 5m rate window and excludes /actuator endpoints. No traffic samples can show No data; this is not a collection failure."
+    },
+    {
+      "id": 10,
+      "title": "JVM live threads",
+      "type": "timeseries",
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 21
+      },
+      "datasource": {
+        "type": "grafana-amazonprometheus-datasource",
+        "uid": "otboo-amp"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "min": 0
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "grafana-amazonprometheus-datasource",
+            "uid": "otboo-amp"
+          },
+          "expr": "sum by (aws_ecs_task_id) (jvm_threads_live_threads{job=\"otboo\",aws_ecs_task_family=\"otboo-backend\",aws_ecs_cluster_arn=\"arn:aws:ecs:ap-northeast-2:121246721746:cluster/otboo-dev-cluster\"})",
+          "editorMode": "code",
+          "range": true,
+          "instant": false,
+          "legendFormat": "{{aws_ecs_task_id}}"
+        }
+      ],
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      }
+    }
+  ]
+}

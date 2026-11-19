@@ -16,4 +16,6 @@ public interface AuthService {
 
     void resetPassword(String email);
 
+    SignInResult issueTokensForAuthenticatedUser(User user);
+
 }

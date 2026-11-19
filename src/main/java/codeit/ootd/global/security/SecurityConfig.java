@@ -1,6 +1,10 @@
 package codeit.ootd.global.security;
 
 import codeit.ootd.domain.auth.jwt.JwtProvider;
+import codeit.ootd.domain.auth.oauth2.CustomOAuth2UserService;
+import codeit.ootd.domain.auth.oauth2.handler.OAuth2AuthenticationFailureHandler;
+import codeit.ootd.domain.auth.oauth2.handler.OAuth2AuthenticationSuccessHandler;
+import codeit.ootd.domain.auth.oauth2.linking.OAuth2LinkAuthorizationRequestRepository;
 import codeit.ootd.domain.auth.service.AuthSessionService;
 import codeit.ootd.domain.user.repository.UserRepository;
 import codeit.ootd.global.exception.ErrorCode;
@@ -18,6 +22,7 @@ import org.springframework.security.config.annotation.method.configuration.Enabl
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.config.http.SessionCreationPolicy;
+import org.springframework.security.oauth2.client.userinfo.DefaultOAuth2UserService;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 import org.springframework.security.web.context.RequestAttributeSecurityContextRepository;
@@ -38,10 +43,15 @@ public class SecurityConfig {
             JwtProvider jwtProvider,
             AuthSessionService authSessionService,
             UserRepository userRepository,
-            JsonMapper jsonMapper
+            JsonMapper jsonMapper,
+            CustomOAuth2UserService customOAuth2UserService,
+            OAuth2AuthenticationFailureHandler oAuth2FailureHandler,
+            OAuth2AuthenticationSuccessHandler oAuth2SuccessHandler,
+            OAuth2LinkAuthorizationRequestRepository linkAuthorizationRequestRepository
     ) throws Exception {
 
         http.csrf(csrf -> csrf
+                .ignoringRequestMatchers("/ws", "/ws/**")
                 .csrfTokenRepository(
                         CookieCsrfTokenRepository.withHttpOnlyFalse()
                 )
@@ -53,6 +63,20 @@ public class SecurityConfig {
         // Spring Security 기본 로그인 방식 비활성화
         http.formLogin(form -> form.disable());
         http.httpBasic(basic -> basic.disable());
+
+        // OAuth2 사용자 서비스 연결
+        http.oauth2Login(oauth2 -> oauth2
+                .authorizationEndpoint(endpoint -> endpoint
+                        .authorizationRequestRepository(
+                                linkAuthorizationRequestRepository
+                        )
+                )
+                .userInfoEndpoint(userInfo -> userInfo
+                        .userService(customOAuth2UserService)
+                )
+                .successHandler(oAuth2SuccessHandler)
+                .failureHandler(oAuth2FailureHandler)
+        );
 
         // 기존 API 접근 권한 설정
         http.sessionManagement(session -> session
@@ -73,15 +97,22 @@ public class SecurityConfig {
                         "/js/**",
                         "/images/**"
                 ).permitAll()
+                .requestMatchers(
+                        "/oauth2/authorization/**",
+                        "/login/oauth2/code/**"
+                ).permitAll()
+                .requestMatchers("/error").permitAll()
+                .requestMatchers("/ws", "/ws/**").permitAll()
                 .requestMatchers(HttpMethod.GET, "/files/clothes/**").permitAll()
+                .requestMatchers(HttpMethod.GET, "/files/profiles/**").permitAll()
                 .requestMatchers(HttpMethod.GET, "/actuator/health/readiness").permitAll()
                 .requestMatchers(HttpMethod.POST, "/api/users").permitAll()
                 .requestMatchers(HttpMethod.POST, "/api/auth/sign-in").permitAll()
+                .requestMatchers(HttpMethod.POST, "/api/auth/reset-password").permitAll()
                 .requestMatchers(HttpMethod.POST, "/api/auth/refresh").permitAll()
                 .requestMatchers(HttpMethod.POST, "/api/auth/sign-out").permitAll()
                 .requestMatchers(
                         HttpMethod.GET,
-                        "/api/auth/csrf",
                         "/api/auth/csrf-token",
                         "/actuator/prometheus"
                 ).permitAll()
@@ -89,12 +120,14 @@ public class SecurityConfig {
         );
 
         http.exceptionHandling(exception -> exception
-                .authenticationEntryPoint((request, response, authException) ->
-                        writeSecurityError(
-                                response,
-                                ErrorCode.AUTHENTICATION_REQUIRED,
-                                jsonMapper
-                        )
+                .defaultAuthenticationEntryPointFor(
+                        (request, response, authException) ->
+                                writeSecurityError(
+                                        response,
+                                        ErrorCode.AUTHENTICATION_REQUIRED,
+                                        jsonMapper
+                                ),
+                        request -> request.getServletPath().startsWith("/api/")
                 )
                 .accessDeniedHandler((request, response, accessDeniedException) ->
                         writeSecurityError(
@@ -104,6 +137,7 @@ public class SecurityConfig {
                         )
                 )
         );
+
 
         JwtAuthenticationFilter jwtAuthenticationFilter =
                 new JwtAuthenticationFilter(
@@ -158,5 +192,29 @@ public class SecurityConfig {
                 .anyRequest().permitAll()
             )
             .build();
+    }
+
+    @Bean
+    @Profile("dev")
+    @Order(2)
+    public SecurityFilterChain devSwaggerSecurityFilterChain(
+            HttpSecurity http
+    ) throws Exception {
+        return http
+                .securityMatcher(
+                        "/swagger-ui.html",
+                        "/swagger-ui/**",
+                        "/v3/api-docs",
+                        "/v3/api-docs/**"
+                )
+                .authorizeHttpRequests(auth -> auth
+                        .anyRequest().permitAll()
+                )
+                .build();
+    }
+
+    @Bean
+    public DefaultOAuth2UserService defaultOAuth2UserService() {
+        return new DefaultOAuth2UserService();
     }
 }

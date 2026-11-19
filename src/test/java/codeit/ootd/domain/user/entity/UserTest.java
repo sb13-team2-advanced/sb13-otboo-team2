@@ -120,4 +120,20 @@ class UserTest {
         assertThat(user.hasValidTemporaryPassword(now)).isFalse();
     }
 
+    @Test
+    @DisplayName("일반 회원가입 시 가입 유형은 LOCAL이다")
+    void create_localUser_setsSignupType() {
+        // given & when
+        User user = User.create(
+                "일반 사용자",
+                "local@example.com",
+                "encoded-password"
+        );
+
+        // then
+        assertThat(user.getSignupType())
+                .isEqualTo(SignupType.LOCAL);
+    }
+
+
 }

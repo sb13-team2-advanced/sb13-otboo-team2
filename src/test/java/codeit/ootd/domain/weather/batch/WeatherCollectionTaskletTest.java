@@ -89,7 +89,7 @@ class WeatherCollectionTaskletTest {
     }
 
     @Test
-    @DisplayName("최초 수집을 완료한 대상 셀의 예보를 수집하고 5일치 날씨를 집계한다")
+    @DisplayName("최초 수집을 완료한 대상 셀의 예보를 수집하고 6일치 날씨를 집계한다")
     void executeCollectsAndAggregatesWeather() {
 
         when(weatherLocationRepository
@@ -115,7 +115,7 @@ class WeatherCollectionTaskletTest {
         verify(weatherForecastCollector)
             .collectForecasts(location);
 
-        verify(weatherService, times(5))
+        verify(weatherService, times(6))
             .calculateAndSaveDailyWeather(
                 eq(location),
                 any(LocalDate.class)
@@ -176,7 +176,7 @@ class WeatherCollectionTaskletTest {
         verify(weatherForecastCollector)
             .collectForecasts(secondLocation);
 
-        verify(weatherService, times(5))
+        verify(weatherService, times(6))
             .calculateAndSaveDailyWeather(
                 eq(secondLocation),
                 any(LocalDate.class)
@@ -213,7 +213,7 @@ class WeatherCollectionTaskletTest {
         verify(weatherForecastCollector, times(3))
             .collectForecasts(location);
 
-        verify(weatherService, times(5))
+        verify(weatherService, times(6))
             .calculateAndSaveDailyWeather(
                 eq(location),
                 any(LocalDate.class)
@@ -306,7 +306,7 @@ class WeatherCollectionTaskletTest {
         verify(weatherForecastCollector, times(21))
             .collectForecasts(any(WeatherLocation.class));
 
-        verify(weatherService, times(105))
+        verify(weatherService, times(126))
             .calculateAndSaveDailyWeather(
                 any(WeatherLocation.class),
                 any(LocalDate.class)
@@ -364,7 +364,7 @@ class WeatherCollectionTaskletTest {
         verify(weatherForecastCollector, times(100))
             .collectForecasts(any(WeatherLocation.class));
 
-        verify(weatherService, times(500))
+        verify(weatherService, times(600))
             .calculateAndSaveDailyWeather(
                 any(WeatherLocation.class),
                 any(LocalDate.class)
@@ -409,7 +409,7 @@ class WeatherCollectionTaskletTest {
         verify(weatherForecastCollector)
             .collectForecasts(location);
 
-        verify(weatherService, times(5))
+        verify(weatherService, times(6))
             .calculateAndSaveDailyWeather(
                 eq(location),
                 any(LocalDate.class)

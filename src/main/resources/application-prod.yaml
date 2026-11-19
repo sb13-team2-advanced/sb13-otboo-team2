@@ -1,4 +1,9 @@
 spring:
+  data:
+    redis:
+      host: ${SPRING_REDIS_HOST}
+      port: ${SPRING_REDIS_PORT}
+
   datasource:
     url: jdbc:postgresql://${OOTD_DB_HOST}:${OOTD_DB_PORT:5432}/${OOTD_DB_NAME}
     username: ${OOTD_DB_USERNAME}
@@ -41,3 +46,11 @@ ootd:
   openapi:
     server-url: ${OOTD_SERVER_URL}
     server-description: 운영 배포 서버
+
+otboo:
+  storage:
+    type: s3
+    s3:
+      region: ${AWS_REGION:ap-northeast-2}
+      bucket: ${OTBOO_STORAGE_S3_BUCKET}
+      base-url: ${OTBOO_STORAGE_S3_BASE_URL}

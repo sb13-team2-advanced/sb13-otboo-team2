@@ -29,6 +29,7 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.web.client.ResourceAccessException;
 
 @ExtendWith(MockitoExtension.class)
 class WeatherLocationServiceTest {
@@ -299,5 +300,29 @@ class WeatherLocationServiceTest {
         verify(weatherLocationRepository, never()).findByCellId(r8CellId);
         verify(weatherLocationRepository)
             .saveAndFlush(any(WeatherLocation.class));
+    }
+
+    @Test
+    @DisplayName("카카오 API 호출에 실패해도 좌표와 대체 위치명을 반환한다")
+    void getLocationReturnsCoordinatesWhenKakaoFails() {
+        double latitude = 37.5665;
+        double longitude = 126.9780;
+
+        when(kakaoLocalClient.getAdministrativeRegion(latitude, longitude))
+            .thenThrow(new ResourceAccessException("Kakao API 응답 타임아웃"));
+
+        WeatherAPILocation result =
+            weatherLocationService.getLocation(latitude, longitude);
+
+        assertThat(result.latitude()).isEqualTo(latitude);
+        assertThat(result.longitude()).isEqualTo(longitude);
+        assertThat(result.x()).isEqualTo(latitude);
+        assertThat(result.y()).isEqualTo(longitude);
+        assertThat(result.locationNames())
+            .containsExactly("위치 정보가 없습니다.");
+
+        verify(h3Service).validateCoordinates(latitude, longitude);
+        verify(kakaoLocalClient)
+            .getAdministrativeRegion(latitude, longitude);
     }
 }
