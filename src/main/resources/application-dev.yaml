@@ -54,6 +54,11 @@ ootd:
   openapi:
     server-url: http://localhost:${server.port:8080}
     server-description: 로컬 개발 서버
+  embedding:
+    base-url: http://127.0.0.1:8001
+  recommendation:
+    knowledge:
+      include-drafts: true
 
 auth:
   cookie:
