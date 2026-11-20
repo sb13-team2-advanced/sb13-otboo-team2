@@ -1,3 +1,8 @@
+otboo:
+  realtime:
+    redis:
+      enabled: false
+
 spring:
   datasource:
     url: jdbc:h2:mem:ootd-test;DB_CLOSE_DELAY=-1

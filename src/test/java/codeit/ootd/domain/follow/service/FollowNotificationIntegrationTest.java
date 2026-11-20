@@ -15,6 +15,7 @@ import codeit.ootd.domain.notification.dto.response.NotificationDto;
 import codeit.ootd.domain.notification.entity.Notification;
 import codeit.ootd.domain.notification.enums.NotificationLevel;
 import codeit.ootd.domain.notification.event.NotificationEventListener;
+import codeit.ootd.global.realtime.LocalRealtimeMessagePublisher;
 import codeit.ootd.domain.notification.repository.NotificationQueryRepository;
 import codeit.ootd.domain.notification.repository.NotificationRepository;
 import codeit.ootd.domain.notification.service.NotificationService;
@@ -33,6 +34,7 @@ import org.mockito.ArgumentCaptor;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.data.jpa.test.autoconfigure.DataJpaTest;
 import org.springframework.context.annotation.Import;
+import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.transaction.PlatformTransactionManager;
@@ -41,7 +43,7 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionTemplate;
 
 @DataJpaTest
-@Import({FollowService.class, FollowQueryRepository.class, NotificationEventListener.class,
+@Import({LocalRealtimeMessagePublisher.class, FollowService.class, FollowQueryRepository.class, NotificationEventListener.class,
         NotificationService.class, NotificationQueryRepository.class,
         QuerydslConfig.class, JpaAuditingConfig.class})
 @Transactional(propagation = Propagation.NOT_SUPPORTED)
@@ -54,6 +56,7 @@ class FollowNotificationIntegrationTest {
     @Autowired private UserRepository users;
     @Autowired private PlatformTransactionManager transactionManager;
     @MockitoBean private NotificationSseService sse;
+    @MockitoBean private SimpMessagingTemplate messagingTemplate;
 
     private User follower;
     private User followee;

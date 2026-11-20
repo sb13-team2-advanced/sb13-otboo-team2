@@ -18,6 +18,7 @@ import codeit.ootd.domain.user.entity.User;
 import codeit.ootd.domain.user.repository.UserRepository;
 import codeit.ootd.global.config.JpaAuditingConfig;
 import codeit.ootd.global.config.KafkaConfig;
+import codeit.ootd.global.realtime.LocalRealtimeMessagePublisher;
 import java.time.Duration;
 import java.util.UUID;
 import org.apache.kafka.common.serialization.StringDeserializer;
@@ -32,6 +33,7 @@ import org.springframework.boot.kafka.autoconfigure.KafkaAutoConfiguration;
 import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.context.annotation.Bean;
+import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.context.annotation.Import;
 import org.springframework.kafka.core.DefaultKafkaConsumerFactory;
 import org.springframework.kafka.core.KafkaTemplate;
@@ -61,7 +63,7 @@ import tools.jackson.databind.json.JsonMapper;
 @Transactional(propagation = Propagation.NOT_SUPPORTED)
 @EmbeddedKafka(partitions = 1, topics = {"otboo.notification.requested.v1", "otboo.notification.requested.v1.DLT"})
 @ImportAutoConfiguration(KafkaAutoConfiguration.class)
-@Import({JpaAuditingConfig.class, KafkaConfig.class, NotificationKafkaConfig.class, NotificationOutboxListener.class,
+@Import({LocalRealtimeMessagePublisher.class, JpaAuditingConfig.class, KafkaConfig.class, NotificationKafkaConfig.class, NotificationOutboxListener.class,
         NotificationOutboxPublisher.class, NotificationKafkaConsumer.class, NotificationMessageService.class,
         NotificationKafkaIntegrationTest.JsonConfig.class})
 @DisplayName("Kafka 알림 처리 통합 테스트")
@@ -77,6 +79,7 @@ class NotificationKafkaIntegrationTest {
     @Autowired KafkaTemplate<String, String> kafka;
     @Autowired EmbeddedKafkaBroker broker;
     @MockitoBean NotificationSseService sse;
+    @MockitoBean SimpMessagingTemplate messagingTemplate;
 
     private TransactionTemplate transaction;
     private UUID receiverId;

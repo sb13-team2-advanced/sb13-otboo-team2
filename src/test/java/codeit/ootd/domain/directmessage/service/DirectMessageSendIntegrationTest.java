@@ -21,6 +21,7 @@ import codeit.ootd.domain.notification.repository.NotificationQueryRepository;
 import codeit.ootd.domain.notification.service.NotificationService;
 import codeit.ootd.domain.notification.service.NotificationSseService;
 import codeit.ootd.global.config.QuerydslConfig;
+import codeit.ootd.global.realtime.LocalRealtimeMessagePublisher;
 import codeit.ootd.domain.user.entity.User;
 import codeit.ootd.domain.user.repository.UserRepository;
 import codeit.ootd.global.exception.OtbooException;
@@ -47,7 +48,7 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionTemplate;
 
 @DataJpaTest
-@Import({DirectMessageService.class, DirectMessageStompController.class,
+@Import({LocalRealtimeMessagePublisher.class, DirectMessageService.class, DirectMessageStompController.class,
         DirectMessageEventListener.class, DirectMessageQueryRepository.class,
         NotificationEventListener.class, NotificationService.class, NotificationQueryRepository.class,
         QuerydslConfig.class, JpaAuditingConfig.class})
