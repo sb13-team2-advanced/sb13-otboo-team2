@@ -20,6 +20,8 @@ import codeit.ootd.domain.profile.repository.ProfileRepository;
 import codeit.ootd.domain.recommendation.algorithm.RecommendationConditions;
 import codeit.ootd.domain.recommendation.dto.response.RecommendationClothesResponse;
 import codeit.ootd.domain.recommendation.dto.response.RecommendationResponse;
+import codeit.ootd.domain.recommendation.dto.OutfitColorMatchResult;
+import codeit.ootd.domain.recommendation.dto.RecommendationExplanation;
 import codeit.ootd.domain.recommendation.service.impl.RecommendationServiceImpl;
 import codeit.ootd.domain.weather.entity.Weather;
 import codeit.ootd.domain.weather.entity.WeatherForecast;
@@ -57,6 +59,7 @@ class RecommendationServiceTest {
     @Mock private ClothesAttributeDefinitionRepository definitionRepository;
     @Mock private ProfileRepository profileRepository;
     @Mock private OutfitRecommendationService recommender;
+    @Mock private RecommendationExplanationService explanationService;
     @Spy private Clock clock = Clock.fixed(Instant.parse("2026-11-18T06:00:00Z"), ZoneOffset.UTC);
     private RecommendationServiceImpl service;
 
@@ -65,7 +68,11 @@ class RecommendationServiceTest {
         RecommendationContextLoader loader = new RecommendationContextLoader(weatherRepository,
             forecastRepository, clothesRepository, attributeRepository, definitionRepository,
             profileRepository, clock);
-        service = new RecommendationServiceImpl(loader, recommender);
+        service = new RecommendationServiceImpl(loader, recommender, explanationService);
+        lenient().when(recommender.recommendWithEvidence(any(), anyList()))
+            .thenReturn(OutfitColorMatchResult.withoutEvidence(List.of()));
+        lenient().when(explanationService.explain(any(), any()))
+            .thenReturn(RecommendationExplanation.of("기본 설명", List.of()));
     }
 
     /**
@@ -121,7 +128,7 @@ class RecommendationServiceTest {
         service.recommend(userId, weatherId);
 
         // then
-        verify(recommender).recommend(eq(RecommendationConditions.of(26, 0, 0, 0, 1)), anyList());
+        verify(recommender).recommendWithEvidence(eq(RecommendationConditions.of(26, 0, 0, 0, 1)), anyList());
     }
 
     /**
@@ -150,7 +157,7 @@ class RecommendationServiceTest {
         service.recommend(userId, weatherId);
 
         // then
-        verify(recommender).recommend(argThat(conditions ->
+        verify(recommender).recommendWithEvidence(argThat(conditions ->
                 conditions.temperature() == 8 && conditions.precipitationExpected()
                         && conditions.windy()), anyList());
     }
@@ -172,7 +179,7 @@ class RecommendationServiceTest {
         service.recommend(userId, weatherId);
 
         // then
-        verify(recommender).recommend(eq(RecommendationConditions.of(25, 0, 1, 0, 1)), anyList());
+        verify(recommender).recommendWithEvidence(eq(RecommendationConditions.of(25, 0, 1, 0, 1)), anyList());
     }
 
     @Test
@@ -191,7 +198,7 @@ class RecommendationServiceTest {
         service.recommend(userId, weatherId);
 
         // then
-        verify(recommender).recommend(eq(RecommendationConditions.of(25, 0, 0, 0, 1)), anyList());
+        verify(recommender).recommendWithEvidence(eq(RecommendationConditions.of(25, 0, 0, 0, 1)), anyList());
     }
 
     @Test
@@ -247,7 +254,7 @@ class RecommendationServiceTest {
         service.recommend(userId, weatherId);
 
         // then
-        verify(recommender).recommend(eq(RecommendationConditions.of(25, 0.7, 1, 0, 1)), anyList());
+        verify(recommender).recommendWithEvidence(eq(RecommendationConditions.of(25, 0.7, 1, 0, 1)), anyList());
         verifyNoInteractions(forecastRepository);
     }
 
@@ -326,7 +333,7 @@ class RecommendationServiceTest {
                 List.of(new ClothesAttributeWithDefDto(
                         definitionId, "두께", List.of("얇음", "보통", "두꺼움"), "보통")));
 
-        given(recommender.recommend(RecommendationConditions.of(15.0, 0, 0, 0, 0), List.of(expected))).willReturn(List.of(expected));
+        given(recommender.recommendWithEvidence(RecommendationConditions.of(15.0, 0, 0, 0, 0), List.of(expected))).willReturn(OutfitColorMatchResult.withoutEvidence(List.of(expected)));
 
         // when
         RecommendationResponse response = service.recommend(userId, weatherId);
@@ -335,7 +342,7 @@ class RecommendationServiceTest {
         assertThat(response.clothes()).containsExactly(expected);
         verify(clothesRepository).findAllByUserId(userId);
         verify(profileRepository).findByUserId(userId);
-        verify(recommender).recommend(RecommendationConditions.of(15.0, 0, 0, 0, 0), List.of(expected));
+        verify(recommender).recommendWithEvidence(RecommendationConditions.of(15.0, 0, 0, 0, 0), List.of(expected));
     }
 
     @Test
@@ -392,7 +399,7 @@ class RecommendationServiceTest {
         given(profileRepository.findByUserId(userId)).willReturn(Optional.of(profile));
         RecommendationClothesResponse candidate = new RecommendationClothesResponse(
                 clothesId, "상의", null, ClothesType.TOP, List.of());
-        given(recommender.recommend(RecommendationConditions.of(expectedTemperature, 0, 0, 0, 0), List.of(candidate))).willReturn(List.of(candidate));
+        given(recommender.recommendWithEvidence(RecommendationConditions.of(expectedTemperature, 0, 0, 0, 0), List.of(candidate))).willReturn(OutfitColorMatchResult.withoutEvidence(List.of(candidate)));
 
         // when
         RecommendationResponse response = service.recommend(userId, weatherId);
@@ -402,7 +409,7 @@ class RecommendationServiceTest {
         assertThat(response.userId()).isEqualTo(userId);
         assertThat(response.weatherId()).isEqualTo(weatherId);
         verify(profileRepository).findByUserId(userId);
-        verify(recommender).recommend(RecommendationConditions.of(expectedTemperature, 0, 0, 0, 0), List.of(candidate));
+        verify(recommender).recommendWithEvidence(RecommendationConditions.of(expectedTemperature, 0, 0, 0, 0), List.of(candidate));
     }
 
     @Test
@@ -421,7 +428,7 @@ class RecommendationServiceTest {
         service.recommend(userId, weatherId);
 
         // then
-        verify(recommender).recommend(eq(RecommendationConditions.of(15.0, 0, 0, 0, 0)), anyList());
+        verify(recommender).recommendWithEvidence(eq(RecommendationConditions.of(15.0, 0, 0, 0, 0)), anyList());
     }
 
     /**
@@ -450,7 +457,7 @@ class RecommendationServiceTest {
         service.recommend(userId, weatherId);
 
         // then
-        verify(recommender).recommend(argThat(conditions ->
+        verify(recommender).recommendWithEvidence(argThat(conditions ->
                 conditions.temperature() == expectedTemperature
                         && conditions.precipitationExpected() && conditions.windy()), anyList());
         verify(weather).getRainAmount();

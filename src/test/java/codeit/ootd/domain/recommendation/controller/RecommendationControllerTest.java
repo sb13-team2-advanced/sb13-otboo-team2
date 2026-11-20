@@ -16,6 +16,7 @@ import codeit.ootd.domain.auth.oauth2.handler.OAuth2AuthenticationSuccessHandler
 import codeit.ootd.domain.auth.oauth2.linking.OAuth2LinkAuthorizationRequestRepository;
 import codeit.ootd.domain.auth.service.AuthSessionService;
 import codeit.ootd.domain.recommendation.dto.response.RecommendationResponse;
+import codeit.ootd.domain.recommendation.dto.RecommendationExplanation;
 import codeit.ootd.domain.recommendation.service.RecommendationService;
 import codeit.ootd.domain.user.repository.UserRepository;
 import codeit.ootd.global.exception.ErrorCode;
@@ -98,7 +99,8 @@ class RecommendationControllerTest {
         // given
         UUID weatherId = UUID.randomUUID();
         given(service.recommend(UUID.fromString(USER_ID), weatherId))
-                .willReturn(new RecommendationResponse(weatherId, UUID.fromString(USER_ID), List.of()));
+                .willReturn(RecommendationResponse.of(weatherId, UUID.fromString(USER_ID), List.of(),
+                    RecommendationExplanation.of("추천할 의상이 없습니다.", List.of())));
         // when then
         mockMvc.perform(get("/api/recommendations").param("weatherId", weatherId.toString())
                         .with(authentication(new UsernamePasswordAuthenticationToken(
@@ -106,7 +108,9 @@ class RecommendationControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.userId").value(USER_ID))
                 .andExpect(jsonPath("$.weatherId").value(weatherId.toString()))
-                .andExpect(jsonPath("$.clothes").isEmpty());
+                .andExpect(jsonPath("$.clothes").isEmpty())
+                .andExpect(jsonPath("$.explanation").value("추천할 의상이 없습니다."))
+                .andExpect(jsonPath("$.sources").isEmpty());
         verify(service).recommend(UUID.fromString(USER_ID), weatherId);
     }
 

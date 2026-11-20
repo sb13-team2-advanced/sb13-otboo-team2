@@ -39,26 +39,34 @@ public class OutfitRecommendationService {
     private final OutfitColorMatcher colorMatcher;
 
     /**
+     * 날씨와 배색으로 선택한 의상 목록을 반환한다.
+     */
+    public List<RecommendationClothesResponse> recommend(RecommendationConditions conditions,
+        List<RecommendationClothesResponse> clothes) {
+        return recommendWithEvidence(conditions, clothes).clothes();
+    }
+
+    /**
      * 상하의 코디는 하의·상의·아우터 순서로 색상을 아는 기준 의상을 선택하고 배색 유형을 제한하지 않는다.
      * 원피스는 대응하는 문서가 없으므로 기존 추천을 유지한다.
      * 외부 HTTP 호출 때 상위 트랜잭션을 중지하고 지식 조회는 Repository의 별도 트랜잭션에서 실행한다.
      * 임베딩 통신·응답 검증 또는 지식 DB 조회가 실패하면 기존 날씨 추천으로 대체한다.
      * 기준 의상과 검색 문서, 선택 결과 및 대체 이유를 기록하되 문서 본문과 임베딩은 출력하지 않는다.
      */
-    @Transactional(propagation = Propagation.NOT_SUPPORTED)
-    public List<RecommendationClothesResponse> recommend(RecommendationConditions conditions,
+
+    public OutfitColorMatchResult recommendWithEvidence(RecommendationConditions conditions,
         List<RecommendationClothesResponse> clothes) {
 
         List<RecommendationClothesResponse> baseline = weatherRecommender.recommend(conditions, clothes);
 
         if (baseline.isEmpty()) {
             log.debug("배색 추천 생략. applied=false reason=NO_COMPLETE_OUTFIT");
-            return baseline;
+            return OutfitColorMatchResult.withoutEvidence(baseline);
         }
 
         if (baseline.stream().anyMatch(item -> item.type() == ClothesType.DRESS)) {
             log.debug("배색 추천 생략. applied=false reason=UNSUPPORTED_OUTFIT_TYPE outfitType=DRESS");
-            return baseline;
+            return OutfitColorMatchResult.withoutEvidence(baseline);
         }
 
         Optional<RecommendationClothesResponse> anchor = ANCHOR_PRIORITY.stream()
@@ -68,7 +76,7 @@ public class OutfitRecommendationService {
 
         if (anchor.isEmpty()) {
             log.debug("배색 추천 생략. applied=false reason=NO_KNOWN_ANCHOR_COLOR");
-            return baseline;
+            return OutfitColorMatchResult.withoutEvidence(baseline);
         }
 
         RecommendationClothesResponse reference = anchor.get();
@@ -90,7 +98,7 @@ public class OutfitRecommendationService {
                     + "anchorType={} anchorClothesId={} baseColor={} cause={}",
                 reason, reference.type(), reference.clothesId(), baseColor, exception.getClass().getSimpleName());
 
-            return baseline;
+            return OutfitColorMatchResult.withoutEvidence(baseline);
         }
 
         OutfitColorMatchResult result =
@@ -98,7 +106,7 @@ public class OutfitRecommendationService {
 
         logResult(reference, baseColor, documents, baseline, result);
 
-        return result.clothes();
+        return result;
     }
 
     /**
