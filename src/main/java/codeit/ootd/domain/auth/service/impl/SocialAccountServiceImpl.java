@@ -8,6 +8,8 @@ import codeit.ootd.domain.auth.repository.SocialAccountRepository;
 import codeit.ootd.domain.auth.service.SocialAccountService;
 import codeit.ootd.domain.user.exception.UserNotFoundException;
 import codeit.ootd.domain.user.repository.UserRepository;
+
+import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.UUID;
@@ -80,4 +82,26 @@ public class SocialAccountServiceImpl implements SocialAccountService {
 
         socialAccountRepository.save(account);
     }
+
+    @Override
+    @Transactional(readOnly = true)
+    public Map<String, Boolean> getLinkedProviders(UUID userId) {
+        Objects.requireNonNull(userId, "userId는 필수입니다.");
+
+        if (!userRepository.existsById(userId)) {
+            throw new UserNotFoundException();
+        }
+
+        return Map.of(
+                "google",
+                socialAccountRepository.existsByUserIdAndProvider(
+                        userId, OAuthProvider.GOOGLE
+                ),
+                "kakao",
+                socialAccountRepository.existsByUserIdAndProvider(
+                        userId, OAuthProvider.KAKAO
+                )
+        );
+    }
+
 }

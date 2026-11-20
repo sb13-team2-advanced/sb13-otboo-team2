@@ -197,7 +197,7 @@ class OAuth2CallbackSecurityIntegrationTest {
         assertThat(callback.getResponse().getStatus()).isEqualTo(302);
 
         assertThat(callback.getResponse().getRedirectedUrl())
-                .isEqualTo("/#/auth/login?link_success=true");
+                .isEqualTo("/#/settings?link_success=true");
 
         verify(linkRequestService).consume(
                 "test-link-token",
@@ -299,7 +299,7 @@ class OAuth2CallbackSecurityIntegrationTest {
         ).andReturn();
 
         assertThat(first.getResponse().getRedirectedUrl())
-                .isEqualTo("/#/auth/login?link_success=true");
+                .isEqualTo("/#/settings?link_success=true");
 
         // when: 같은 state로 두 번째 콜백
         var second = mockMvc.perform(

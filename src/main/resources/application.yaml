@@ -80,6 +80,12 @@ jwt:
   access-token-expiration: 30m
 
 ootd:
+  groq:
+    enabled: ${OOTD_GROQ_ENABLED:false}
+    api-key: ${GROQ_API_KEY:}
+    model: ${OOTD_GROQ_MODEL:openai/gpt-oss-20b}
+    connect-timeout: 2s
+    read-timeout: 8s
   weather:
     openweathermap:
       api-key: ${OWM_API_KEY}

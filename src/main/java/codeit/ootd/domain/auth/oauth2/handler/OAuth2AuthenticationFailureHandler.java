@@ -1,5 +1,6 @@
 package codeit.ootd.domain.auth.oauth2.handler;
 
+import codeit.ootd.domain.auth.oauth2.linking.OAuth2LinkAuthorizationRequestRepository;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
@@ -30,8 +31,11 @@ public class OAuth2AuthenticationFailureHandler
             String errorCode = oauthException.getError().getErrorCode();
 
             if ("user_not_exists".equals(errorCode)
-                    || "oauth_link_failed".equals(errorCode)|| "email_already_exists".equals(errorCode)
-                    || "email_required".equals(errorCode)) {
+                    || "oauth_link_failed".equals(errorCode)
+                    || "email_already_exists".equals(errorCode)
+                    || "email_required".equals(errorCode)
+                    || "social_account_already_linked".equals(errorCode)
+                    || "oauth_provider_already_linked".equals(errorCode)) {
                 errorMessage = errorCode;
             }
         }
@@ -45,6 +49,18 @@ public class OAuth2AuthenticationFailureHandler
                 .build();
 
         response.addHeader(HttpHeaders.SET_COOKIE, cookie.toString());
+
+        boolean isLinkRequest =
+                request.getAttribute(
+                        OAuth2LinkAuthorizationRequestRepository.LINK_TOKEN_ATTRIBUTE
+                ) instanceof String;
+
+        if (isLinkRequest) {
+            response.sendRedirect(
+                    "/#/settings?error_message=" + errorMessage
+            );
+            return;
+        }
 
         response.sendRedirect(
                 "/#/auth/login?error=oauth_failed"

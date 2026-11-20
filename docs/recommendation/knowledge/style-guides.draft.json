@@ -1,0 +1,1762 @@
+{
+  "datasetVersion": 4,
+  "createdOn": "2026-11-19",
+  "language": "ko",
+  "documents": [
+    {
+      "id": "palettehunt-black-basic",
+      "title": "블랙 기준 기본 배색 사례",
+      "content": "Palette Hunt 시뮬레이터에서 확인한 블랙 기준 기본 배색의 색 배치 사례다. 상의 기준: 상의 블랙, 하의 소프트 화이트, 아우터 데님, 소품 카멜. 하의 기준: 상의 소프트 화이트, 하의 블랙, 아우터 데님, 소품 카멜. 아우터 기준: 상의 소프트 화이트, 하의 데님, 아우터 블랙, 소품 카멜.",
+      "category": "COLOR",
+      "tags": [
+        "블랙",
+        "기본 배색",
+        "소프트 화이트",
+        "데님",
+        "카멜"
+      ],
+      "requiredAttributes": [
+        "색상"
+      ],
+      "baseColor": "블랙",
+      "combinationType": "BASIC",
+      "outfitVariants": [
+        {
+          "selectedType": "TOP",
+          "topColor": "블랙",
+          "bottomColor": "소프트 화이트",
+          "outerColor": "데님",
+          "accessoryColor": "카멜"
+        },
+        {
+          "selectedType": "BOTTOM",
+          "topColor": "소프트 화이트",
+          "bottomColor": "블랙",
+          "outerColor": "데님",
+          "accessoryColor": "카멜"
+        },
+        {
+          "selectedType": "OUTER",
+          "topColor": "소프트 화이트",
+          "bottomColor": "데님",
+          "outerColor": "블랙",
+          "accessoryColor": "카멜"
+        }
+      ],
+      "sourceType": "WEB_OBSERVED",
+      "sourceUrl": "https://www.palettehunt.com/%EC%98%B7-%EC%83%89-%EC%A1%B0%ED%95%A9",
+      "reviewStatus": "APPROVED",
+      "version": 1
+    },
+    {
+      "id": "palettehunt-black-tonal",
+      "title": "블랙 기준 톤온톤 배색 사례",
+      "content": "Palette Hunt 시뮬레이터에서 확인한 블랙 기준 톤온톤 배색의 색 배치 사례다. 상의 기준: 상의 블랙, 하의 차콜, 아우터 스톤, 소품 실버. 하의 기준: 상의 차콜, 하의 블랙, 아우터 스톤, 소품 실버. 아우터 기준: 상의 차콜, 하의 스톤, 아우터 블랙, 소품 실버.",
+      "category": "COLOR",
+      "tags": [
+        "블랙",
+        "톤온톤 배색",
+        "차콜",
+        "스톤",
+        "실버"
+      ],
+      "requiredAttributes": [
+        "색상"
+      ],
+      "baseColor": "블랙",
+      "combinationType": "TONAL",
+      "outfitVariants": [
+        {
+          "selectedType": "TOP",
+          "topColor": "블랙",
+          "bottomColor": "차콜",
+          "outerColor": "스톤",
+          "accessoryColor": "실버"
+        },
+        {
+          "selectedType": "BOTTOM",
+          "topColor": "차콜",
+          "bottomColor": "블랙",
+          "outerColor": "스톤",
+          "accessoryColor": "실버"
+        },
+        {
+          "selectedType": "OUTER",
+          "topColor": "차콜",
+          "bottomColor": "스톤",
+          "outerColor": "블랙",
+          "accessoryColor": "실버"
+        }
+      ],
+      "sourceType": "WEB_OBSERVED",
+      "sourceUrl": "https://www.palettehunt.com/%EC%98%B7-%EC%83%89-%EC%A1%B0%ED%95%A9",
+      "reviewStatus": "APPROVED",
+      "version": 1
+    },
+    {
+      "id": "palettehunt-black-accent",
+      "title": "블랙 기준 포인트 배색 사례",
+      "content": "Palette Hunt 시뮬레이터에서 확인한 블랙 기준 포인트 배색의 색 배치 사례다. 상의 기준: 상의 블랙, 하의 선명한 레드, 아우터 코발트 블루, 소품 푸크시아. 하의 기준: 상의 선명한 레드, 하의 블랙, 아우터 코발트 블루, 소품 푸크시아. 아우터 기준: 상의 선명한 레드, 하의 코발트 블루, 아우터 블랙, 소품 푸크시아.",
+      "category": "COLOR",
+      "tags": [
+        "블랙",
+        "포인트 배색",
+        "선명한 레드",
+        "코발트 블루",
+        "푸크시아"
+      ],
+      "requiredAttributes": [
+        "색상"
+      ],
+      "baseColor": "블랙",
+      "combinationType": "ACCENT",
+      "outfitVariants": [
+        {
+          "selectedType": "TOP",
+          "topColor": "블랙",
+          "bottomColor": "선명한 레드",
+          "outerColor": "코발트 블루",
+          "accessoryColor": "푸크시아"
+        },
+        {
+          "selectedType": "BOTTOM",
+          "topColor": "선명한 레드",
+          "bottomColor": "블랙",
+          "outerColor": "코발트 블루",
+          "accessoryColor": "푸크시아"
+        },
+        {
+          "selectedType": "OUTER",
+          "topColor": "선명한 레드",
+          "bottomColor": "코발트 블루",
+          "outerColor": "블랙",
+          "accessoryColor": "푸크시아"
+        }
+      ],
+      "sourceType": "WEB_OBSERVED",
+      "sourceUrl": "https://www.palettehunt.com/%EC%98%B7-%EC%83%89-%EC%A1%B0%ED%95%A9",
+      "reviewStatus": "APPROVED",
+      "version": 1
+    },
+    {
+      "id": "palettehunt-white-basic",
+      "title": "화이트 기준 기본 배색 사례",
+      "content": "Palette Hunt 시뮬레이터에서 확인한 화이트 기준 기본 배색의 색 배치 사례다. 상의 기준: 상의 화이트, 하의 네이비, 아우터 데님, 소품 탠. 하의 기준: 상의 네이비, 하의 화이트, 아우터 데님, 소품 탠. 아우터 기준: 상의 네이비, 하의 데님, 아우터 화이트, 소품 탠.",
+      "category": "COLOR",
+      "tags": [
+        "화이트",
+        "기본 배색",
+        "네이비",
+        "데님",
+        "탠"
+      ],
+      "requiredAttributes": [
+        "색상"
+      ],
+      "baseColor": "화이트",
+      "combinationType": "BASIC",
+      "outfitVariants": [
+        {
+          "selectedType": "TOP",
+          "topColor": "화이트",
+          "bottomColor": "네이비",
+          "outerColor": "데님",
+          "accessoryColor": "탠"
+        },
+        {
+          "selectedType": "BOTTOM",
+          "topColor": "네이비",
+          "bottomColor": "화이트",
+          "outerColor": "데님",
+          "accessoryColor": "탠"
+        },
+        {
+          "selectedType": "OUTER",
+          "topColor": "네이비",
+          "bottomColor": "데님",
+          "outerColor": "화이트",
+          "accessoryColor": "탠"
+        }
+      ],
+      "sourceType": "WEB_OBSERVED",
+      "sourceUrl": "https://www.palettehunt.com/%EC%98%B7-%EC%83%89-%EC%A1%B0%ED%95%A9",
+      "reviewStatus": "APPROVED",
+      "version": 1
+    },
+    {
+      "id": "palettehunt-white-tonal",
+      "title": "화이트 기준 톤온톤 배색 사례",
+      "content": "Palette Hunt 시뮬레이터에서 확인한 화이트 기준 톤온톤 배색의 색 배치 사례다. 상의 기준: 상의 화이트, 하의 크림, 아우터 토프, 소품 스톤. 하의 기준: 상의 크림, 하의 화이트, 아우터 토프, 소품 스톤. 아우터 기준: 상의 크림, 하의 토프, 아우터 화이트, 소품 스톤.",
+      "category": "COLOR",
+      "tags": [
+        "화이트",
+        "톤온톤 배색",
+        "크림",
+        "토프",
+        "스톤"
+      ],
+      "requiredAttributes": [
+        "색상"
+      ],
+      "baseColor": "화이트",
+      "combinationType": "TONAL",
+      "outfitVariants": [
+        {
+          "selectedType": "TOP",
+          "topColor": "화이트",
+          "bottomColor": "크림",
+          "outerColor": "토프",
+          "accessoryColor": "스톤"
+        },
+        {
+          "selectedType": "BOTTOM",
+          "topColor": "크림",
+          "bottomColor": "화이트",
+          "outerColor": "토프",
+          "accessoryColor": "스톤"
+        },
+        {
+          "selectedType": "OUTER",
+          "topColor": "크림",
+          "bottomColor": "토프",
+          "outerColor": "화이트",
+          "accessoryColor": "스톤"
+        }
+      ],
+      "sourceType": "WEB_OBSERVED",
+      "sourceUrl": "https://www.palettehunt.com/%EC%98%B7-%EC%83%89-%EC%A1%B0%ED%95%A9",
+      "reviewStatus": "APPROVED",
+      "version": 1
+    },
+    {
+      "id": "palettehunt-white-accent",
+      "title": "화이트 기준 포인트 배색 사례",
+      "content": "Palette Hunt 시뮬레이터에서 확인한 화이트 기준 포인트 배색의 색 배치 사례다. 상의 기준: 상의 화이트, 하의 에메랄드, 아우터 레드, 소품 코발트 블루. 하의 기준: 상의 에메랄드, 하의 화이트, 아우터 레드, 소품 코발트 블루. 아우터 기준: 상의 에메랄드, 하의 레드, 아우터 화이트, 소품 코발트 블루.",
+      "category": "COLOR",
+      "tags": [
+        "화이트",
+        "포인트 배색",
+        "에메랄드",
+        "레드",
+        "코발트 블루"
+      ],
+      "requiredAttributes": [
+        "색상"
+      ],
+      "baseColor": "화이트",
+      "combinationType": "ACCENT",
+      "outfitVariants": [
+        {
+          "selectedType": "TOP",
+          "topColor": "화이트",
+          "bottomColor": "에메랄드",
+          "outerColor": "레드",
+          "accessoryColor": "코발트 블루"
+        },
+        {
+          "selectedType": "BOTTOM",
+          "topColor": "에메랄드",
+          "bottomColor": "화이트",
+          "outerColor": "레드",
+          "accessoryColor": "코발트 블루"
+        },
+        {
+          "selectedType": "OUTER",
+          "topColor": "에메랄드",
+          "bottomColor": "레드",
+          "outerColor": "화이트",
+          "accessoryColor": "코발트 블루"
+        }
+      ],
+      "sourceType": "WEB_OBSERVED",
+      "sourceUrl": "https://www.palettehunt.com/%EC%98%B7-%EC%83%89-%EC%A1%B0%ED%95%A9",
+      "reviewStatus": "APPROVED",
+      "version": 1
+    },
+    {
+      "id": "palettehunt-navy-basic",
+      "title": "네이비 기준 기본 배색 사례",
+      "content": "Palette Hunt 시뮬레이터에서 확인한 네이비 기준 기본 배색의 색 배치 사례다. 상의 기준: 상의 네이비, 하의 화이트, 아우터 라이트 블루, 소품 탠. 하의 기준: 상의 화이트, 하의 네이비, 아우터 라이트 블루, 소품 탠. 아우터 기준: 상의 화이트, 하의 라이트 블루, 아우터 네이비, 소품 탠.",
+      "category": "COLOR",
+      "tags": [
+        "네이비",
+        "기본 배색",
+        "화이트",
+        "라이트 블루",
+        "탠"
+      ],
+      "requiredAttributes": [
+        "색상"
+      ],
+      "baseColor": "네이비",
+      "combinationType": "BASIC",
+      "outfitVariants": [
+        {
+          "selectedType": "TOP",
+          "topColor": "네이비",
+          "bottomColor": "화이트",
+          "outerColor": "라이트 블루",
+          "accessoryColor": "탠"
+        },
+        {
+          "selectedType": "BOTTOM",
+          "topColor": "화이트",
+          "bottomColor": "네이비",
+          "outerColor": "라이트 블루",
+          "accessoryColor": "탠"
+        },
+        {
+          "selectedType": "OUTER",
+          "topColor": "화이트",
+          "bottomColor": "라이트 블루",
+          "outerColor": "네이비",
+          "accessoryColor": "탠"
+        }
+      ],
+      "sourceType": "WEB_OBSERVED",
+      "sourceUrl": "https://www.palettehunt.com/%EC%98%B7-%EC%83%89-%EC%A1%B0%ED%95%A9",
+      "reviewStatus": "APPROVED",
+      "version": 1
+    },
+    {
+      "id": "palettehunt-navy-tonal",
+      "title": "네이비 기준 톤온톤 배색 사례",
+      "content": "Palette Hunt 시뮬레이터에서 확인한 네이비 기준 톤온톤 배색의 색 배치 사례다. 상의 기준: 상의 네이비, 하의 데님, 아우터 블루 그레이, 소품 크림. 하의 기준: 상의 데님, 하의 네이비, 아우터 블루 그레이, 소품 크림. 아우터 기준: 상의 데님, 하의 블루 그레이, 아우터 네이비, 소품 크림.",
+      "category": "COLOR",
+      "tags": [
+        "네이비",
+        "톤온톤 배색",
+        "데님",
+        "블루 그레이",
+        "크림"
+      ],
+      "requiredAttributes": [
+        "색상"
+      ],
+      "baseColor": "네이비",
+      "combinationType": "TONAL",
+      "outfitVariants": [
+        {
+          "selectedType": "TOP",
+          "topColor": "네이비",
+          "bottomColor": "데님",
+          "outerColor": "블루 그레이",
+          "accessoryColor": "크림"
+        },
+        {
+          "selectedType": "BOTTOM",
+          "topColor": "데님",
+          "bottomColor": "네이비",
+          "outerColor": "블루 그레이",
+          "accessoryColor": "크림"
+        },
+        {
+          "selectedType": "OUTER",
+          "topColor": "데님",
+          "bottomColor": "블루 그레이",
+          "outerColor": "네이비",
+          "accessoryColor": "크림"
+        }
+      ],
+      "sourceType": "WEB_OBSERVED",
+      "sourceUrl": "https://www.palettehunt.com/%EC%98%B7-%EC%83%89-%EC%A1%B0%ED%95%A9",
+      "reviewStatus": "APPROVED",
+      "version": 1
+    },
+    {
+      "id": "palettehunt-navy-accent",
+      "title": "네이비 기준 포인트 배색 사례",
+      "content": "Palette Hunt 시뮬레이터에서 확인한 네이비 기준 포인트 배색의 색 배치 사례다. 상의 기준: 상의 네이비, 하의 적갈색, 아우터 코랄, 소품 머스터드. 하의 기준: 상의 적갈색, 하의 네이비, 아우터 코랄, 소품 머스터드. 아우터 기준: 상의 적갈색, 하의 코랄, 아우터 네이비, 소품 머스터드.",
+      "category": "COLOR",
+      "tags": [
+        "네이비",
+        "포인트 배색",
+        "적갈색",
+        "코랄",
+        "머스터드"
+      ],
+      "requiredAttributes": [
+        "색상"
+      ],
+      "baseColor": "네이비",
+      "combinationType": "ACCENT",
+      "outfitVariants": [
+        {
+          "selectedType": "TOP",
+          "topColor": "네이비",
+          "bottomColor": "적갈색",
+          "outerColor": "코랄",
+          "accessoryColor": "머스터드"
+        },
+        {
+          "selectedType": "BOTTOM",
+          "topColor": "적갈색",
+          "bottomColor": "네이비",
+          "outerColor": "코랄",
+          "accessoryColor": "머스터드"
+        },
+        {
+          "selectedType": "OUTER",
+          "topColor": "적갈색",
+          "bottomColor": "코랄",
+          "outerColor": "네이비",
+          "accessoryColor": "머스터드"
+        }
+      ],
+      "sourceType": "WEB_OBSERVED",
+      "sourceUrl": "https://www.palettehunt.com/%EC%98%B7-%EC%83%89-%EC%A1%B0%ED%95%A9",
+      "reviewStatus": "APPROVED",
+      "version": 1
+    },
+    {
+      "id": "palettehunt-blue-basic",
+      "title": "블루 기준 기본 배색 사례",
+      "content": "Palette Hunt 시뮬레이터에서 확인한 블루 기준 기본 배색의 색 배치 사례다. 상의 기준: 상의 블루, 하의 화이트, 아우터 그레이, 소품 탠. 하의 기준: 상의 화이트, 하의 블루, 아우터 그레이, 소품 탠. 아우터 기준: 상의 화이트, 하의 그레이, 아우터 블루, 소품 탠.",
+      "category": "COLOR",
+      "tags": [
+        "블루",
+        "기본 배색",
+        "화이트",
+        "그레이",
+        "탠"
+      ],
+      "requiredAttributes": [
+        "색상"
+      ],
+      "baseColor": "블루",
+      "combinationType": "BASIC",
+      "outfitVariants": [
+        {
+          "selectedType": "TOP",
+          "topColor": "블루",
+          "bottomColor": "화이트",
+          "outerColor": "그레이",
+          "accessoryColor": "탠"
+        },
+        {
+          "selectedType": "BOTTOM",
+          "topColor": "화이트",
+          "bottomColor": "블루",
+          "outerColor": "그레이",
+          "accessoryColor": "탠"
+        },
+        {
+          "selectedType": "OUTER",
+          "topColor": "화이트",
+          "bottomColor": "그레이",
+          "outerColor": "블루",
+          "accessoryColor": "탠"
+        }
+      ],
+      "sourceType": "WEB_OBSERVED",
+      "sourceUrl": "https://www.palettehunt.com/%EC%98%B7-%EC%83%89-%EC%A1%B0%ED%95%A9",
+      "reviewStatus": "APPROVED",
+      "version": 1
+    },
+    {
+      "id": "palettehunt-blue-tonal",
+      "title": "블루 기준 톤온톤 배색 사례",
+      "content": "Palette Hunt 시뮬레이터에서 확인한 블루 기준 톤온톤 배색의 색 배치 사례다. 상의 기준: 상의 블루, 하의 네이비, 아우터 스카이 블루, 소품 아이보리. 하의 기준: 상의 네이비, 하의 블루, 아우터 스카이 블루, 소품 아이보리. 아우터 기준: 상의 네이비, 하의 스카이 블루, 아우터 블루, 소품 아이보리.",
+      "category": "COLOR",
+      "tags": [
+        "블루",
+        "톤온톤 배색",
+        "네이비",
+        "스카이 블루",
+        "아이보리"
+      ],
+      "requiredAttributes": [
+        "색상"
+      ],
+      "baseColor": "블루",
+      "combinationType": "TONAL",
+      "outfitVariants": [
+        {
+          "selectedType": "TOP",
+          "topColor": "블루",
+          "bottomColor": "네이비",
+          "outerColor": "스카이 블루",
+          "accessoryColor": "아이보리"
+        },
+        {
+          "selectedType": "BOTTOM",
+          "topColor": "네이비",
+          "bottomColor": "블루",
+          "outerColor": "스카이 블루",
+          "accessoryColor": "아이보리"
+        },
+        {
+          "selectedType": "OUTER",
+          "topColor": "네이비",
+          "bottomColor": "스카이 블루",
+          "outerColor": "블루",
+          "accessoryColor": "아이보리"
+        }
+      ],
+      "sourceType": "WEB_OBSERVED",
+      "sourceUrl": "https://www.palettehunt.com/%EC%98%B7-%EC%83%89-%EC%A1%B0%ED%95%A9",
+      "reviewStatus": "APPROVED",
+      "version": 1
+    },
+    {
+      "id": "palettehunt-blue-accent",
+      "title": "블루 기준 포인트 배색 사례",
+      "content": "Palette Hunt 시뮬레이터에서 확인한 블루 기준 포인트 배색의 색 배치 사례다. 상의 기준: 상의 블루, 하의 오렌지, 아우터 코랄, 소품 적갈색. 하의 기준: 상의 오렌지, 하의 블루, 아우터 코랄, 소품 적갈색. 아우터 기준: 상의 오렌지, 하의 코랄, 아우터 블루, 소품 적갈색.",
+      "category": "COLOR",
+      "tags": [
+        "블루",
+        "포인트 배색",
+        "오렌지",
+        "코랄",
+        "적갈색"
+      ],
+      "requiredAttributes": [
+        "색상"
+      ],
+      "baseColor": "블루",
+      "combinationType": "ACCENT",
+      "outfitVariants": [
+        {
+          "selectedType": "TOP",
+          "topColor": "블루",
+          "bottomColor": "오렌지",
+          "outerColor": "코랄",
+          "accessoryColor": "적갈색"
+        },
+        {
+          "selectedType": "BOTTOM",
+          "topColor": "오렌지",
+          "bottomColor": "블루",
+          "outerColor": "코랄",
+          "accessoryColor": "적갈색"
+        },
+        {
+          "selectedType": "OUTER",
+          "topColor": "오렌지",
+          "bottomColor": "코랄",
+          "outerColor": "블루",
+          "accessoryColor": "적갈색"
+        }
+      ],
+      "sourceType": "WEB_OBSERVED",
+      "sourceUrl": "https://www.palettehunt.com/%EC%98%B7-%EC%83%89-%EC%A1%B0%ED%95%A9",
+      "reviewStatus": "APPROVED",
+      "version": 1
+    },
+    {
+      "id": "palettehunt-gray-basic",
+      "title": "그레이 기준 기본 배색 사례",
+      "content": "Palette Hunt 시뮬레이터에서 확인한 그레이 기준 기본 배색의 색 배치 사례다. 상의 기준: 상의 그레이, 하의 화이트, 아우터 네이비, 소품 블랙. 하의 기준: 상의 화이트, 하의 그레이, 아우터 네이비, 소품 블랙. 아우터 기준: 상의 화이트, 하의 네이비, 아우터 그레이, 소품 블랙.",
+      "category": "COLOR",
+      "tags": [
+        "그레이",
+        "기본 배색",
+        "화이트",
+        "네이비",
+        "블랙"
+      ],
+      "requiredAttributes": [
+        "색상"
+      ],
+      "baseColor": "그레이",
+      "combinationType": "BASIC",
+      "outfitVariants": [
+        {
+          "selectedType": "TOP",
+          "topColor": "그레이",
+          "bottomColor": "화이트",
+          "outerColor": "네이비",
+          "accessoryColor": "블랙"
+        },
+        {
+          "selectedType": "BOTTOM",
+          "topColor": "화이트",
+          "bottomColor": "그레이",
+          "outerColor": "네이비",
+          "accessoryColor": "블랙"
+        },
+        {
+          "selectedType": "OUTER",
+          "topColor": "화이트",
+          "bottomColor": "네이비",
+          "outerColor": "그레이",
+          "accessoryColor": "블랙"
+        }
+      ],
+      "sourceType": "WEB_OBSERVED",
+      "sourceUrl": "https://www.palettehunt.com/%EC%98%B7-%EC%83%89-%EC%A1%B0%ED%95%A9",
+      "reviewStatus": "APPROVED",
+      "version": 1
+    },
+    {
+      "id": "palettehunt-gray-tonal",
+      "title": "그레이 기준 톤온톤 배색 사례",
+      "content": "Palette Hunt 시뮬레이터에서 확인한 그레이 기준 톤온톤 배색의 색 배치 사례다. 상의 기준: 상의 그레이, 하의 차콜, 아우터 스톤, 소품 실버. 하의 기준: 상의 차콜, 하의 그레이, 아우터 스톤, 소품 실버. 아우터 기준: 상의 차콜, 하의 스톤, 아우터 그레이, 소품 실버.",
+      "category": "COLOR",
+      "tags": [
+        "그레이",
+        "톤온톤 배색",
+        "차콜",
+        "스톤",
+        "실버"
+      ],
+      "requiredAttributes": [
+        "색상"
+      ],
+      "baseColor": "그레이",
+      "combinationType": "TONAL",
+      "outfitVariants": [
+        {
+          "selectedType": "TOP",
+          "topColor": "그레이",
+          "bottomColor": "차콜",
+          "outerColor": "스톤",
+          "accessoryColor": "실버"
+        },
+        {
+          "selectedType": "BOTTOM",
+          "topColor": "차콜",
+          "bottomColor": "그레이",
+          "outerColor": "스톤",
+          "accessoryColor": "실버"
+        },
+        {
+          "selectedType": "OUTER",
+          "topColor": "차콜",
+          "bottomColor": "스톤",
+          "outerColor": "그레이",
+          "accessoryColor": "실버"
+        }
+      ],
+      "sourceType": "WEB_OBSERVED",
+      "sourceUrl": "https://www.palettehunt.com/%EC%98%B7-%EC%83%89-%EC%A1%B0%ED%95%A9",
+      "reviewStatus": "APPROVED",
+      "version": 1
+    },
+    {
+      "id": "palettehunt-gray-accent",
+      "title": "그레이 기준 포인트 배색 사례",
+      "content": "Palette Hunt 시뮬레이터에서 확인한 그레이 기준 포인트 배색의 색 배치 사례다. 상의 기준: 상의 그레이, 하의 버건디, 아우터 코발트 블루, 소품 에메랄드. 하의 기준: 상의 버건디, 하의 그레이, 아우터 코발트 블루, 소품 에메랄드. 아우터 기준: 상의 버건디, 하의 코발트 블루, 아우터 그레이, 소품 에메랄드.",
+      "category": "COLOR",
+      "tags": [
+        "그레이",
+        "포인트 배색",
+        "버건디",
+        "코발트 블루",
+        "에메랄드"
+      ],
+      "requiredAttributes": [
+        "색상"
+      ],
+      "baseColor": "그레이",
+      "combinationType": "ACCENT",
+      "outfitVariants": [
+        {
+          "selectedType": "TOP",
+          "topColor": "그레이",
+          "bottomColor": "버건디",
+          "outerColor": "코발트 블루",
+          "accessoryColor": "에메랄드"
+        },
+        {
+          "selectedType": "BOTTOM",
+          "topColor": "버건디",
+          "bottomColor": "그레이",
+          "outerColor": "코발트 블루",
+          "accessoryColor": "에메랄드"
+        },
+        {
+          "selectedType": "OUTER",
+          "topColor": "버건디",
+          "bottomColor": "코발트 블루",
+          "outerColor": "그레이",
+          "accessoryColor": "에메랄드"
+        }
+      ],
+      "sourceType": "WEB_OBSERVED",
+      "sourceUrl": "https://www.palettehunt.com/%EC%98%B7-%EC%83%89-%EC%A1%B0%ED%95%A9",
+      "reviewStatus": "APPROVED",
+      "version": 1
+    },
+    {
+      "id": "palettehunt-beige-basic",
+      "title": "베이지 기준 기본 배색 사례",
+      "content": "Palette Hunt 시뮬레이터에서 확인한 베이지 기준 기본 배색의 색 배치 사례다. 상의 기준: 상의 베이지, 하의 화이트, 아우터 네이비, 소품 브라운. 하의 기준: 상의 화이트, 하의 베이지, 아우터 네이비, 소품 브라운. 아우터 기준: 상의 화이트, 하의 네이비, 아우터 베이지, 소품 브라운.",
+      "category": "COLOR",
+      "tags": [
+        "베이지",
+        "기본 배색",
+        "화이트",
+        "네이비",
+        "브라운"
+      ],
+      "requiredAttributes": [
+        "색상"
+      ],
+      "baseColor": "베이지",
+      "combinationType": "BASIC",
+      "outfitVariants": [
+        {
+          "selectedType": "TOP",
+          "topColor": "베이지",
+          "bottomColor": "화이트",
+          "outerColor": "네이비",
+          "accessoryColor": "브라운"
+        },
+        {
+          "selectedType": "BOTTOM",
+          "topColor": "화이트",
+          "bottomColor": "베이지",
+          "outerColor": "네이비",
+          "accessoryColor": "브라운"
+        },
+        {
+          "selectedType": "OUTER",
+          "topColor": "화이트",
+          "bottomColor": "네이비",
+          "outerColor": "베이지",
+          "accessoryColor": "브라운"
+        }
+      ],
+      "sourceType": "WEB_OBSERVED",
+      "sourceUrl": "https://www.palettehunt.com/%EC%98%B7-%EC%83%89-%EC%A1%B0%ED%95%A9",
+      "reviewStatus": "APPROVED",
+      "version": 1
+    },
+    {
+      "id": "palettehunt-beige-tonal",
+      "title": "베이지 기준 톤온톤 배색 사례",
+      "content": "Palette Hunt 시뮬레이터에서 확인한 베이지 기준 톤온톤 배색의 색 배치 사례다. 상의 기준: 상의 베이지, 하의 크림, 아우터 카멜, 소품 초콜릿. 하의 기준: 상의 크림, 하의 베이지, 아우터 카멜, 소품 초콜릿. 아우터 기준: 상의 크림, 하의 카멜, 아우터 베이지, 소품 초콜릿.",
+      "category": "COLOR",
+      "tags": [
+        "베이지",
+        "톤온톤 배색",
+        "크림",
+        "카멜",
+        "초콜릿"
+      ],
+      "requiredAttributes": [
+        "색상"
+      ],
+      "baseColor": "베이지",
+      "combinationType": "TONAL",
+      "outfitVariants": [
+        {
+          "selectedType": "TOP",
+          "topColor": "베이지",
+          "bottomColor": "크림",
+          "outerColor": "카멜",
+          "accessoryColor": "초콜릿"
+        },
+        {
+          "selectedType": "BOTTOM",
+          "topColor": "크림",
+          "bottomColor": "베이지",
+          "outerColor": "카멜",
+          "accessoryColor": "초콜릿"
+        },
+        {
+          "selectedType": "OUTER",
+          "topColor": "크림",
+          "bottomColor": "카멜",
+          "outerColor": "베이지",
+          "accessoryColor": "초콜릿"
+        }
+      ],
+      "sourceType": "WEB_OBSERVED",
+      "sourceUrl": "https://www.palettehunt.com/%EC%98%B7-%EC%83%89-%EC%A1%B0%ED%95%A9",
+      "reviewStatus": "APPROVED",
+      "version": 1
+    },
+    {
+      "id": "palettehunt-beige-accent",
+      "title": "베이지 기준 포인트 배색 사례",
+      "content": "Palette Hunt 시뮬레이터에서 확인한 베이지 기준 포인트 배색의 색 배치 사례다. 상의 기준: 상의 베이지, 하의 틸, 아우터 버건디, 소품 포레스트 그린. 하의 기준: 상의 틸, 하의 베이지, 아우터 버건디, 소품 포레스트 그린. 아우터 기준: 상의 틸, 하의 버건디, 아우터 베이지, 소품 포레스트 그린.",
+      "category": "COLOR",
+      "tags": [
+        "베이지",
+        "포인트 배색",
+        "틸",
+        "버건디",
+        "포레스트 그린"
+      ],
+      "requiredAttributes": [
+        "색상"
+      ],
+      "baseColor": "베이지",
+      "combinationType": "ACCENT",
+      "outfitVariants": [
+        {
+          "selectedType": "TOP",
+          "topColor": "베이지",
+          "bottomColor": "틸",
+          "outerColor": "버건디",
+          "accessoryColor": "포레스트 그린"
+        },
+        {
+          "selectedType": "BOTTOM",
+          "topColor": "틸",
+          "bottomColor": "베이지",
+          "outerColor": "버건디",
+          "accessoryColor": "포레스트 그린"
+        },
+        {
+          "selectedType": "OUTER",
+          "topColor": "틸",
+          "bottomColor": "버건디",
+          "outerColor": "베이지",
+          "accessoryColor": "포레스트 그린"
+        }
+      ],
+      "sourceType": "WEB_OBSERVED",
+      "sourceUrl": "https://www.palettehunt.com/%EC%98%B7-%EC%83%89-%EC%A1%B0%ED%95%A9",
+      "reviewStatus": "APPROVED",
+      "version": 1
+    },
+    {
+      "id": "palettehunt-brown-basic",
+      "title": "브라운 기준 기본 배색 사례",
+      "content": "Palette Hunt 시뮬레이터에서 확인한 브라운 기준 기본 배색의 색 배치 사례다. 상의 기준: 상의 브라운, 하의 크림, 아우터 데님, 소품 올리브. 하의 기준: 상의 크림, 하의 브라운, 아우터 데님, 소품 올리브. 아우터 기준: 상의 크림, 하의 데님, 아우터 브라운, 소품 올리브.",
+      "category": "COLOR",
+      "tags": [
+        "브라운",
+        "기본 배색",
+        "크림",
+        "데님",
+        "올리브"
+      ],
+      "requiredAttributes": [
+        "색상"
+      ],
+      "baseColor": "브라운",
+      "combinationType": "BASIC",
+      "outfitVariants": [
+        {
+          "selectedType": "TOP",
+          "topColor": "브라운",
+          "bottomColor": "크림",
+          "outerColor": "데님",
+          "accessoryColor": "올리브"
+        },
+        {
+          "selectedType": "BOTTOM",
+          "topColor": "크림",
+          "bottomColor": "브라운",
+          "outerColor": "데님",
+          "accessoryColor": "올리브"
+        },
+        {
+          "selectedType": "OUTER",
+          "topColor": "크림",
+          "bottomColor": "데님",
+          "outerColor": "브라운",
+          "accessoryColor": "올리브"
+        }
+      ],
+      "sourceType": "WEB_OBSERVED",
+      "sourceUrl": "https://www.palettehunt.com/%EC%98%B7-%EC%83%89-%EC%A1%B0%ED%95%A9",
+      "reviewStatus": "APPROVED",
+      "version": 1
+    },
+    {
+      "id": "palettehunt-brown-tonal",
+      "title": "브라운 기준 톤온톤 배색 사례",
+      "content": "Palette Hunt 시뮬레이터에서 확인한 브라운 기준 톤온톤 배색의 색 배치 사례다. 상의 기준: 상의 브라운, 하의 카멜, 아우터 탠, 소품 아이보리. 하의 기준: 상의 카멜, 하의 브라운, 아우터 탠, 소품 아이보리. 아우터 기준: 상의 카멜, 하의 탠, 아우터 브라운, 소품 아이보리.",
+      "category": "COLOR",
+      "tags": [
+        "브라운",
+        "톤온톤 배색",
+        "카멜",
+        "탠",
+        "아이보리"
+      ],
+      "requiredAttributes": [
+        "색상"
+      ],
+      "baseColor": "브라운",
+      "combinationType": "TONAL",
+      "outfitVariants": [
+        {
+          "selectedType": "TOP",
+          "topColor": "브라운",
+          "bottomColor": "카멜",
+          "outerColor": "탠",
+          "accessoryColor": "아이보리"
+        },
+        {
+          "selectedType": "BOTTOM",
+          "topColor": "카멜",
+          "bottomColor": "브라운",
+          "outerColor": "탠",
+          "accessoryColor": "아이보리"
+        },
+        {
+          "selectedType": "OUTER",
+          "topColor": "카멜",
+          "bottomColor": "탠",
+          "outerColor": "브라운",
+          "accessoryColor": "아이보리"
+        }
+      ],
+      "sourceType": "WEB_OBSERVED",
+      "sourceUrl": "https://www.palettehunt.com/%EC%98%B7-%EC%83%89-%EC%A1%B0%ED%95%A9",
+      "reviewStatus": "APPROVED",
+      "version": 1
+    },
+    {
+      "id": "palettehunt-brown-accent",
+      "title": "브라운 기준 포인트 배색 사례",
+      "content": "Palette Hunt 시뮬레이터에서 확인한 브라운 기준 포인트 배색의 색 배치 사례다. 상의 기준: 상의 브라운, 하의 터쿼이즈, 아우터 코발트 블루, 소품 적갈색. 하의 기준: 상의 터쿼이즈, 하의 브라운, 아우터 코발트 블루, 소품 적갈색. 아우터 기준: 상의 터쿼이즈, 하의 코발트 블루, 아우터 브라운, 소품 적갈색.",
+      "category": "COLOR",
+      "tags": [
+        "브라운",
+        "포인트 배색",
+        "터쿼이즈",
+        "코발트 블루",
+        "적갈색"
+      ],
+      "requiredAttributes": [
+        "색상"
+      ],
+      "baseColor": "브라운",
+      "combinationType": "ACCENT",
+      "outfitVariants": [
+        {
+          "selectedType": "TOP",
+          "topColor": "브라운",
+          "bottomColor": "터쿼이즈",
+          "outerColor": "코발트 블루",
+          "accessoryColor": "적갈색"
+        },
+        {
+          "selectedType": "BOTTOM",
+          "topColor": "터쿼이즈",
+          "bottomColor": "브라운",
+          "outerColor": "코발트 블루",
+          "accessoryColor": "적갈색"
+        },
+        {
+          "selectedType": "OUTER",
+          "topColor": "터쿼이즈",
+          "bottomColor": "코발트 블루",
+          "outerColor": "브라운",
+          "accessoryColor": "적갈색"
+        }
+      ],
+      "sourceType": "WEB_OBSERVED",
+      "sourceUrl": "https://www.palettehunt.com/%EC%98%B7-%EC%83%89-%EC%A1%B0%ED%95%A9",
+      "reviewStatus": "APPROVED",
+      "version": 1
+    },
+    {
+      "id": "palettehunt-green-basic",
+      "title": "그린 기준 기본 배색 사례",
+      "content": "Palette Hunt 시뮬레이터에서 확인한 그린 기준 기본 배색의 색 배치 사례다. 상의 기준: 상의 그린, 하의 화이트, 아우터 탠, 소품 데님. 하의 기준: 상의 화이트, 하의 그린, 아우터 탠, 소품 데님. 아우터 기준: 상의 화이트, 하의 탠, 아우터 그린, 소품 데님.",
+      "category": "COLOR",
+      "tags": [
+        "그린",
+        "기본 배색",
+        "화이트",
+        "탠",
+        "데님"
+      ],
+      "requiredAttributes": [
+        "색상"
+      ],
+      "baseColor": "그린",
+      "combinationType": "BASIC",
+      "outfitVariants": [
+        {
+          "selectedType": "TOP",
+          "topColor": "그린",
+          "bottomColor": "화이트",
+          "outerColor": "탠",
+          "accessoryColor": "데님"
+        },
+        {
+          "selectedType": "BOTTOM",
+          "topColor": "화이트",
+          "bottomColor": "그린",
+          "outerColor": "탠",
+          "accessoryColor": "데님"
+        },
+        {
+          "selectedType": "OUTER",
+          "topColor": "화이트",
+          "bottomColor": "탠",
+          "outerColor": "그린",
+          "accessoryColor": "데님"
+        }
+      ],
+      "sourceType": "WEB_OBSERVED",
+      "sourceUrl": "https://www.palettehunt.com/%EC%98%B7-%EC%83%89-%EC%A1%B0%ED%95%A9",
+      "reviewStatus": "APPROVED",
+      "version": 1
+    },
+    {
+      "id": "palettehunt-green-tonal",
+      "title": "그린 기준 톤온톤 배색 사례",
+      "content": "Palette Hunt 시뮬레이터에서 확인한 그린 기준 톤온톤 배색의 색 배치 사례다. 상의 기준: 상의 그린, 하의 올리브, 아우터 세이지, 소품 크림. 하의 기준: 상의 올리브, 하의 그린, 아우터 세이지, 소품 크림. 아우터 기준: 상의 올리브, 하의 세이지, 아우터 그린, 소품 크림.",
+      "category": "COLOR",
+      "tags": [
+        "그린",
+        "톤온톤 배색",
+        "올리브",
+        "세이지",
+        "크림"
+      ],
+      "requiredAttributes": [
+        "색상"
+      ],
+      "baseColor": "그린",
+      "combinationType": "TONAL",
+      "outfitVariants": [
+        {
+          "selectedType": "TOP",
+          "topColor": "그린",
+          "bottomColor": "올리브",
+          "outerColor": "세이지",
+          "accessoryColor": "크림"
+        },
+        {
+          "selectedType": "BOTTOM",
+          "topColor": "올리브",
+          "bottomColor": "그린",
+          "outerColor": "세이지",
+          "accessoryColor": "크림"
+        },
+        {
+          "selectedType": "OUTER",
+          "topColor": "올리브",
+          "bottomColor": "세이지",
+          "outerColor": "그린",
+          "accessoryColor": "크림"
+        }
+      ],
+      "sourceType": "WEB_OBSERVED",
+      "sourceUrl": "https://www.palettehunt.com/%EC%98%B7-%EC%83%89-%EC%A1%B0%ED%95%A9",
+      "reviewStatus": "APPROVED",
+      "version": 1
+    },
+    {
+      "id": "palettehunt-green-accent",
+      "title": "그린 기준 포인트 배색 사례",
+      "content": "Palette Hunt 시뮬레이터에서 확인한 그린 기준 포인트 배색의 색 배치 사례다. 상의 기준: 상의 그린, 하의 버건디, 아우터 라일락, 소품 코랄. 하의 기준: 상의 버건디, 하의 그린, 아우터 라일락, 소품 코랄. 아우터 기준: 상의 버건디, 하의 라일락, 아우터 그린, 소품 코랄.",
+      "category": "COLOR",
+      "tags": [
+        "그린",
+        "포인트 배색",
+        "버건디",
+        "라일락",
+        "코랄"
+      ],
+      "requiredAttributes": [
+        "색상"
+      ],
+      "baseColor": "그린",
+      "combinationType": "ACCENT",
+      "outfitVariants": [
+        {
+          "selectedType": "TOP",
+          "topColor": "그린",
+          "bottomColor": "버건디",
+          "outerColor": "라일락",
+          "accessoryColor": "코랄"
+        },
+        {
+          "selectedType": "BOTTOM",
+          "topColor": "버건디",
+          "bottomColor": "그린",
+          "outerColor": "라일락",
+          "accessoryColor": "코랄"
+        },
+        {
+          "selectedType": "OUTER",
+          "topColor": "버건디",
+          "bottomColor": "라일락",
+          "outerColor": "그린",
+          "accessoryColor": "코랄"
+        }
+      ],
+      "sourceType": "WEB_OBSERVED",
+      "sourceUrl": "https://www.palettehunt.com/%EC%98%B7-%EC%83%89-%EC%A1%B0%ED%95%A9",
+      "reviewStatus": "APPROVED",
+      "version": 1
+    },
+    {
+      "id": "palettehunt-red-basic",
+      "title": "레드 기준 기본 배색 사례",
+      "content": "Palette Hunt 시뮬레이터에서 확인한 레드 기준 기본 배색의 색 배치 사례다. 상의 기준: 상의 레드, 하의 네이비, 아우터 화이트, 소품 데님. 하의 기준: 상의 네이비, 하의 레드, 아우터 화이트, 소품 데님. 아우터 기준: 상의 네이비, 하의 화이트, 아우터 레드, 소품 데님.",
+      "category": "COLOR",
+      "tags": [
+        "레드",
+        "기본 배색",
+        "네이비",
+        "화이트",
+        "데님"
+      ],
+      "requiredAttributes": [
+        "색상"
+      ],
+      "baseColor": "레드",
+      "combinationType": "BASIC",
+      "outfitVariants": [
+        {
+          "selectedType": "TOP",
+          "topColor": "레드",
+          "bottomColor": "네이비",
+          "outerColor": "화이트",
+          "accessoryColor": "데님"
+        },
+        {
+          "selectedType": "BOTTOM",
+          "topColor": "네이비",
+          "bottomColor": "레드",
+          "outerColor": "화이트",
+          "accessoryColor": "데님"
+        },
+        {
+          "selectedType": "OUTER",
+          "topColor": "네이비",
+          "bottomColor": "화이트",
+          "outerColor": "레드",
+          "accessoryColor": "데님"
+        }
+      ],
+      "sourceType": "WEB_OBSERVED",
+      "sourceUrl": "https://www.palettehunt.com/%EC%98%B7-%EC%83%89-%EC%A1%B0%ED%95%A9",
+      "reviewStatus": "APPROVED",
+      "version": 1
+    },
+    {
+      "id": "palettehunt-red-tonal",
+      "title": "레드 기준 톤온톤 배색 사례",
+      "content": "Palette Hunt 시뮬레이터에서 확인한 레드 기준 톤온톤 배색의 색 배치 사례다. 상의 기준: 상의 레드, 하의 버건디, 아우터 블러시 핑크, 소품 크림. 하의 기준: 상의 버건디, 하의 레드, 아우터 블러시 핑크, 소품 크림. 아우터 기준: 상의 버건디, 하의 블러시 핑크, 아우터 레드, 소품 크림.",
+      "category": "COLOR",
+      "tags": [
+        "레드",
+        "톤온톤 배색",
+        "버건디",
+        "블러시 핑크",
+        "크림"
+      ],
+      "requiredAttributes": [
+        "색상"
+      ],
+      "baseColor": "레드",
+      "combinationType": "TONAL",
+      "outfitVariants": [
+        {
+          "selectedType": "TOP",
+          "topColor": "레드",
+          "bottomColor": "버건디",
+          "outerColor": "블러시 핑크",
+          "accessoryColor": "크림"
+        },
+        {
+          "selectedType": "BOTTOM",
+          "topColor": "버건디",
+          "bottomColor": "레드",
+          "outerColor": "블러시 핑크",
+          "accessoryColor": "크림"
+        },
+        {
+          "selectedType": "OUTER",
+          "topColor": "버건디",
+          "bottomColor": "블러시 핑크",
+          "outerColor": "레드",
+          "accessoryColor": "크림"
+        }
+      ],
+      "sourceType": "WEB_OBSERVED",
+      "sourceUrl": "https://www.palettehunt.com/%EC%98%B7-%EC%83%89-%EC%A1%B0%ED%95%A9",
+      "reviewStatus": "APPROVED",
+      "version": 1
+    },
+    {
+      "id": "palettehunt-red-accent",
+      "title": "레드 기준 포인트 배색 사례",
+      "content": "Palette Hunt 시뮬레이터에서 확인한 레드 기준 포인트 배색의 색 배치 사례다. 상의 기준: 상의 레드, 하의 틸, 아우터 코발트 블루, 소품 핑크. 하의 기준: 상의 틸, 하의 레드, 아우터 코발트 블루, 소품 핑크. 아우터 기준: 상의 틸, 하의 코발트 블루, 아우터 레드, 소품 핑크.",
+      "category": "COLOR",
+      "tags": [
+        "레드",
+        "포인트 배색",
+        "틸",
+        "코발트 블루",
+        "핑크"
+      ],
+      "requiredAttributes": [
+        "색상"
+      ],
+      "baseColor": "레드",
+      "combinationType": "ACCENT",
+      "outfitVariants": [
+        {
+          "selectedType": "TOP",
+          "topColor": "레드",
+          "bottomColor": "틸",
+          "outerColor": "코발트 블루",
+          "accessoryColor": "핑크"
+        },
+        {
+          "selectedType": "BOTTOM",
+          "topColor": "틸",
+          "bottomColor": "레드",
+          "outerColor": "코발트 블루",
+          "accessoryColor": "핑크"
+        },
+        {
+          "selectedType": "OUTER",
+          "topColor": "틸",
+          "bottomColor": "코발트 블루",
+          "outerColor": "레드",
+          "accessoryColor": "핑크"
+        }
+      ],
+      "sourceType": "WEB_OBSERVED",
+      "sourceUrl": "https://www.palettehunt.com/%EC%98%B7-%EC%83%89-%EC%A1%B0%ED%95%A9",
+      "reviewStatus": "APPROVED",
+      "version": 1
+    },
+    {
+      "id": "palettehunt-pink-basic",
+      "title": "핑크 기준 기본 배색 사례",
+      "content": "Palette Hunt 시뮬레이터에서 확인한 핑크 기준 기본 배색의 색 배치 사례다. 상의 기준: 상의 핑크, 하의 화이트, 아우터 그레이, 소품 데님. 하의 기준: 상의 화이트, 하의 핑크, 아우터 그레이, 소품 데님. 아우터 기준: 상의 화이트, 하의 그레이, 아우터 핑크, 소품 데님.",
+      "category": "COLOR",
+      "tags": [
+        "핑크",
+        "기본 배색",
+        "화이트",
+        "그레이",
+        "데님"
+      ],
+      "requiredAttributes": [
+        "색상"
+      ],
+      "baseColor": "핑크",
+      "combinationType": "BASIC",
+      "outfitVariants": [
+        {
+          "selectedType": "TOP",
+          "topColor": "핑크",
+          "bottomColor": "화이트",
+          "outerColor": "그레이",
+          "accessoryColor": "데님"
+        },
+        {
+          "selectedType": "BOTTOM",
+          "topColor": "화이트",
+          "bottomColor": "핑크",
+          "outerColor": "그레이",
+          "accessoryColor": "데님"
+        },
+        {
+          "selectedType": "OUTER",
+          "topColor": "화이트",
+          "bottomColor": "그레이",
+          "outerColor": "핑크",
+          "accessoryColor": "데님"
+        }
+      ],
+      "sourceType": "WEB_OBSERVED",
+      "sourceUrl": "https://www.palettehunt.com/%EC%98%B7-%EC%83%89-%EC%A1%B0%ED%95%A9",
+      "reviewStatus": "APPROVED",
+      "version": 1
+    },
+    {
+      "id": "palettehunt-pink-tonal",
+      "title": "핑크 기준 톤온톤 배색 사례",
+      "content": "Palette Hunt 시뮬레이터에서 확인한 핑크 기준 톤온톤 배색의 색 배치 사례다. 상의 기준: 상의 핑크, 하의 블러시 핑크, 아우터 버건디, 소품 크림. 하의 기준: 상의 블러시 핑크, 하의 핑크, 아우터 버건디, 소품 크림. 아우터 기준: 상의 블러시 핑크, 하의 버건디, 아우터 핑크, 소품 크림.",
+      "category": "COLOR",
+      "tags": [
+        "핑크",
+        "톤온톤 배색",
+        "블러시 핑크",
+        "버건디",
+        "크림"
+      ],
+      "requiredAttributes": [
+        "색상"
+      ],
+      "baseColor": "핑크",
+      "combinationType": "TONAL",
+      "outfitVariants": [
+        {
+          "selectedType": "TOP",
+          "topColor": "핑크",
+          "bottomColor": "블러시 핑크",
+          "outerColor": "버건디",
+          "accessoryColor": "크림"
+        },
+        {
+          "selectedType": "BOTTOM",
+          "topColor": "블러시 핑크",
+          "bottomColor": "핑크",
+          "outerColor": "버건디",
+          "accessoryColor": "크림"
+        },
+        {
+          "selectedType": "OUTER",
+          "topColor": "블러시 핑크",
+          "bottomColor": "버건디",
+          "outerColor": "핑크",
+          "accessoryColor": "크림"
+        }
+      ],
+      "sourceType": "WEB_OBSERVED",
+      "sourceUrl": "https://www.palettehunt.com/%EC%98%B7-%EC%83%89-%EC%A1%B0%ED%95%A9",
+      "reviewStatus": "APPROVED",
+      "version": 1
+    },
+    {
+      "id": "palettehunt-pink-accent",
+      "title": "핑크 기준 포인트 배색 사례",
+      "content": "Palette Hunt 시뮬레이터에서 확인한 핑크 기준 포인트 배색의 색 배치 사례다. 상의 기준: 상의 핑크, 하의 포레스트 그린, 아우터 레드, 소품 코발트 블루. 하의 기준: 상의 포레스트 그린, 하의 핑크, 아우터 레드, 소품 코발트 블루. 아우터 기준: 상의 포레스트 그린, 하의 레드, 아우터 핑크, 소품 코발트 블루.",
+      "category": "COLOR",
+      "tags": [
+        "핑크",
+        "포인트 배색",
+        "포레스트 그린",
+        "레드",
+        "코발트 블루"
+      ],
+      "requiredAttributes": [
+        "색상"
+      ],
+      "baseColor": "핑크",
+      "combinationType": "ACCENT",
+      "outfitVariants": [
+        {
+          "selectedType": "TOP",
+          "topColor": "핑크",
+          "bottomColor": "포레스트 그린",
+          "outerColor": "레드",
+          "accessoryColor": "코발트 블루"
+        },
+        {
+          "selectedType": "BOTTOM",
+          "topColor": "포레스트 그린",
+          "bottomColor": "핑크",
+          "outerColor": "레드",
+          "accessoryColor": "코발트 블루"
+        },
+        {
+          "selectedType": "OUTER",
+          "topColor": "포레스트 그린",
+          "bottomColor": "레드",
+          "outerColor": "핑크",
+          "accessoryColor": "코발트 블루"
+        }
+      ],
+      "sourceType": "WEB_OBSERVED",
+      "sourceUrl": "https://www.palettehunt.com/%EC%98%B7-%EC%83%89-%EC%A1%B0%ED%95%A9",
+      "reviewStatus": "APPROVED",
+      "version": 1
+    },
+    {
+      "id": "palettehunt-purple-basic",
+      "title": "퍼플 기준 기본 배색 사례",
+      "content": "Palette Hunt 시뮬레이터에서 확인한 퍼플 기준 기본 배색의 색 배치 사례다. 상의 기준: 상의 퍼플, 하의 그레이, 아우터 네이비, 소품 화이트. 하의 기준: 상의 그레이, 하의 퍼플, 아우터 네이비, 소품 화이트. 아우터 기준: 상의 그레이, 하의 네이비, 아우터 퍼플, 소품 화이트.",
+      "category": "COLOR",
+      "tags": [
+        "퍼플",
+        "기본 배색",
+        "그레이",
+        "네이비",
+        "화이트"
+      ],
+      "requiredAttributes": [
+        "색상"
+      ],
+      "baseColor": "퍼플",
+      "combinationType": "BASIC",
+      "outfitVariants": [
+        {
+          "selectedType": "TOP",
+          "topColor": "퍼플",
+          "bottomColor": "그레이",
+          "outerColor": "네이비",
+          "accessoryColor": "화이트"
+        },
+        {
+          "selectedType": "BOTTOM",
+          "topColor": "그레이",
+          "bottomColor": "퍼플",
+          "outerColor": "네이비",
+          "accessoryColor": "화이트"
+        },
+        {
+          "selectedType": "OUTER",
+          "topColor": "그레이",
+          "bottomColor": "네이비",
+          "outerColor": "퍼플",
+          "accessoryColor": "화이트"
+        }
+      ],
+      "sourceType": "WEB_OBSERVED",
+      "sourceUrl": "https://www.palettehunt.com/%EC%98%B7-%EC%83%89-%EC%A1%B0%ED%95%A9",
+      "reviewStatus": "APPROVED",
+      "version": 1
+    },
+    {
+      "id": "palettehunt-purple-tonal",
+      "title": "퍼플 기준 톤온톤 배색 사례",
+      "content": "Palette Hunt 시뮬레이터에서 확인한 퍼플 기준 톤온톤 배색의 색 배치 사례다. 상의 기준: 상의 퍼플, 하의 라벤더, 아우터 플럼, 소품 크림. 하의 기준: 상의 라벤더, 하의 퍼플, 아우터 플럼, 소품 크림. 아우터 기준: 상의 라벤더, 하의 플럼, 아우터 퍼플, 소품 크림.",
+      "category": "COLOR",
+      "tags": [
+        "퍼플",
+        "톤온톤 배색",
+        "라벤더",
+        "플럼",
+        "크림"
+      ],
+      "requiredAttributes": [
+        "색상"
+      ],
+      "baseColor": "퍼플",
+      "combinationType": "TONAL",
+      "outfitVariants": [
+        {
+          "selectedType": "TOP",
+          "topColor": "퍼플",
+          "bottomColor": "라벤더",
+          "outerColor": "플럼",
+          "accessoryColor": "크림"
+        },
+        {
+          "selectedType": "BOTTOM",
+          "topColor": "라벤더",
+          "bottomColor": "퍼플",
+          "outerColor": "플럼",
+          "accessoryColor": "크림"
+        },
+        {
+          "selectedType": "OUTER",
+          "topColor": "라벤더",
+          "bottomColor": "플럼",
+          "outerColor": "퍼플",
+          "accessoryColor": "크림"
+        }
+      ],
+      "sourceType": "WEB_OBSERVED",
+      "sourceUrl": "https://www.palettehunt.com/%EC%98%B7-%EC%83%89-%EC%A1%B0%ED%95%A9",
+      "reviewStatus": "APPROVED",
+      "version": 1
+    },
+    {
+      "id": "palettehunt-purple-accent",
+      "title": "퍼플 기준 포인트 배색 사례",
+      "content": "Palette Hunt 시뮬레이터에서 확인한 퍼플 기준 포인트 배색의 색 배치 사례다. 상의 기준: 상의 퍼플, 하의 옐로, 아우터 에메랄드, 소품 코랄. 하의 기준: 상의 옐로, 하의 퍼플, 아우터 에메랄드, 소품 코랄. 아우터 기준: 상의 옐로, 하의 에메랄드, 아우터 퍼플, 소품 코랄.",
+      "category": "COLOR",
+      "tags": [
+        "퍼플",
+        "포인트 배색",
+        "옐로",
+        "에메랄드",
+        "코랄"
+      ],
+      "requiredAttributes": [
+        "색상"
+      ],
+      "baseColor": "퍼플",
+      "combinationType": "ACCENT",
+      "outfitVariants": [
+        {
+          "selectedType": "TOP",
+          "topColor": "퍼플",
+          "bottomColor": "옐로",
+          "outerColor": "에메랄드",
+          "accessoryColor": "코랄"
+        },
+        {
+          "selectedType": "BOTTOM",
+          "topColor": "옐로",
+          "bottomColor": "퍼플",
+          "outerColor": "에메랄드",
+          "accessoryColor": "코랄"
+        },
+        {
+          "selectedType": "OUTER",
+          "topColor": "옐로",
+          "bottomColor": "에메랄드",
+          "outerColor": "퍼플",
+          "accessoryColor": "코랄"
+        }
+      ],
+      "sourceType": "WEB_OBSERVED",
+      "sourceUrl": "https://www.palettehunt.com/%EC%98%B7-%EC%83%89-%EC%A1%B0%ED%95%A9",
+      "reviewStatus": "APPROVED",
+      "version": 1
+    },
+    {
+      "id": "palettehunt-orange-basic",
+      "title": "오렌지 기준 기본 배색 사례",
+      "content": "Palette Hunt 시뮬레이터에서 확인한 오렌지 기준 기본 배색의 색 배치 사례다. 상의 기준: 상의 오렌지, 하의 크림, 아우터 데님, 소품 브라운. 하의 기준: 상의 크림, 하의 오렌지, 아우터 데님, 소품 브라운. 아우터 기준: 상의 크림, 하의 데님, 아우터 오렌지, 소품 브라운.",
+      "category": "COLOR",
+      "tags": [
+        "오렌지",
+        "기본 배색",
+        "크림",
+        "데님",
+        "브라운"
+      ],
+      "requiredAttributes": [
+        "색상"
+      ],
+      "baseColor": "오렌지",
+      "combinationType": "BASIC",
+      "outfitVariants": [
+        {
+          "selectedType": "TOP",
+          "topColor": "오렌지",
+          "bottomColor": "크림",
+          "outerColor": "데님",
+          "accessoryColor": "브라운"
+        },
+        {
+          "selectedType": "BOTTOM",
+          "topColor": "크림",
+          "bottomColor": "오렌지",
+          "outerColor": "데님",
+          "accessoryColor": "브라운"
+        },
+        {
+          "selectedType": "OUTER",
+          "topColor": "크림",
+          "bottomColor": "데님",
+          "outerColor": "오렌지",
+          "accessoryColor": "브라운"
+        }
+      ],
+      "sourceType": "WEB_OBSERVED",
+      "sourceUrl": "https://www.palettehunt.com/%EC%98%B7-%EC%83%89-%EC%A1%B0%ED%95%A9",
+      "reviewStatus": "APPROVED",
+      "version": 1
+    },
+    {
+      "id": "palettehunt-orange-tonal",
+      "title": "오렌지 기준 톤온톤 배색 사례",
+      "content": "Palette Hunt 시뮬레이터에서 확인한 오렌지 기준 톤온톤 배색의 색 배치 사례다. 상의 기준: 상의 오렌지, 하의 적갈색, 아우터 카멜, 소품 아이보리. 하의 기준: 상의 적갈색, 하의 오렌지, 아우터 카멜, 소품 아이보리. 아우터 기준: 상의 적갈색, 하의 카멜, 아우터 오렌지, 소품 아이보리.",
+      "category": "COLOR",
+      "tags": [
+        "오렌지",
+        "톤온톤 배색",
+        "적갈색",
+        "카멜",
+        "아이보리"
+      ],
+      "requiredAttributes": [
+        "색상"
+      ],
+      "baseColor": "오렌지",
+      "combinationType": "TONAL",
+      "outfitVariants": [
+        {
+          "selectedType": "TOP",
+          "topColor": "오렌지",
+          "bottomColor": "적갈색",
+          "outerColor": "카멜",
+          "accessoryColor": "아이보리"
+        },
+        {
+          "selectedType": "BOTTOM",
+          "topColor": "적갈색",
+          "bottomColor": "오렌지",
+          "outerColor": "카멜",
+          "accessoryColor": "아이보리"
+        },
+        {
+          "selectedType": "OUTER",
+          "topColor": "적갈색",
+          "bottomColor": "카멜",
+          "outerColor": "오렌지",
+          "accessoryColor": "아이보리"
+        }
+      ],
+      "sourceType": "WEB_OBSERVED",
+      "sourceUrl": "https://www.palettehunt.com/%EC%98%B7-%EC%83%89-%EC%A1%B0%ED%95%A9",
+      "reviewStatus": "APPROVED",
+      "version": 1
+    },
+    {
+      "id": "palettehunt-orange-accent",
+      "title": "오렌지 기준 포인트 배색 사례",
+      "content": "Palette Hunt 시뮬레이터에서 확인한 오렌지 기준 포인트 배색의 색 배치 사례다. 상의 기준: 상의 오렌지, 하의 코발트 블루, 아우터 틸, 소품 푸크시아. 하의 기준: 상의 코발트 블루, 하의 오렌지, 아우터 틸, 소품 푸크시아. 아우터 기준: 상의 코발트 블루, 하의 틸, 아우터 오렌지, 소품 푸크시아.",
+      "category": "COLOR",
+      "tags": [
+        "오렌지",
+        "포인트 배색",
+        "코발트 블루",
+        "틸",
+        "푸크시아"
+      ],
+      "requiredAttributes": [
+        "색상"
+      ],
+      "baseColor": "오렌지",
+      "combinationType": "ACCENT",
+      "outfitVariants": [
+        {
+          "selectedType": "TOP",
+          "topColor": "오렌지",
+          "bottomColor": "코발트 블루",
+          "outerColor": "틸",
+          "accessoryColor": "푸크시아"
+        },
+        {
+          "selectedType": "BOTTOM",
+          "topColor": "코발트 블루",
+          "bottomColor": "오렌지",
+          "outerColor": "틸",
+          "accessoryColor": "푸크시아"
+        },
+        {
+          "selectedType": "OUTER",
+          "topColor": "코발트 블루",
+          "bottomColor": "틸",
+          "outerColor": "오렌지",
+          "accessoryColor": "푸크시아"
+        }
+      ],
+      "sourceType": "WEB_OBSERVED",
+      "sourceUrl": "https://www.palettehunt.com/%EC%98%B7-%EC%83%89-%EC%A1%B0%ED%95%A9",
+      "reviewStatus": "APPROVED",
+      "version": 1
+    },
+    {
+      "id": "palettehunt-yellow-basic",
+      "title": "옐로 기준 기본 배색 사례",
+      "content": "Palette Hunt 시뮬레이터에서 확인한 옐로 기준 기본 배색의 색 배치 사례다. 상의 기준: 상의 옐로, 하의 화이트, 아우터 데님, 소품 탠. 하의 기준: 상의 화이트, 하의 옐로, 아우터 데님, 소품 탠. 아우터 기준: 상의 화이트, 하의 데님, 아우터 옐로, 소품 탠.",
+      "category": "COLOR",
+      "tags": [
+        "옐로",
+        "기본 배색",
+        "화이트",
+        "데님",
+        "탠"
+      ],
+      "requiredAttributes": [
+        "색상"
+      ],
+      "baseColor": "옐로",
+      "combinationType": "BASIC",
+      "outfitVariants": [
+        {
+          "selectedType": "TOP",
+          "topColor": "옐로",
+          "bottomColor": "화이트",
+          "outerColor": "데님",
+          "accessoryColor": "탠"
+        },
+        {
+          "selectedType": "BOTTOM",
+          "topColor": "화이트",
+          "bottomColor": "옐로",
+          "outerColor": "데님",
+          "accessoryColor": "탠"
+        },
+        {
+          "selectedType": "OUTER",
+          "topColor": "화이트",
+          "bottomColor": "데님",
+          "outerColor": "옐로",
+          "accessoryColor": "탠"
+        }
+      ],
+      "sourceType": "WEB_OBSERVED",
+      "sourceUrl": "https://www.palettehunt.com/%EC%98%B7-%EC%83%89-%EC%A1%B0%ED%95%A9",
+      "reviewStatus": "APPROVED",
+      "version": 1
+    },
+    {
+      "id": "palettehunt-yellow-tonal",
+      "title": "옐로 기준 톤온톤 배색 사례",
+      "content": "Palette Hunt 시뮬레이터에서 확인한 옐로 기준 톤온톤 배색의 색 배치 사례다. 상의 기준: 상의 옐로, 하의 머스터드, 아우터 크림, 소품 브라운. 하의 기준: 상의 머스터드, 하의 옐로, 아우터 크림, 소품 브라운. 아우터 기준: 상의 머스터드, 하의 크림, 아우터 옐로, 소품 브라운.",
+      "category": "COLOR",
+      "tags": [
+        "옐로",
+        "톤온톤 배색",
+        "머스터드",
+        "크림",
+        "브라운"
+      ],
+      "requiredAttributes": [
+        "색상"
+      ],
+      "baseColor": "옐로",
+      "combinationType": "TONAL",
+      "outfitVariants": [
+        {
+          "selectedType": "TOP",
+          "topColor": "옐로",
+          "bottomColor": "머스터드",
+          "outerColor": "크림",
+          "accessoryColor": "브라운"
+        },
+        {
+          "selectedType": "BOTTOM",
+          "topColor": "머스터드",
+          "bottomColor": "옐로",
+          "outerColor": "크림",
+          "accessoryColor": "브라운"
+        },
+        {
+          "selectedType": "OUTER",
+          "topColor": "머스터드",
+          "bottomColor": "크림",
+          "outerColor": "옐로",
+          "accessoryColor": "브라운"
+        }
+      ],
+      "sourceType": "WEB_OBSERVED",
+      "sourceUrl": "https://www.palettehunt.com/%EC%98%B7-%EC%83%89-%EC%A1%B0%ED%95%A9",
+      "reviewStatus": "APPROVED",
+      "version": 1
+    },
+    {
+      "id": "palettehunt-yellow-accent",
+      "title": "옐로 기준 포인트 배색 사례",
+      "content": "Palette Hunt 시뮬레이터에서 확인한 옐로 기준 포인트 배색의 색 배치 사례다. 상의 기준: 상의 옐로, 하의 퍼플, 아우터 코발트 블루, 소품 에메랄드. 하의 기준: 상의 퍼플, 하의 옐로, 아우터 코발트 블루, 소품 에메랄드. 아우터 기준: 상의 퍼플, 하의 코발트 블루, 아우터 옐로, 소품 에메랄드.",
+      "category": "COLOR",
+      "tags": [
+        "옐로",
+        "포인트 배색",
+        "퍼플",
+        "코발트 블루",
+        "에메랄드"
+      ],
+      "requiredAttributes": [
+        "색상"
+      ],
+      "baseColor": "옐로",
+      "combinationType": "ACCENT",
+      "outfitVariants": [
+        {
+          "selectedType": "TOP",
+          "topColor": "옐로",
+          "bottomColor": "퍼플",
+          "outerColor": "코발트 블루",
+          "accessoryColor": "에메랄드"
+        },
+        {
+          "selectedType": "BOTTOM",
+          "topColor": "퍼플",
+          "bottomColor": "옐로",
+          "outerColor": "코발트 블루",
+          "accessoryColor": "에메랄드"
+        },
+        {
+          "selectedType": "OUTER",
+          "topColor": "퍼플",
+          "bottomColor": "코발트 블루",
+          "outerColor": "옐로",
+          "accessoryColor": "에메랄드"
+        }
+      ],
+      "sourceType": "WEB_OBSERVED",
+      "sourceUrl": "https://www.palettehunt.com/%EC%98%B7-%EC%83%89-%EC%A1%B0%ED%95%A9",
+      "reviewStatus": "APPROVED",
+      "version": 1
+    }
+  ]
+}

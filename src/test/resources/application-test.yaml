@@ -24,6 +24,8 @@ spring:
       initialize-schema: always
 
 ootd:
+  groq:
+    enabled: false
   weather:
     openweathermap:
       api-key: test-key
