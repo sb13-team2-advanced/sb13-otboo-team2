@@ -3,19 +3,25 @@ package codeit.ootd.domain.recommendation.repository;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.assertj.core.api.Assertions.within;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.verify;
 
 import codeit.ootd.domain.clothes.enums.ClothesType;
+import codeit.ootd.domain.clothes.dto.response.ClothesAttributeWithDefDto;
+import codeit.ootd.domain.recommendation.algorithm.RecommendationConditions;
+import codeit.ootd.domain.recommendation.dto.response.RecommendationClothesResponse;
 import codeit.ootd.domain.recommendation.dto.response.OutfitColorVariant;
 import codeit.ootd.domain.recommendation.dto.response.StyleKnowledgeMatch;
 import codeit.ootd.domain.recommendation.enums.CombinationType;
 import codeit.ootd.domain.recommendation.service.StyleKnowledgeSearchService;
+import codeit.ootd.domain.recommendation.service.OutfitRecommendationService;
 import codeit.ootd.infra.embedding.EmbeddingClient;
 import codeit.ootd.infra.embedding.EmbeddingResponse;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.UUID;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
@@ -27,6 +33,10 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.annotation.Propagation;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
+import org.springframework.transaction.support.TransactionTemplate;
 import org.testcontainers.containers.PostgreSQLContainer;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
@@ -58,9 +68,89 @@ class StyleKnowledgeRepositoryIntegrationTest {
     @Autowired
     private StyleKnowledgeSearchService searchService;
     @Autowired
+    private OutfitRecommendationService outfitRecommendationService;
+    @Autowired
     private JdbcTemplate jdbcTemplate;
+    @Autowired
+    private PlatformTransactionManager transactionManager;
     @MockitoBean
     private EmbeddingClient embeddingClient;
+
+    @Test
+    @Transactional(propagation = Propagation.NOT_SUPPORTED)
+    void 실제_벡터_검색_결과가_의상_선택에_반영되고_임베딩은_트랜잭션_밖에서_호출된다() {
+        // given
+        insert("outfit-integration", "오렌지", "TONAL", "APPROVED", MODEL, vector(1, 0));
+        RecommendationClothesResponse blueTop = coloredItem(ClothesType.TOP, "블루");
+        RecommendationClothesResponse brownTop = coloredItem(ClothesType.TOP, "적갈색");
+        RecommendationClothesResponse bottom = coloredItem(ClothesType.BOTTOM, "주황색");
+        given(embeddingClient.embed(anyString())).willAnswer(invocation -> {
+            assertThat(TransactionSynchronizationManager.isActualTransactionActive()).isFalse();
+            return QUERY;
+        });
+
+        try {
+            // when
+            List<RecommendationClothesResponse> result = outfitRecommendationService.recommend(
+                RecommendationConditions.of(25, 0, 0, 0, 0), List.of(blueTop, brownTop, bottom));
+
+            // then
+            assertThat(result).containsExactly(brownTop, bottom);
+            verify(embeddingClient).embed("오렌지 하의를 기준으로 상의, 하의, 아우터와 어울리는 색 조합");
+        } finally {
+            jdbcTemplate.update("DELETE FROM style_knowledge WHERE document_key = 'outfit-integration'");
+        }
+    }
+
+    @Test
+    void 상위_트랜잭션도_임베딩_호출_동안_중지하고_실패_뒤에는_복원한다() {
+        // given
+        RecommendationClothesResponse top = coloredItem(ClothesType.TOP, "블루");
+        RecommendationClothesResponse bottom = coloredItem(ClothesType.BOTTOM, "주황색");
+        given(embeddingClient.embed(anyString())).willAnswer(invocation -> {
+            assertThat(TransactionSynchronizationManager.isActualTransactionActive()).isFalse();
+            throw new IllegalStateException("유효하지 않은 임베딩");
+        });
+
+        // when
+        List<RecommendationClothesResponse> result = outfitRecommendationService.recommend(
+            RecommendationConditions.of(25, 0, 0, 0, 0), List.of(top, bottom));
+
+        // then
+        assertThat(result).containsExactly(top, bottom);
+        assertThat(TransactionSynchronizationManager.isActualTransactionActive()).isTrue();
+    }
+
+    @Test
+    @Transactional(propagation = Propagation.NOT_SUPPORTED)
+    void 지식_조회_SQL이_실패해도_기존_추천을_반환하고_상위_트랜잭션은_사용할_수_있다() {
+        // given
+        insert("database-failure-integration", "오렌지", "TONAL", "APPROVED", MODEL, vector(1, 0));
+        RecommendationClothesResponse top = coloredItem(ClothesType.TOP, "블루");
+        RecommendationClothesResponse bottom = coloredItem(ClothesType.BOTTOM, "주황색");
+        given(embeddingClient.embed(anyString())).willReturn(
+            new EmbeddingResponse(MODEL, 2, List.of(1.0, 0.0)));
+
+        try {
+            new TransactionTemplate(transactionManager).executeWithoutResult(status -> {
+                // when
+                List<RecommendationClothesResponse> result = outfitRecommendationService.recommend(
+                    RecommendationConditions.of(25, 0, 0, 0, 0), List.of(top, bottom));
+
+                // then
+                assertThat(result).containsExactly(top, bottom);
+                assertThat(status.isRollbackOnly()).isFalse();
+                assertThat(jdbcTemplate.queryForObject("SELECT 1", Integer.class)).isEqualTo(1);
+            });
+        } finally {
+            jdbcTemplate.update("DELETE FROM style_knowledge WHERE document_key = 'database-failure-integration'");
+        }
+    }
+
+    private RecommendationClothesResponse coloredItem(ClothesType type, String color) {
+        return new RecommendationClothesResponse(UUID.randomUUID(), color, null, type,
+            List.of(new ClothesAttributeWithDefDto(UUID.randomUUID(), "색상", List.of(color), color)));
+    }
 
     @Test
     void 검색_서비스는_임베딩_응답으로_기준색의_문서를_거리순으로_조회한다() {

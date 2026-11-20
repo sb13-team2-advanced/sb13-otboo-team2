@@ -17,7 +17,6 @@ import codeit.ootd.domain.clothes.repository.ClothesAttributeRepository;
 import codeit.ootd.domain.clothes.repository.ClothesAttributeDefinitionRepository;
 import codeit.ootd.domain.profile.entity.Profile;
 import codeit.ootd.domain.profile.repository.ProfileRepository;
-import codeit.ootd.domain.recommendation.algorithm.OutfitRecommender;
 import codeit.ootd.domain.recommendation.algorithm.RecommendationConditions;
 import codeit.ootd.domain.recommendation.dto.response.RecommendationClothesResponse;
 import codeit.ootd.domain.recommendation.dto.response.RecommendationResponse;
@@ -38,10 +37,10 @@ import java.util.Optional;
 import java.util.UUID;
 
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
-import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -57,9 +56,17 @@ class RecommendationServiceTest {
     @Mock private ClothesAttributeRepository attributeRepository;
     @Mock private ClothesAttributeDefinitionRepository definitionRepository;
     @Mock private ProfileRepository profileRepository;
-    @Mock private OutfitRecommender recommender;
+    @Mock private OutfitRecommendationService recommender;
     @Spy private Clock clock = Clock.fixed(Instant.parse("2026-11-18T06:00:00Z"), ZoneOffset.UTC);
-    @InjectMocks private RecommendationServiceImpl service;
+    private RecommendationServiceImpl service;
+
+    @BeforeEach
+    void setUp() {
+        RecommendationContextLoader loader = new RecommendationContextLoader(weatherRepository,
+            forecastRepository, clothesRepository, attributeRepository, definitionRepository,
+            profileRepository, clock);
+        service = new RecommendationServiceImpl(loader, recommender);
+    }
 
     /**
      * 한국 시간의 정시·30분 경계와 날짜 시작을 기준으로 조회 시작점이 반올림되는지 검증한다.
