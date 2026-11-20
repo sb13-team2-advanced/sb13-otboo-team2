@@ -2,6 +2,7 @@ package codeit.ootd.domain.clothes.controller;
 
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.BDDMockito.given;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -11,18 +12,23 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import codeit.ootd.domain.clothes.dto.response.ClothesAttributeWithDefDto;
 import codeit.ootd.domain.clothes.dto.response.ClothesDto;
 import codeit.ootd.domain.clothes.enums.ClothesType;
+import codeit.ootd.domain.clothes.service.ClothesExtractionRateLimiter;
 import codeit.ootd.domain.clothes.service.ClothesExtractionService;
 import codeit.ootd.global.exception.ErrorCode;
 import codeit.ootd.global.exception.GlobalExceptionHandler;
 import codeit.ootd.global.exception.OtbooException;
 import java.util.List;
 import java.util.UUID;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.http.converter.json.JacksonJsonHttpMessageConverter;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.security.web.method.annotation.AuthenticationPrincipalArgumentResolver;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import tools.jackson.databind.json.JsonMapper;
@@ -36,15 +42,29 @@ class ClothesExtractionControllerTest {
     @Mock
     private ClothesExtractionService service;
 
+    @Mock
+    private ClothesExtractionRateLimiter rateLimiter;
+
+    private final UUID userId = UUID.randomUUID();
+
     private MockMvc mockMvc;
 
     @BeforeEach
     void setUp() {
+        SecurityContextHolder.getContext().setAuthentication(
+                new UsernamePasswordAuthenticationToken(userId, null, List.of()));
+
         mockMvc = MockMvcBuilders
-                .standaloneSetup(new ClothesExtractionController(service))
+                .standaloneSetup(new ClothesExtractionController(service, rateLimiter))
                 .setControllerAdvice(new GlobalExceptionHandler())
+                .setCustomArgumentResolvers(new AuthenticationPrincipalArgumentResolver())
                 .setMessageConverters(new JacksonJsonHttpMessageConverter(JsonMapper.builder().build()))
                 .build();
+    }
+
+    @AfterEach
+    void tearDown() {
+        SecurityContextHolder.clearContext();
     }
 
     @Test
@@ -99,5 +119,27 @@ class ClothesExtractionControllerTest {
         mockMvc.perform(get(URL).param("url", PAGE_URL))
                 .andExpect(status().is(ErrorCode.CLOTHES_EXTRACTION_NOT_FOUND.getStatus().value()))
                 .andExpect(jsonPath("$.message").value(ErrorCode.CLOTHES_EXTRACTION_NOT_FOUND.getMessage()));
+    }
+
+    @Test
+    void 로그인한_사용자_기준으로_요청_횟수를_확인한다() throws Exception {
+        given(service.extract(PAGE_URL)).willReturn(new ClothesDto(null, null, "셔츠", null, ClothesType.TOP, List.of()));
+
+        mockMvc.perform(get(URL).param("url", PAGE_URL))
+                .andExpect(status().isOk());
+
+        verify(rateLimiter).check(userId);
+    }
+
+    @Test
+    void 요청_횟수를_초과하면_429를_반환하고_페이지를_가져오지_않는다() throws Exception {
+        doThrow(new OtbooException(ErrorCode.CLOTHES_EXTRACTION_RATE_LIMIT_EXCEEDED))
+                .when(rateLimiter).check(userId);
+
+        mockMvc.perform(get(URL).param("url", PAGE_URL))
+                .andExpect(status().isTooManyRequests())
+                .andExpect(jsonPath("$.message").value(ErrorCode.CLOTHES_EXTRACTION_RATE_LIMIT_EXCEEDED.getMessage()));
+
+        verifyNoInteractions(service);
     }
 }

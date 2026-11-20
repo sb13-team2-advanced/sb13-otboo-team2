@@ -1,0 +1,37 @@
+# 실제 배포 환경 또는 개인 Kafka 이벤트 발행 테스트 시에만 활성화한다.
+# 배포: SPRING_PROFILES_ACTIVE=prod,kafka 및 OTBOO_KAFKA_ENABLED=true
+# 개인 테스트: SPRING_PROFILES_ACTIVE=dev,kafka 및 OTBOO_KAFKA_ENABLED=true
+# Confluent Cloud 접속 정보가 필요하며, 일반 로컬 개발에서는 기본 비활성화를 유지한다.
+spring:
+  kafka:
+    bootstrap-servers: ${CONFLUENT_BOOTSTRAP_SERVERS}
+    properties:
+      security.protocol: SASL_SSL
+      sasl.mechanism: PLAIN
+      sasl.jaas.config: 'org.apache.kafka.common.security.plain.PlainLoginModule required username="${CONFLUENT_API_KEY}" password="${CONFLUENT_API_SECRET}";'
+    producer:
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.apache.kafka.common.serialization.StringSerializer
+      acks: all
+      properties:
+        enable.idempotence: true
+        delivery.timeout.ms: 10000
+        request.timeout.ms: 5000
+        max.block.ms: 10000
+    consumer:
+      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      value-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      enable-auto-commit: false
+      auto-offset-reset: earliest
+    listener:
+      ack-mode: record
+      missing-topics-fatal: true
+
+otboo:
+  kafka:
+    enabled: ${OTBOO_KAFKA_ENABLED:false}
+  notification:
+    kafka:
+      enabled: ${OTBOO_KAFKA_ENABLED:false}
+      topic: ${OTBOO_NOTIFICATION_KAFKA_TOPIC:otboo.notification.requested.v1}
+      group-id: ${OTBOO_NOTIFICATION_KAFKA_GROUP_ID:otboo-notifications-v1}

@@ -1,0 +1,556 @@
+{
+  "apiVersion": 1,
+  "groups": [
+    {
+      "orgId": 1,
+      "name": "otboo-service-health",
+      "folder": "AWS",
+      "interval": "60s",
+      "rules": [
+        {
+          "uid": "otboo-ecs-cpu-high",
+          "title": "ECS CPU > 80% for 5m",
+          "condition": "C",
+          "data": [
+            {
+              "refId": "A",
+              "datasourceUid": "otboo-cloudwatch",
+              "relativeTimeRange": {
+                "from": 600,
+                "to": 60
+              },
+              "model": {
+                "datasource": {
+                  "type": "cloudwatch",
+                  "uid": "otboo-cloudwatch"
+                },
+                "queryMode": "Metrics",
+                "metricEditorMode": 0,
+                "metricQueryType": 0,
+                "region": "ap-northeast-2",
+                "namespace": "AWS/ECS",
+                "metricName": "CPUUtilization",
+                "statistic": "Average",
+                "period": "60",
+                "matchExact": true,
+                "dimensions": {
+                  "ClusterName": "otboo-dev-cluster",
+                  "ServiceName": "otboo-backend"
+                },
+                "refId": "A",
+                "intervalMs": 60000,
+                "maxDataPoints": 600
+              }
+            },
+            {
+              "refId": "B",
+              "datasourceUid": "__expr__",
+              "relativeTimeRange": {
+                "from": 0,
+                "to": 0
+              },
+              "model": {
+                "refId": "B",
+                "datasource": {
+                  "type": "__expr__",
+                  "uid": "__expr__"
+                },
+                "type": "reduce",
+                "expression": "A",
+                "reducer": "last",
+                "settings": {
+                  "mode": "dropNN"
+                },
+                "conditions": []
+              }
+            },
+            {
+              "refId": "C",
+              "datasourceUid": "__expr__",
+              "relativeTimeRange": {
+                "from": 0,
+                "to": 0
+              },
+              "model": {
+                "refId": "C",
+                "datasource": {
+                  "type": "__expr__",
+                  "uid": "__expr__"
+                },
+                "type": "threshold",
+                "expression": "B",
+                "conditions": [
+                  {
+                    "type": "query",
+                    "evaluator": {
+                      "type": "gt",
+                      "params": [
+                        80
+                      ]
+                    },
+                    "operator": {
+                      "type": "and"
+                    },
+                    "query": {
+                      "params": [
+                        "C"
+                      ]
+                    },
+                    "reducer": {
+                      "type": "last",
+                      "params": []
+                    }
+                  }
+                ]
+              }
+            }
+          ],
+          "noDataState": "NoData",
+          "execErrState": "Error",
+          "for": "5m",
+          "isPaused": false,
+          "annotations": {
+            "summary": "ECS CPU > 80% for 5m",
+            "description": "ECS CPU utilization exceeds 80%. Inspect service load and task capacity in the linked dashboard.",
+            "__dashboardUid__": "otboo-ecs-monitoring",
+            "__panelId__": "1"
+          },
+          "labels": {
+            "service": "otboo-backend",
+            "environment": "dev",
+            "severity": "warning"
+          }
+        },
+        {
+          "uid": "otboo-ecs-memory-high",
+          "title": "ECS memory > 80% for 5m",
+          "condition": "C",
+          "data": [
+            {
+              "refId": "A",
+              "datasourceUid": "otboo-cloudwatch",
+              "relativeTimeRange": {
+                "from": 600,
+                "to": 60
+              },
+              "model": {
+                "datasource": {
+                  "type": "cloudwatch",
+                  "uid": "otboo-cloudwatch"
+                },
+                "queryMode": "Metrics",
+                "metricEditorMode": 0,
+                "metricQueryType": 0,
+                "region": "ap-northeast-2",
+                "namespace": "AWS/ECS",
+                "metricName": "MemoryUtilization",
+                "statistic": "Average",
+                "period": "60",
+                "matchExact": true,
+                "dimensions": {
+                  "ClusterName": "otboo-dev-cluster",
+                  "ServiceName": "otboo-backend"
+                },
+                "refId": "A",
+                "intervalMs": 60000,
+                "maxDataPoints": 600
+              }
+            },
+            {
+              "refId": "B",
+              "datasourceUid": "__expr__",
+              "relativeTimeRange": {
+                "from": 0,
+                "to": 0
+              },
+              "model": {
+                "refId": "B",
+                "datasource": {
+                  "type": "__expr__",
+                  "uid": "__expr__"
+                },
+                "type": "reduce",
+                "expression": "A",
+                "reducer": "last",
+                "settings": {
+                  "mode": "dropNN"
+                },
+                "conditions": []
+              }
+            },
+            {
+              "refId": "C",
+              "datasourceUid": "__expr__",
+              "relativeTimeRange": {
+                "from": 0,
+                "to": 0
+              },
+              "model": {
+                "refId": "C",
+                "datasource": {
+                  "type": "__expr__",
+                  "uid": "__expr__"
+                },
+                "type": "threshold",
+                "expression": "B",
+                "conditions": [
+                  {
+                    "type": "query",
+                    "evaluator": {
+                      "type": "gt",
+                      "params": [
+                        80
+                      ]
+                    },
+                    "operator": {
+                      "type": "and"
+                    },
+                    "query": {
+                      "params": [
+                        "C"
+                      ]
+                    },
+                    "reducer": {
+                      "type": "last",
+                      "params": []
+                    }
+                  }
+                ]
+              }
+            }
+          ],
+          "noDataState": "NoData",
+          "execErrState": "Error",
+          "for": "5m",
+          "isPaused": false,
+          "annotations": {
+            "summary": "ECS memory > 80% for 5m",
+            "description": "ECS memory utilization exceeds 80%. Inspect JVM heap, GC activity and task memory capacity.",
+            "__dashboardUid__": "otboo-ecs-monitoring",
+            "__panelId__": "2"
+          },
+          "labels": {
+            "service": "otboo-backend",
+            "environment": "dev",
+            "severity": "warning"
+          }
+        },
+        {
+          "uid": "otboo-scrape-failed",
+          "title": "Application metrics unavailable for 2m",
+          "condition": "C",
+          "data": [
+            {
+              "refId": "A",
+              "datasourceUid": "otboo-amp",
+              "relativeTimeRange": {
+                "from": 600,
+                "to": 0
+              },
+              "model": {
+                "datasource": {
+                  "type": "grafana-amazonprometheus-datasource",
+                  "uid": "otboo-amp"
+                },
+                "expr": "1 - (max(up{job=\"otboo\",aws_ecs_task_family=\"otboo-backend\",aws_ecs_cluster_arn=\"arn:aws:ecs:ap-northeast-2:121246721746:cluster/otboo-dev-cluster\"}) or vector(0))",
+                "instant": true,
+                "range": false,
+                "editorMode": "code",
+                "refId": "A",
+                "intervalMs": 60000,
+                "maxDataPoints": 600
+              }
+            },
+            {
+              "refId": "B",
+              "datasourceUid": "__expr__",
+              "relativeTimeRange": {
+                "from": 0,
+                "to": 0
+              },
+              "model": {
+                "refId": "B",
+                "datasource": {
+                  "type": "__expr__",
+                  "uid": "__expr__"
+                },
+                "type": "reduce",
+                "expression": "A",
+                "reducer": "last",
+                "settings": {
+                  "mode": "dropNN"
+                },
+                "conditions": []
+              }
+            },
+            {
+              "refId": "C",
+              "datasourceUid": "__expr__",
+              "relativeTimeRange": {
+                "from": 0,
+                "to": 0
+              },
+              "model": {
+                "refId": "C",
+                "datasource": {
+                  "type": "__expr__",
+                  "uid": "__expr__"
+                },
+                "type": "threshold",
+                "expression": "B",
+                "conditions": [
+                  {
+                    "type": "query",
+                    "evaluator": {
+                      "type": "gt",
+                      "params": [
+                        0.5
+                      ]
+                    },
+                    "operator": {
+                      "type": "and"
+                    },
+                    "query": {
+                      "params": [
+                        "C"
+                      ]
+                    },
+                    "reducer": {
+                      "type": "last",
+                      "params": []
+                    }
+                  }
+                ]
+              }
+            }
+          ],
+          "noDataState": "NoData",
+          "execErrState": "Error",
+          "for": "2m",
+          "isPaused": false,
+          "annotations": {
+            "summary": "Application metrics unavailable for 2m",
+            "description": "No application target is being scraped successfully. Check ADOT logs, ECS task status and /actuator/prometheus.",
+            "__dashboardUid__": "otboo-application-monitoring",
+            "__panelId__": "1"
+          },
+          "labels": {
+            "service": "otboo-backend",
+            "environment": "dev",
+            "severity": "warning"
+          }
+        },
+        {
+          "uid": "otboo-http-errors",
+          "title": "HTTP 5xx > 5% for 5m (at least 20 requests/5m)",
+          "condition": "C",
+          "data": [
+            {
+              "refId": "A",
+              "datasourceUid": "otboo-amp",
+              "relativeTimeRange": {
+                "from": 600,
+                "to": 0
+              },
+              "model": {
+                "datasource": {
+                  "type": "grafana-amazonprometheus-datasource",
+                  "uid": "otboo-amp"
+                },
+                "expr": "((sum(rate(http_server_requests_seconds_count{job=\"otboo\",aws_ecs_task_family=\"otboo-backend\",aws_ecs_cluster_arn=\"arn:aws:ecs:ap-northeast-2:121246721746:cluster/otboo-dev-cluster\",uri!~\"/actuator.*\",status=~\"5..\"}[5m])) or (0 * sum(rate(http_server_requests_seconds_count{job=\"otboo\",aws_ecs_task_family=\"otboo-backend\",aws_ecs_cluster_arn=\"arn:aws:ecs:ap-northeast-2:121246721746:cluster/otboo-dev-cluster\",uri!~\"/actuator.*\"}[5m])))) / clamp_min(sum(rate(http_server_requests_seconds_count{job=\"otboo\",aws_ecs_task_family=\"otboo-backend\",aws_ecs_cluster_arn=\"arn:aws:ecs:ap-northeast-2:121246721746:cluster/otboo-dev-cluster\",uri!~\"/actuator.*\"}[5m])), 1e-9)) and (sum(increase(http_server_requests_seconds_count{job=\"otboo\",aws_ecs_task_family=\"otboo-backend\",aws_ecs_cluster_arn=\"arn:aws:ecs:ap-northeast-2:121246721746:cluster/otboo-dev-cluster\",uri!~\"/actuator.*\"}[5m])) >= 20)",
+                "instant": true,
+                "range": false,
+                "editorMode": "code",
+                "refId": "A",
+                "intervalMs": 60000,
+                "maxDataPoints": 600
+              }
+            },
+            {
+              "refId": "B",
+              "datasourceUid": "__expr__",
+              "relativeTimeRange": {
+                "from": 0,
+                "to": 0
+              },
+              "model": {
+                "refId": "B",
+                "datasource": {
+                  "type": "__expr__",
+                  "uid": "__expr__"
+                },
+                "type": "reduce",
+                "expression": "A",
+                "reducer": "last",
+                "settings": {
+                  "mode": "dropNN"
+                },
+                "conditions": []
+              }
+            },
+            {
+              "refId": "C",
+              "datasourceUid": "__expr__",
+              "relativeTimeRange": {
+                "from": 0,
+                "to": 0
+              },
+              "model": {
+                "refId": "C",
+                "datasource": {
+                  "type": "__expr__",
+                  "uid": "__expr__"
+                },
+                "type": "threshold",
+                "expression": "B",
+                "conditions": [
+                  {
+                    "type": "query",
+                    "evaluator": {
+                      "type": "gt",
+                      "params": [
+                        0.05
+                      ]
+                    },
+                    "operator": {
+                      "type": "and"
+                    },
+                    "query": {
+                      "params": [
+                        "C"
+                      ]
+                    },
+                    "reducer": {
+                      "type": "last",
+                      "params": []
+                    }
+                  }
+                ]
+              }
+            }
+          ],
+          "noDataState": "OK",
+          "execErrState": "Error",
+          "for": "5m",
+          "isPaused": false,
+          "annotations": {
+            "summary": "HTTP 5xx > 5% for 5m (at least 20 requests/5m)",
+            "description": "HTTP 5xx ratio exceeds 5% with at least 20 requests in 5 minutes. Inspect application errors and downstream dependencies.",
+            "__dashboardUid__": "otboo-application-monitoring",
+            "__panelId__": "9"
+          },
+          "labels": {
+            "service": "otboo-backend",
+            "environment": "dev",
+            "severity": "warning"
+          }
+        },
+        {
+          "uid": "otboo-http-latency",
+          "title": "HTTP mean latency > 1s for 5m (at least 20 requests/5m)",
+          "condition": "C",
+          "data": [
+            {
+              "refId": "A",
+              "datasourceUid": "otboo-amp",
+              "relativeTimeRange": {
+                "from": 600,
+                "to": 0
+              },
+              "model": {
+                "datasource": {
+                  "type": "grafana-amazonprometheus-datasource",
+                  "uid": "otboo-amp"
+                },
+                "expr": "(sum(rate(http_server_requests_seconds_sum{job=\"otboo\",aws_ecs_task_family=\"otboo-backend\",aws_ecs_cluster_arn=\"arn:aws:ecs:ap-northeast-2:121246721746:cluster/otboo-dev-cluster\",uri!~\"/actuator.*\"}[5m])) / clamp_min(sum(rate(http_server_requests_seconds_count{job=\"otboo\",aws_ecs_task_family=\"otboo-backend\",aws_ecs_cluster_arn=\"arn:aws:ecs:ap-northeast-2:121246721746:cluster/otboo-dev-cluster\",uri!~\"/actuator.*\"}[5m])), 1e-9)) and (sum(increase(http_server_requests_seconds_count{job=\"otboo\",aws_ecs_task_family=\"otboo-backend\",aws_ecs_cluster_arn=\"arn:aws:ecs:ap-northeast-2:121246721746:cluster/otboo-dev-cluster\",uri!~\"/actuator.*\"}[5m])) >= 20)",
+                "instant": true,
+                "range": false,
+                "editorMode": "code",
+                "refId": "A",
+                "intervalMs": 60000,
+                "maxDataPoints": 600
+              }
+            },
+            {
+              "refId": "B",
+              "datasourceUid": "__expr__",
+              "relativeTimeRange": {
+                "from": 0,
+                "to": 0
+              },
+              "model": {
+                "refId": "B",
+                "datasource": {
+                  "type": "__expr__",
+                  "uid": "__expr__"
+                },
+                "type": "reduce",
+                "expression": "A",
+                "reducer": "last",
+                "settings": {
+                  "mode": "dropNN"
+                },
+                "conditions": []
+              }
+            },
+            {
+              "refId": "C",
+              "datasourceUid": "__expr__",
+              "relativeTimeRange": {
+                "from": 0,
+                "to": 0
+              },
+              "model": {
+                "refId": "C",
+                "datasource": {
+                  "type": "__expr__",
+                  "uid": "__expr__"
+                },
+                "type": "threshold",
+                "expression": "B",
+                "conditions": [
+                  {
+                    "type": "query",
+                    "evaluator": {
+                      "type": "gt",
+                      "params": [
+                        1
+                      ]
+                    },
+                    "operator": {
+                      "type": "and"
+                    },
+                    "query": {
+                      "params": [
+                        "C"
+                      ]
+                    },
+                    "reducer": {
+                      "type": "last",
+                      "params": []
+                    }
+                  }
+                ]
+              }
+            }
+          ],
+          "noDataState": "OK",
+          "execErrState": "Error",
+          "for": "5m",
+          "isPaused": false,
+          "annotations": {
+            "summary": "HTTP mean latency > 1s for 5m (at least 20 requests/5m)",
+            "description": "Mean HTTP latency exceeds 1 second with at least 20 requests in 5 minutes. Inspect request latency, database and downstream dependencies.",
+            "__dashboardUid__": "otboo-application-monitoring",
+            "__panelId__": "8"
+          },
+          "labels": {
+            "service": "otboo-backend",
+            "environment": "dev",
+            "severity": "warning"
+          }
+        }
+      ]
+    }
+  ]
+}

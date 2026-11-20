@@ -3,6 +3,8 @@ package codeit.ootd.domain.weather.service;
 import codeit.ootd.domain.weather.dto.response.WeatherDto;
 import codeit.ootd.domain.weather.entity.WeatherLocation;
 import codeit.ootd.domain.weather.repository.WeatherLocationRepository;
+import codeit.ootd.infra.weather.OwmHourlyForecastConverter.ThreeHourForecast;
+import codeit.ootd.infra.weather.dto.OwmForecastResponse;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
@@ -11,16 +13,20 @@ import java.time.ZoneId;
 import java.util.List;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
+import org.springframework.web.client.HttpServerErrorException;
+import org.springframework.web.client.ResourceAccessException;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class WeatherQueryService {
 
     private static final ZoneId KOREA_ZONE = ZoneId.of("Asia/Seoul");
 
-    private static final Duration REFRESH_INTERVAL = Duration.ofHours(2);
     private static final Duration RETRY_INTERVAL = Duration.ofMinutes(10);
+    private static final Duration TRANSIENT_RETRY_INTERVAL = Duration.ofMinutes(1);
     private static final Duration RESERVATION_DURATION = Duration.ofMinutes(5);
     private static final long[] WAIT_INTERVALS_MS = {500, 500, 1000, 1000};
 
@@ -28,6 +34,7 @@ public class WeatherQueryService {
     private final WeatherForecastCollector weatherForecastCollector;
     private final WeatherService weatherService;
     private final WeatherLocationRepository weatherLocationRepository;
+    private final WeatherInitialCollectionPersistenceService initialCollectionPersistenceService;
     private final Clock clock;
 
     public List<WeatherDto> getWeathers(
@@ -63,10 +70,16 @@ public class WeatherQueryService {
                     } catch (RuntimeException e) {
                         Instant failedAt = clock.instant();
 
+                        Duration retryInterval =
+                            e instanceof ResourceAccessException
+                                || e instanceof HttpServerErrorException
+                                ? TRANSIENT_RETRY_INTERVAL
+                                : RETRY_INTERVAL;
+
                         weatherLocationRepository.scheduleInitialCollectionRetry(
                             location.getId(),
                             token,
-                            failedAt.plus(RETRY_INTERVAL)
+                            failedAt.plus(retryInterval)
                         );
 
                         throw e;
@@ -113,22 +126,30 @@ public class WeatherQueryService {
         UUID token
     ) {
 
-        weatherForecastCollector.collectForecasts(location);
+        OwmForecastResponse response =
+            weatherForecastCollector.fetchForecast(location);
 
-        for (int day = 0; day < 5; day++) {
-            weatherService.calculateAndSaveDailyWeather(
-                location,
-                today.plusDays(day)
+        List<ThreeHourForecast> historicalForecasts;
+
+        try {
+            historicalForecasts =
+                weatherForecastCollector.fetchHistoricalForecasts(location);
+        } catch (RuntimeException e) {
+            log.warn(
+                "One Call 과거 날씨 수집 실패, Forecast5 데이터로 진행: cellId={}, errorType={}",
+                location.getCellId(),
+                e.getClass().getSimpleName()
             );
+
+            historicalForecasts = List.of();
         }
 
-        Instant completedAt = clock.instant();
-
-        weatherLocationRepository.completeInitialCollection(
+        initialCollectionPersistenceService.save(
             location.getId(),
             token,
-            completedAt,
-            completedAt.plus(REFRESH_INTERVAL)
+            response,
+            historicalForecasts,
+            today
         );
     }
 }

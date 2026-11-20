@@ -8,13 +8,16 @@ import codeit.ootd.domain.auth.exception.AccountLockedException;
 import codeit.ootd.domain.auth.exception.InvalidAuthSessionException;
 import codeit.ootd.domain.auth.exception.InvalidCredentialsException;
 import codeit.ootd.domain.auth.exception.InvalidRefreshTokenException;
+import codeit.ootd.domain.auth.exception.SocialAccountPasswordResetNotAllowedException;
 import codeit.ootd.domain.auth.jwt.JwtProvider;
 import codeit.ootd.domain.auth.service.impl.AuthServiceImpl;
 import codeit.ootd.domain.user.entity.User;
 import codeit.ootd.domain.user.entity.UserStatus;
+import codeit.ootd.domain.user.exception.UserNotFoundException;
 import codeit.ootd.domain.user.repository.UserRepository;
 
 import codeit.ootd.global.exception.ErrorCode;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -26,11 +29,18 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import org.springframework.mail.MailSendException;
 import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.test.util.ReflectionTestUtils;
 
+import java.time.Clock;
+import java.time.Instant;
+import java.time.ZoneOffset;
 import java.util.Optional;
 import java.util.UUID;
 
+import static org.assertj.core.api.AssertionsForClassTypes.assertThat;
+import static org.assertj.core.api.AssertionsForClassTypes.assertThatThrownBy;
 import static org.junit.jupiter.api.Assertions.assertAll;
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -63,10 +73,34 @@ class AuthServiceImplTest {
     private RefreshTokenService refreshTokenService;
 
     @Mock
+    private TemporaryPasswordGenerator temporaryPasswordGenerator;
+
+    @Mock
     private JwtProvider jwtProvider;
 
-    @InjectMocks
+    @Mock
+    private TemporaryPasswordMailSender temporaryPasswordMailSender;
+
+    private final Clock clock = Clock.fixed(
+            Instant.parse("2026-11-12T00:00:00Z"),
+            ZoneOffset.UTC
+    );
+
     private AuthServiceImpl authService;
+
+    @BeforeEach
+    void setUp() {
+        authService = new AuthServiceImpl(
+                userRepository,
+                passwordEncoder,
+                authSessionService,
+                refreshTokenService,
+                jwtProvider,
+                temporaryPasswordGenerator,
+                clock,
+                temporaryPasswordMailSender
+        );
+    }
 
     @Test
     @DisplayName("이메일과 비밀번호가 일치하면 인증에 성공한다")
@@ -78,7 +112,7 @@ class AuthServiceImplTest {
 
         User user = createUser(email);
 
-        when(userRepository.findByEmail(email))
+        when(userRepository.findByEmailIgnoreCase(email))
                 .thenReturn(Optional.of(user));
 
         when(passwordEncoder.matches(
@@ -95,7 +129,7 @@ class AuthServiceImplTest {
         // then
         assertSame(user, result);
 
-        verify(userRepository).findByEmail(email);
+        verify(userRepository).findByEmailIgnoreCase(email);
         verify(passwordEncoder).matches(
                 rawPassword,
                 encodedPassword
@@ -109,7 +143,7 @@ class AuthServiceImplTest {
         String email = "unknown@example.com";
         String password = "password123!";
 
-        when(userRepository.findByEmail(email))
+        when(userRepository.findByEmailIgnoreCase(email))
                 .thenReturn(Optional.empty());
 
         // when & then
@@ -130,7 +164,7 @@ class AuthServiceImplTest {
 
         User user = createUser(email);
 
-        when(userRepository.findByEmail(email))
+        when(userRepository.findByEmailIgnoreCase(email))
                 .thenReturn(Optional.of(user));
 
         when(passwordEncoder.matches(password, user.getPassword()))
@@ -158,7 +192,7 @@ class AuthServiceImplTest {
         User user = createUser(email);
         user.lock();
 
-        when(userRepository.findByEmail(email))
+        when(userRepository.findByEmailIgnoreCase(email))
                 .thenReturn(Optional.of(user));
 
         when(passwordEncoder.matches(password, user.getPassword()))
@@ -190,7 +224,7 @@ class AuthServiceImplTest {
             user.markDeleted();
         }
 
-        when(userRepository.findByEmail(email))
+        when(userRepository.findByEmailIgnoreCase(email))
                 .thenReturn(Optional.of(user));
 
         when(passwordEncoder.matches(password, user.getPassword()))
@@ -220,7 +254,7 @@ class AuthServiceImplTest {
         when(user.isLocked()).thenReturn(false);
         when(user.getStatus()).thenReturn(UserStatus.ACTIVE);
 
-        when(userRepository.findByEmail(email))
+        when(userRepository.findByEmailIgnoreCase(email))
                 .thenReturn(Optional.of(user));
 
         when(passwordEncoder.matches(password, "encoded-password"))
@@ -267,7 +301,7 @@ class AuthServiceImplTest {
 
         User user = createUser(email);
 
-        when(userRepository.findByEmail(email))
+        when(userRepository.findByEmailIgnoreCase(email))
                 .thenReturn(Optional.of(user));
 
         when(passwordEncoder.matches(password, user.getPassword()))
@@ -577,6 +611,420 @@ class AuthServiceImplTest {
 
         verify(refreshTokenService).findSessionIdByToken(refreshToken);
         verify(authSessionService).revokeSession(sessionId);
+    }
+
+    @Test
+    @DisplayName("임시 비밀번호를 발급하면 암호화하여 3분간 저장한다")
+    void resetPassword_success() {
+        // given
+        String email = "test@example.com";
+        String temporaryPassword = "random-temp-password";
+        String encodedPassword = "encoded-temp-password";
+
+        Instant issuedAt = Instant.parse("2026-11-12T00:00:00Z");
+
+        User user = createUser(email);
+
+        when(userRepository.findByEmailIgnoreCase(email))
+                .thenReturn(Optional.of(user));
+
+        when(temporaryPasswordGenerator.generate())
+                .thenReturn(temporaryPassword);
+
+        when(passwordEncoder.encode(temporaryPassword))
+                .thenReturn(encodedPassword);
+
+        // when
+        authService.resetPassword(email);
+
+        // then
+        assertEquals(
+                encodedPassword,
+                user.getTemporaryPassword()
+        );
+
+        assertEquals(
+                issuedAt.plusSeconds(180),
+                user.getTemporaryPasswordExpiresAt()
+        );
+
+        assertEquals("encoded-password", user.getPassword());
+
+        verify(temporaryPasswordGenerator).generate();
+        verify(passwordEncoder).encode(temporaryPassword);
+    }
+
+    @Test
+    @DisplayName("존재하지 않는 이메일은 임시 비밀번호를 발급하지 않는다")
+    void resetPassword_userNotFound() {
+        // given
+        String email = "unknown@example.com";
+
+        when(userRepository.findByEmailIgnoreCase(email))
+                .thenReturn(Optional.empty());
+
+        // when & then
+        assertThrows(
+                UserNotFoundException.class,
+                () -> authService.resetPassword(email)
+        );
+
+        verifyNoInteractions(temporaryPasswordGenerator);
+        verify(passwordEncoder, never()).encode(anyString());
+    }
+
+    @Test
+    @DisplayName("잠긴 계정은 임시 비밀번호를 발급하지 않는다")
+    void resetPassword_lockedUser() {
+        // given
+        String email = "test@example.com";
+
+        User user = createUser(email);
+        user.lock();
+
+        when(userRepository.findByEmailIgnoreCase(email))
+                .thenReturn(Optional.of(user));
+
+        // when & then
+        assertThrows(
+                AccountLockedException.class,
+                () -> authService.resetPassword(email)
+        );
+
+        verifyNoInteractions(temporaryPasswordGenerator);
+        verify(passwordEncoder, never()).encode(anyString());
+    }
+
+    @ParameterizedTest
+    @EnumSource(
+            value = UserStatus.class,
+            names = {"DEACTIVATED", "DELETED"}
+    )
+    @DisplayName("비활성화되거나 탈퇴한 계정은 임시 비밀번호를 발급할 수 없다")
+    void resetPassword_inactiveUser(UserStatus status) {
+        // given
+        String email = "test@example.com";
+        User user = createUser(email);
+
+        if (status == UserStatus.DEACTIVATED) {
+            user.deactivate();
+        } else {
+            user.markDeleted();
+        }
+
+        when(userRepository.findByEmailIgnoreCase(email))
+                .thenReturn(Optional.of(user));
+
+        // when & then
+        assertThrows(
+                AccountInactiveException.class,
+                () -> authService.resetPassword(email)
+        );
+
+        verifyNoInteractions(temporaryPasswordGenerator);
+        verify(passwordEncoder, never()).encode(anyString());
+    }
+
+    @Test
+    @DisplayName("유효한 임시 비밀번호로 인증에 성공한다")
+    void authenticate_temporaryPassword_success() {
+        // given
+        String email = "test@example.com";
+        String temporaryPassword = "temporary123!";
+        String encodedTemporaryPassword = "encoded-temporary-password";
+
+        Instant now = Instant.parse("2026-11-12T00:00:00Z");
+
+        User user = createUser(email);
+        user.issueTemporaryPassword(
+                encodedTemporaryPassword,
+                now.plusSeconds(180)
+        );
+
+        when(userRepository.findByEmailIgnoreCase(email))
+                .thenReturn(Optional.of(user));
+
+        when(passwordEncoder.matches(
+                temporaryPassword,
+                user.getPassword()
+        )).thenReturn(false);
+
+        when(passwordEncoder.matches(
+                temporaryPassword,
+                encodedTemporaryPassword
+        )).thenReturn(true);
+
+        // when
+        User result = authService.authenticate(email, temporaryPassword);
+
+        // then
+        assertSame(user, result);
+    }
+
+    @Test
+    @DisplayName("만료된 임시 비밀번호로 인증할 수 없다")
+    void authenticate_temporaryPassword_expired() {
+        // given
+        String email = "test@example.com";
+        String temporaryPassword = "temporary123!";
+        String encodedTemporaryPassword = "encoded-temporary-password";
+
+        Instant now = Instant.parse("2026-11-12T00:00:00Z");
+
+        User user = createUser(email);
+        user.issueTemporaryPassword(encodedTemporaryPassword, now);
+
+        when(userRepository.findByEmailIgnoreCase(email))
+                .thenReturn(Optional.of(user));
+
+        when(passwordEncoder.matches(
+                temporaryPassword,
+                user.getPassword()
+        )).thenReturn(false);
+
+        // when & then
+        assertThrows(
+                InvalidCredentialsException.class,
+                () -> authService.authenticate(email, temporaryPassword)
+        );
+
+        // 만료된 임시 비밀번호는 비교하지 않는다.
+        verify(passwordEncoder, never()).matches(
+                temporaryPassword,
+                encodedTemporaryPassword
+        );
+    }
+
+    @Test
+    @DisplayName("유효기간 내에도 임시 비밀번호가 일치하지 않으면 인증에 실패한다")
+    void authenticate_temporaryPassword_wrongPassword() {
+        // given
+        String email = "test@example.com";
+        String wrongPassword = "wrong-temporary-password";
+        String encodedTemporaryPassword = "encoded-temporary-password";
+
+        Instant now = Instant.parse("2026-11-12T00:00:00Z");
+
+        User user = createUser(email);
+        user.issueTemporaryPassword(
+                encodedTemporaryPassword,
+                now.plusSeconds(180)
+        );
+
+        when(userRepository.findByEmailIgnoreCase(email))
+                .thenReturn(Optional.of(user));
+
+        when(passwordEncoder.matches(
+                wrongPassword,
+                user.getPassword()
+        )).thenReturn(false);
+
+        when(passwordEncoder.matches(
+                wrongPassword,
+                encodedTemporaryPassword
+        )).thenReturn(false);
+
+        // when & then
+        assertThrows(
+                InvalidCredentialsException.class,
+                () -> authService.authenticate(email, wrongPassword)
+        );
+    }
+
+    @Test
+    @DisplayName("임시 비밀번호 이메일 발송에 실패하면 예외를 전파한다")
+    void resetPassword_mailSendFailed() {
+        // given
+        String email = "test@example.com";
+        String temporaryPassword = "temporary123!";
+
+        User user = createUser(email);
+
+        when(userRepository.findByEmailIgnoreCase(email))
+                .thenReturn(Optional.of(user));
+
+        when(temporaryPasswordGenerator.generate())
+                .thenReturn(temporaryPassword);
+
+        when(passwordEncoder.encode(temporaryPassword))
+                .thenReturn("encoded-temporary-password");
+
+        doThrow(new MailSendException("메일 발송 실패"))
+                .when(temporaryPasswordMailSender)
+                .send(email, temporaryPassword);
+
+        // when & then
+        assertThrows(
+                MailSendException.class,
+                () -> authService.resetPassword(email)
+        );
+    }
+
+    @Test
+    @DisplayName("대문자 이메일로 로그인해도 소문자로 정규화하여 조회한다")
+    void authenticate_uppercaseEmail_normalizesEmail() {
+        // given
+        String email = "TEST@Example.com";
+        String normalizedEmail = "test@example.com";
+        String password = "password123!";
+
+        User user = createUser(normalizedEmail);
+
+        when(userRepository.findByEmailIgnoreCase(normalizedEmail))
+                .thenReturn(Optional.of(user));
+
+        when(passwordEncoder.matches(password, user.getPassword()))
+                .thenReturn(true);
+
+        // when
+        User result = authService.authenticate(email, password);
+
+        // then
+        assertSame(user, result);
+        verify(userRepository).findByEmailIgnoreCase(normalizedEmail);
+    }
+
+    @Test
+    @DisplayName("대문자 이메일로 비밀번호 초기화 시 소문자로 조회하고 등록된 이메일로 발송한다")
+    void resetPassword_uppercaseEmail_normalizesEmail() {
+        // given
+        String email = "TEST@Example.com";
+        String normalizedEmail = "test@example.com";
+        String temporaryPassword = "temporary123!";
+
+        User user = createUser(normalizedEmail);
+
+        when(userRepository.findByEmailIgnoreCase(normalizedEmail))
+                .thenReturn(Optional.of(user));
+
+        when(temporaryPasswordGenerator.generate())
+                .thenReturn(temporaryPassword);
+
+        when(passwordEncoder.encode(temporaryPassword))
+                .thenReturn("encoded-temporary-password");
+
+        // when
+        authService.resetPassword(email);
+
+        // then
+        verify(userRepository).findByEmailIgnoreCase(normalizedEmail);
+        verify(temporaryPasswordMailSender)
+                .send(normalizedEmail, temporaryPassword);
+    }
+
+    @Test
+    @DisplayName("소셜 인증된 활성 사용자에게 Access Token과 Refresh Token을 발급한다")
+    void issue_tokens_for_authenticated_user_success() {
+        // given
+        UUID userId = UUID.randomUUID();
+        UUID sessionId = UUID.randomUUID();
+
+        User user = User.create(
+                "테스터",
+                "social@example.com",
+                "encoded-password"
+        );
+        ReflectionTestUtils.setField(user, "id", userId);
+
+        AuthSession session = mock(AuthSession.class);
+        when(session.getId()).thenReturn(sessionId);
+
+        when(authSessionService.createSession(userId))
+                .thenReturn(session);
+
+        when(jwtProvider.generateAccessToken(userId, sessionId))
+                .thenReturn("access-token");
+
+        when(refreshTokenService.issue(sessionId))
+                .thenReturn("refresh-token");
+
+        // when
+        SignInResult result =
+                authService.issueTokensForAuthenticatedUser(user);
+
+        // then
+        assertThat(result.accessToken()).isEqualTo("access-token");
+        assertThat(result.refreshToken()).isEqualTo("refresh-token");
+
+        verify(authSessionService).createSession(userId);
+        verify(jwtProvider).generateAccessToken(userId, sessionId);
+        verify(refreshTokenService).issue(sessionId);
+    }
+
+    @Test
+    @DisplayName("잠긴 계정은 소셜 로그인 토큰을 발급할 수 없다")
+    void issue_tokens_for_authenticated_user_fails_when_locked() {
+        // given
+        User user = User.create(
+                "테스터",
+                "social@example.com",
+                "encoded-password"
+        );
+        user.lock();
+
+        // when & then
+        assertThatThrownBy(() ->
+                authService.issueTokensForAuthenticatedUser(user)
+        ).isInstanceOf(AccountLockedException.class);
+
+        verifyNoInteractions(
+                authSessionService,
+                jwtProvider,
+                refreshTokenService
+        );
+    }
+
+    @Test
+    @DisplayName("비활성 계정은 소셜 로그인 토큰을 발급할 수 없다")
+    void issue_tokens_for_authenticated_user_fails_when_inactive() {
+        // given
+        User user = User.create(
+                "테스터",
+                "social@example.com",
+                "encoded-password"
+        );
+        user.deactivate();
+
+        // when & then
+        assertThatThrownBy(() ->
+                authService.issueTokensForAuthenticatedUser(user)
+        ).isInstanceOf(AccountInactiveException.class);
+
+        verifyNoInteractions(
+                authSessionService,
+                jwtProvider,
+                refreshTokenService
+        );
+    }
+
+    @Test
+    @DisplayName("소셜 전용 회원은 임시 비밀번호를 발급할 수 없다")
+    void resetPassword_socialUser_rejectsRequest() {
+        // given
+        String email = "social@example.com";
+
+        User user = User.createSocial(
+                "소셜 사용자",
+                email,
+                "encoded-password"
+        );
+
+        when(userRepository.findByEmailIgnoreCase(email))
+                .thenReturn(Optional.of(user));
+
+        // when & then
+        assertThatThrownBy(() -> authService.resetPassword(email))
+                .isInstanceOf(
+                        SocialAccountPasswordResetNotAllowedException.class
+                );
+
+        verifyNoInteractions(
+                temporaryPasswordGenerator,
+                temporaryPasswordMailSender
+        );
+
+        assertThat(user.getTemporaryPassword()).isNull();
+        assertThat(user.getTemporaryPasswordExpiresAt()).isNull();
     }
 
 

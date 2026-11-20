@@ -1,6 +1,7 @@
 ignore:
   - "**/entity/**"
   - "**/dto/**"
+  - "**/docs/**"
 
 coverage:
   status:

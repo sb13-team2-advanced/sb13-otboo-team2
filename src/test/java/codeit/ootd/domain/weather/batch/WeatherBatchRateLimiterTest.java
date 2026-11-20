@@ -7,7 +7,6 @@ import java.time.Duration;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
-@DisplayName("날씨 Batch 호출 속도 제한 테스트")
 class WeatherBatchRateLimiterTest {
 
     @Test

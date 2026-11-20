@@ -11,6 +11,9 @@ import codeit.ootd.domain.clothes.exception.ClothesAttributeValuesDuplicatedExce
 import codeit.ootd.domain.clothes.repository.ClothesAttributeDefinitionRepository;
 import codeit.ootd.domain.clothes.repository.ClothesAttributeRepository;
 import codeit.ootd.domain.clothes.service.ClothesAttributeDefinitionService;
+import codeit.ootd.domain.notification.enums.NotificationLevel;
+import codeit.ootd.domain.notification.event.NotificationRequestedEvent;
+import codeit.ootd.domain.user.repository.UserRepository;
 import codeit.ootd.global.enums.SortDirection;
 import java.util.ArrayList;
 import java.util.HashSet;
@@ -18,6 +21,7 @@ import java.util.List;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
@@ -30,6 +34,8 @@ public class ClothesAttributeDefinitionServiceImpl implements ClothesAttributeDe
 
     private final ClothesAttributeDefinitionRepository definitionRepository;
     private final ClothesAttributeRepository attributeRepository;
+    private final UserRepository userRepository;
+    private final ApplicationEventPublisher eventPublisher;
 
     @Override
     @Transactional
@@ -43,7 +49,22 @@ public class ClothesAttributeDefinitionServiceImpl implements ClothesAttributeDe
 
         ClothesAttributeDefinition saved = saveAndFlushUnique(new ClothesAttributeDefinition(name, values));
         log.info("의상 속성 정의 등록 완료: definitionId={}", saved.getId());
+        publishCreatedNotifications(saved.getName());
         return ClothesAttributeDefDto.from(saved);
+    }
+
+    /**
+     * 활성 사용자 모두에게 속성 추가 알림을 요청한다. 알림은 등록 트랜잭션이 커밋된 뒤에만 저장된다.
+     */
+    private void publishCreatedNotifications(String definitionName) {
+        for (UUID userId : userRepository.findActiveUserIds()) {
+            eventPublisher.publishEvent(new NotificationRequestedEvent(
+                    userId,
+                    "새로운 의상 속성이 추가되었습니다.",
+                    "'" + definitionName + "' 속성이 추가되었습니다.",
+                    NotificationLevel.INFO
+            ));
+        }
     }
 
     @Override

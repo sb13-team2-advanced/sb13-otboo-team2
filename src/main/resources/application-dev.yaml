@@ -41,11 +41,32 @@ logging:
     org.hibernate.orm.jdbc.batch: trace
     org.hibernate.orm.jdbc.bind: "off"
 
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health, info, metrics, prometheus
+  metrics:
+    tags:
+      application: ${spring.application.name}
+
 ootd:
   openapi:
     server-url: http://localhost:${server.port:8080}
     server-description: 로컬 개발 서버
+  embedding:
+    base-url: http://127.0.0.1:8001
+  recommendation:
+    knowledge:
+      include-drafts: true
 
 auth:
   cookie:
     secure: false
+
+springdoc:
+  swagger-ui:
+    csrf:
+      enabled: true
+      cookie-name: XSRF-TOKEN
+      header-name: X-XSRF-TOKEN

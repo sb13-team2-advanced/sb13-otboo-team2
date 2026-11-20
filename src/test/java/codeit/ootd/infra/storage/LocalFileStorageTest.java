@@ -14,6 +14,8 @@ import java.nio.file.Path;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.web.multipart.MultipartFile;
 
@@ -63,6 +65,53 @@ class LocalFileStorageTest {
 
         // then
         assertThat(firstUrl).isNotEqualTo(secondUrl);
+    }
+
+    @ParameterizedTest
+    @CsvSource({
+        "shirt.jpg, image/jpeg, .jpg",
+        "shirt.jpeg, image/jpeg, .jpeg",
+        "shirt.png, image/png, .png",
+        "shirt.gif, image/gif, .gif",
+        "shirt.webp, image/webp, .webp",
+        "shirt.PNG, IMAGE/PNG, .png"
+    })
+    void 확장자와_MIME_타입이_일치하면_이미지를_저장한다(
+        String filename, String contentType, String expectedExtension
+    ) throws IOException {
+        // given
+        MockMultipartFile file = image(filename, contentType, "image-bytes");
+
+        // when
+        String url = storage.upload(file, "profiles");
+
+        // then
+        assertThat(url).startsWith("/files/profiles/").endsWith(expectedExtension);
+        Path saved = root.resolve(url.substring("/files/".length()));
+        assertThat(Files.readString(saved, StandardCharsets.UTF_8)).isEqualTo("image-bytes");
+    }
+
+    @ParameterizedTest
+    @CsvSource({
+        "shirt.png, image/svg+xml",
+        "shirt.png, image/jpeg",
+        "shirt.jpg, image/png",
+        "shirt.jpeg, image/jpg",
+        "shirt.gif, image/webp",
+        "shirt.webp, image/gif",
+        "shirt.svg, image/svg+xml"
+    })
+    void 확장자와_MIME_타입이_일치하지_않으면_파일을_저장하지_않는다(
+        String filename, String contentType
+    ) {
+        // given
+        MockMultipartFile file = image(filename, contentType, "image-bytes");
+
+        // when/then
+        assertThatThrownBy(() -> storage.upload(file, "clothes"))
+            .isInstanceOfSatisfying(OtbooException.class,
+                e -> assertThat(e.getErrorCode()).isSameAs(ErrorCode.FILE_INVALID_TYPE));
+        assertThat(root).doesNotExist();
     }
 
     @Test

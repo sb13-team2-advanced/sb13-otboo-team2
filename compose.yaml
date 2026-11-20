@@ -1,6 +1,6 @@
 services:
   postgres:
-    image: postgres:16
+    image: pgvector/pgvector:0.8.7-pg16-bookworm
     ports:
       - "127.0.0.1:${OOTD_DB_PORT:-5432}:5432"
     environment:

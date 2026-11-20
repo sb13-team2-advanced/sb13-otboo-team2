@@ -1,143 +1,52 @@
 package codeit.ootd.domain.recommendation.service.impl;
 
-import codeit.ootd.domain.clothes.dto.response.ClothesAttributeWithDefDto;
-import codeit.ootd.domain.clothes.entity.Clothes;
-import codeit.ootd.domain.clothes.entity.ClothesAttribute;
-import codeit.ootd.domain.clothes.entity.ClothesAttributeDefinition;
-import codeit.ootd.domain.clothes.repository.ClothesAttributeDefinitionRepository;
-import codeit.ootd.domain.clothes.repository.ClothesAttributeRepository;
-import codeit.ootd.domain.clothes.repository.ClothesRepository;
-import codeit.ootd.domain.profile.entity.Profile;
-import codeit.ootd.domain.profile.repository.ProfileRepository;
-import codeit.ootd.domain.recommendation.algorithm.OutfitRecommender;
-import codeit.ootd.domain.recommendation.dto.response.RecommendationClothesResponse;
+import codeit.ootd.domain.recommendation.dto.RecommendationContext;
+import codeit.ootd.domain.recommendation.dto.OutfitColorMatchResult;
+import codeit.ootd.domain.recommendation.dto.RecommendationExplanation;
 import codeit.ootd.domain.recommendation.dto.response.RecommendationResponse;
+import codeit.ootd.domain.recommendation.service.OutfitRecommendationService;
+import codeit.ootd.domain.recommendation.service.RecommendationContextLoader;
 import codeit.ootd.domain.recommendation.service.RecommendationService;
-import codeit.ootd.domain.weather.entity.Weather;
-import codeit.ootd.domain.weather.repository.WeatherRepository;
-import codeit.ootd.global.exception.ErrorCode;
-import codeit.ootd.global.exception.OtbooException;
-
+import codeit.ootd.domain.recommendation.service.RecommendationExplanationService;
 import java.util.List;
-import java.util.Map;
 import java.util.UUID;
-import java.util.function.Function;
-import java.util.stream.Collectors;
-
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
 
 @Service
+@Slf4j
 @RequiredArgsConstructor
-@Transactional
 public class RecommendationServiceImpl implements RecommendationService {
 
-    private static final int DEFAULT_TEMPERATURE_SENSITIVITY = 3;
-    private static final double TEMPERATURE_ADJUSTMENT_PER_LEVEL = 2.0;
-
-    private final WeatherRepository weatherRepository;
-    private final ClothesRepository clothesRepository;
-    private final ClothesAttributeRepository attributeRepository;
-    private final ClothesAttributeDefinitionRepository definitionRepository;
-    private final ProfileRepository profileRepository;
-    private final OutfitRecommender recommender;
+    private final RecommendationContextLoader contextLoader;
+    private final OutfitRecommendationService recommender;
+    private final RecommendationExplanationService explanationService;
 
     /**
-     * 사용자 소유 의상과 속성을 일괄 조회하고 프로필의 온도 민감도로 보정한 평균 기온으로 추천한다.
+     * 본인 의상과 날씨를 트랜잭션 안에서 조회한 뒤 배색 검색과 의상 선택을 수행한다.
+     * 남은 예보나 본인 의상이 없으면 외부 검색 없이 빈 추천을 반환한다.
+     * 추천 조건이 없으면 옷장 비어 있음과 남은 예보 없음을 구분해 기록한다.
+     * 최종 의상과 근거를 설명 서비스에 전달하며 외부 호출은 DB 조회 트랜잭션 이후에 수행한다.
      */
-    @Transactional(readOnly = true)
     @Override
     public RecommendationResponse recommend(UUID userId, UUID weatherId) {
 
-        Weather weather = weatherRepository.findById(weatherId)
-                .orElseThrow(() -> new OtbooException(ErrorCode.RECOMMENDATION_WEATHER_NOT_FOUND));
+        RecommendationContext context = contextLoader.load(userId, weatherId);
 
-        List<Clothes> clothes = clothesRepository.findAllByUserId(userId);
+        if (context.conditions().isEmpty()) {
+            log.debug("의상 추천 생략. applied=false reason={}",
+                context.candidates().isEmpty() ? "EMPTY_WARDROBE" : "NO_REMAINING_FORECAST");
 
-        if (clothes.isEmpty()) {
-            return new RecommendationResponse(weatherId, userId, List.of());
+            return RecommendationResponse.of(weatherId, userId, List.of(),
+                RecommendationExplanation.of("추천할 수 있는 의상이 없습니다.", List.of()));
         }
 
-        List<RecommendationClothesResponse> candidates = createCandidates(clothes);
+        OutfitColorMatchResult result = recommender.recommendWithEvidence(
+            context.conditions().get(), context.candidates());
 
-        double temperature = recommendationTemperature(userId, weather.getTemperatureAvg());
+        RecommendationExplanation explanation = explanationService.explain(context.conditions().get(), result);
 
-        return new RecommendationResponse(weatherId, userId,
-                recommender.recommend(temperature, candidates));
-    }
-
-    /**
-     * 민감도 1은 추위, 5는 더위에 민감하므로 3을 기준으로 단계마다 2도를 더한다.
-     * 프로필이나 민감도가 없으면 기본값 3을 적용해 실제 평균 기온을 유지한다.
-     */
-    private double recommendationTemperature(UUID userId, double temperature) {
-
-        int sensitivity = profileRepository.findByUserId(userId)
-                .map(Profile::getTemperatureSensitivity)
-                .orElse(DEFAULT_TEMPERATURE_SENSITIVITY);
-
-        return temperature + (sensitivity - DEFAULT_TEMPERATURE_SENSITIVITY)
-                * TEMPERATURE_ADJUSTMENT_PER_LEVEL;
-    }
-
-    /**
-     * 의상 속성과 정의를 일괄 조회한 뒤 의상별 추천 입력으로 변환한다.
-     */
-    private List<RecommendationClothesResponse> createCandidates(List<Clothes> clothes) {
-        List<ClothesAttribute> attributes = attributeRepository.findAllByClothesIdIn(
-                clothes.stream().map(Clothes::getId).toList());
-        Map<UUID, ClothesAttributeDefinition> definitions = findDefinitions(attributes);
-        Map<UUID, List<ClothesAttribute>> attributesByClothesId = attributes.stream()
-                .collect(Collectors.groupingBy(ClothesAttribute::getClothesId));
-
-        return clothes.stream()
-                .map(item -> toRecommendationClothes(item,
-                        attributesByClothesId.getOrDefault(item.getId(), List.of()), definitions))
-                .toList();
-    }
-
-    /**
-     * 중복을 제거한 속성 정의 ID로 조회해 정의를 ID별로 묶는다.
-     */
-    private Map<UUID, ClothesAttributeDefinition> findDefinitions(List<ClothesAttribute> attributes) {
-
-        List<UUID> definitionIds = attributes.stream()
-                .map(ClothesAttribute::getDefinitionId)
-                .distinct()
-                .toList();
-
-        return definitionRepository.findAllById(definitionIds).stream()
-                .collect(Collectors.toMap(ClothesAttributeDefinition::getId, Function.identity()));
-    }
-
-    /**
-     * 의상 정보와 해당 의상의 속성 응답을 결합한다.
-     */
-    private RecommendationClothesResponse toRecommendationClothes(Clothes clothes,
-                                                                  List<ClothesAttribute> attributes, Map<UUID, ClothesAttributeDefinition> definitions) {
-
-        List<ClothesAttributeWithDefDto> requests = attributes.stream()
-                .map(attribute -> toAttribute(attribute, definitions))
-                .toList();
-
-        return new RecommendationClothesResponse(clothes.getId(), clothes.getName(),
-                clothes.getImageUrl(), clothes.getType(), requests);
-    }
-
-    /**
-     * 속성 정의가 없으면 예외를 발생시키고, 있으면 정의 정보와 속성값을 결합한다.
-     */
-    private ClothesAttributeWithDefDto toAttribute(ClothesAttribute attribute,
-                                                   Map<UUID, ClothesAttributeDefinition> definitions) {
-
-        ClothesAttributeDefinition definition = definitions.get(attribute.getDefinitionId());
-
-        if (definition == null) {
-            throw new OtbooException(ErrorCode.CLOTHES_ATTRIBUTE_DEFINITION_NOT_FOUND);
-        }
-
-        return new ClothesAttributeWithDefDto(definition.getId(), definition.getName(),
-                List.copyOf(definition.getSelectableValues()), attribute.getValue());
+        return RecommendationResponse.of(weatherId, userId, result.clothes(), explanation);
     }
 }

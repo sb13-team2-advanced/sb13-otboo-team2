@@ -21,6 +21,10 @@ repositories {
 
 dependencies {
 
+    // Kafka (Confluent Cloud)
+    implementation 'org.springframework.boot:spring-boot-starter-kafka'
+    testImplementation 'org.springframework.kafka:spring-kafka-test'
+
     // Web
     implementation 'org.springframework.boot:spring-boot-starter-webmvc'
 
@@ -54,6 +58,9 @@ dependencies {
     // Security
     implementation 'org.springframework.boot:spring-boot-starter-security'
 
+    // OAuth2 Client
+    implementation 'org.springframework.boot:spring-boot-starter-security-oauth2-client'
+
     // Validation
     implementation 'org.springframework.boot:spring-boot-starter-validation'
 
@@ -78,12 +85,16 @@ dependencies {
     implementation 'com.github.ben-manes.caffeine:caffeine'
     implementation 'org.springframework.boot:spring-boot-starter-data-redis'
 
+    // S3
+    implementation platform('software.amazon.awssdk:bom:2.46.7')
+    implementation 'software.amazon.awssdk:s3'
 
     // Mail
     implementation 'org.springframework.boot:spring-boot-starter-mail'
 
     // WebSocket
     implementation 'org.springframework.boot:spring-boot-starter-websocket'
+    implementation 'org.springframework.security:spring-security-messaging'
 
     // H3
     implementation 'com.uber:h3:4.5.1'
@@ -93,6 +104,8 @@ dependencies {
     runtimeOnly 'io.jsonwebtoken:jjwt-impl:0.13.0'
     runtimeOnly 'io.jsonwebtoken:jjwt-jackson:0.13.0'
 
+    // Prometheus
+    runtimeOnly 'io.micrometer:micrometer-registry-prometheus'
 
     // Test
     testImplementation 'org.springframework.boot:spring-boot-starter-actuator-test'
@@ -152,7 +165,7 @@ tasks.named('check') {
 tasks.named('jacocoTestReport', JacocoReport) {
     dependsOn tasks.named('test')
     classDirectories.setFrom(sourceSets.main.output.asFileTree.matching {
-        exclude '**/entity/**', '**/dto/**'
+        exclude '**/entity/**', '**/dto/**', '**/docs/**'
     })
     reports {
         html.required = true

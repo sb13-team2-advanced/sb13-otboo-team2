@@ -1,11 +1,13 @@
 package codeit.ootd.domain.weather.repository;
 
 import codeit.ootd.domain.weather.entity.WeatherLocation;
+import jakarta.persistence.LockModeType;
 import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -74,7 +76,12 @@ public interface WeatherLocationRepository
         @Param("retryAt") Instant retryAt
     );
 
-    List<WeatherLocation> findTop20ByLastCollectedAtIsNotNullAndNextRefreshAtLessThanEqualOrderByNextRefreshAtAsc(
+    List<WeatherLocation> findTop20ByResolutionAndLastCollectedAtIsNotNullAndNextRefreshAtLessThanEqualOrderByNextRefreshAtAsc(
+        short resolution,
         Instant now
     );
+
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("SELECT w FROM WeatherLocation w WHERE w.id = :locationId")
+    Optional<WeatherLocation> findByIdForUpdate(@Param("locationId") UUID locationId);
 }

@@ -44,6 +44,16 @@ public class User extends BaseTimeEntity {
     @Column(name = "deleted_at")
     private Instant deletedAt;
 
+    @Column(name = "temporary_password", length = 255)
+    private String temporaryPassword;
+
+    @Column(name = "temporary_password_expires_at")
+    private Instant temporaryPasswordExpiresAt;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "signup_type", nullable = false, length = 20)
+    private SignupType signupType;
+
     public static User create(
             String name,
             String email,
@@ -58,7 +68,18 @@ public class User extends BaseTimeEntity {
         user.role = UserRole.USER;
         user.locked = false;
         user.status = UserStatus.ACTIVE;
+        user.signupType = SignupType.LOCAL;
 
+        return user;
+    }
+
+    public static User createSocial(
+            String name,
+            String email,
+            String encodedPassword
+    ) {
+        User user = create(name, email, encodedPassword);
+        user.signupType = SignupType.SOCIAL;
         return user;
     }
 
@@ -92,6 +113,35 @@ public class User extends BaseTimeEntity {
                 "encodedPassword는 필수입니다."
         );
     }
+
+    public void issueTemporaryPassword(
+            String encodedPassword,
+            Instant expiresAt
+    ) {
+        this.temporaryPassword = Objects.requireNonNull(
+                encodedPassword,
+                "encodedPassword는 필수입니다."
+        );
+        this.temporaryPasswordExpiresAt = Objects.requireNonNull(
+                expiresAt,
+                "expiresAt은 필수입니다."
+        );
+    }
+
+    public void clearTemporaryPassword() {
+        this.temporaryPassword = null;
+        this.temporaryPasswordExpiresAt = null;
+    }
+
+    public boolean hasValidTemporaryPassword(Instant now) {
+        Objects.requireNonNull(now, "now는 필수입니다.");
+
+        return temporaryPassword != null
+                && temporaryPasswordExpiresAt != null
+                && now.isBefore(temporaryPasswordExpiresAt);
+    }
+
+
 
 }
 

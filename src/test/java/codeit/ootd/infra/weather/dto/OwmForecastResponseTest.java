@@ -6,7 +6,6 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import tools.jackson.databind.json.JsonMapper;
 
-@DisplayName("OWM 예보 응답 변환 테스트")
 class OwmForecastResponseTest {
 
     private final JsonMapper jsonMapper = JsonMapper.builder().build();

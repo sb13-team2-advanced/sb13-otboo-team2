@@ -24,6 +24,7 @@ import org.springframework.http.MediaType;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.security.web.context.RequestAttributeSecurityContextRepository;
 import org.springframework.web.filter.OncePerRequestFilter;
 import tools.jackson.databind.json.JsonMapper;
 
@@ -38,6 +39,9 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
     private final AuthSessionService authSessionService;
     private final UserRepository userRepository;
     private final JsonMapper jsonMapper;
+
+    private final RequestAttributeSecurityContextRepository securityContextRepository =
+            new RequestAttributeSecurityContextRepository();
 
     @Override
     protected boolean shouldNotFilter(HttpServletRequest request) {
@@ -115,8 +119,11 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                     authorities
             );
 
-            SecurityContextHolder.getContext()
-                    .setAuthentication(authentication);
+            var context = SecurityContextHolder.createEmptyContext();
+            context.setAuthentication(authentication);
+            SecurityContextHolder.setContext(context);
+            // SSE 완료 등 같은 요청의 비동기 재처리에서도 인증을 복원한다. HTTP 세션에는 저장하지 않는다.
+            securityContextRepository.saveContext(context, request, response);
 
         } catch (AccountLockedException e) {
         SecurityContextHolder.clearContext();

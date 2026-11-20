@@ -1,11 +1,13 @@
 package codeit.ootd.domain.auth.service.impl;
 
 import codeit.ootd.domain.auth.entity.AuthSession;
+import codeit.ootd.domain.auth.event.AuthSessionRevokedEvent;
 import codeit.ootd.domain.auth.exception.InvalidAuthSessionException;
 import codeit.ootd.domain.auth.repository.AuthSessionRepository;
 import codeit.ootd.domain.auth.service.AuthSessionService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -24,6 +26,7 @@ public class AuthSessionServiceImpl implements AuthSessionService {
 
     private final AuthSessionRepository authSessionRepository;
     private final Clock clock;
+    private final ApplicationEventPublisher eventPublisher;
 
 
     @Override
@@ -41,6 +44,7 @@ public class AuthSessionServiceImpl implements AuthSessionService {
         // 2. 기존 활성 세션 무효화
         for (AuthSession activeSession : activeSessions) {
             activeSession.revoke(now);
+            eventPublisher.publishEvent(new AuthSessionRevokedEvent(activeSession.getId()));
         }
 
         // 3. 새로운 세션 생성
@@ -83,6 +87,7 @@ public class AuthSessionServiceImpl implements AuthSessionService {
                 .orElseThrow(InvalidAuthSessionException::new);
 
         session.revoke(now);
+        eventPublisher.publishEvent(new AuthSessionRevokedEvent(sessionId));
 
         log.debug("인증 세션 폐기 완료: sessionId={}", sessionId);
     }
@@ -100,6 +105,7 @@ public class AuthSessionServiceImpl implements AuthSessionService {
 
         for (AuthSession session : activeSessions) {
             session.revoke(now);
+            eventPublisher.publishEvent(new AuthSessionRevokedEvent(session.getId()));
         }
 
         log.debug("사용자 전체 인증 세션 폐기 완료: userId={}, count={}",
