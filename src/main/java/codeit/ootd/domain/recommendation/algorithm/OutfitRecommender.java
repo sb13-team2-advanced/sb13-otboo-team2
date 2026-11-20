@@ -91,32 +91,63 @@ public class OutfitRecommender {
     private Optional<RecommendationClothesResponse> select(List<RecommendationClothesResponse> clothes,
             ClothesType type, int target, RecommendationConditions conditions) {
 
+        List<RecommendationClothesResponse> candidates = bestCandidates(clothes, type, target, conditions);
+        return candidates.isEmpty() ? Optional.empty()
+            : Optional.of(candidates.get(ThreadLocalRandom.current().nextInt(candidates.size())));
+    }
+
+    /**
+     * 기존 날씨 점수가 최소인 같은 종류의 후보를 모두 반환하여 배색 때문에 날씨 적합도가 낮아지지 않게 한다.
+     * 20도 이상인 날의 아우터는 기존 추천과 동일하게 얇은 두께를 목표로 한다.
+     */
+    public List<RecommendationClothesResponse> weatherCandidates(RecommendationConditions conditions,
+        List<RecommendationClothesResponse> clothes, ClothesType type) {
+
+        double temperature = conditions.temperature();
+        int target = temperature < COLD_TEMPERATURE ? THICK
+            : temperature >= WARM_TEMPERATURE ? THIN : NORMAL;
+
+        if (type == ClothesType.OUTER && temperature >= OUTER_TEMPERATURE) {
+            target = THIN;
+        }
+
+        return bestCandidates(clothes, type, target, conditions);
+    }
+
+    /**
+     * 같은 종류의 의상을 날씨 부적합 점수로 비교하고 동점인 후보를 입력 순서대로 유지한다.
+     */
+    private List<RecommendationClothesResponse> bestCandidates(List<RecommendationClothesResponse> clothes,
+        ClothesType type, int target, RecommendationConditions conditions) {
+
         List<RecommendationClothesResponse> category = clothes.stream()
                 .filter(item -> item.type() == type).toList();
         if (category.isEmpty()) {
-            return Optional.empty();
+            return List.of();
         }
 
         int minimum = category.stream().mapToInt(item -> score(item, target, conditions))
                 .min().orElseThrow();
 
-        List<RecommendationClothesResponse> candidates = category.stream()
+        return category.stream()
                 .filter(item -> score(item, target, conditions) == minimum).toList();
-
-        return Optional.of(candidates.get(ThreadLocalRandom.current().nextInt(candidates.size())));
     }
 
     /**
      * 두께 차이 한 단계가 방수·방풍 감점의 합보다 크게 하여 기능 때문에 과도한 두께를 고르지 않는다.
      */
     private int score(RecommendationClothesResponse item, int target, RecommendationConditions conditions) {
+
         int score = Math.abs(thickness(item) - target) * THICKNESS_WEIGHT;
+
         if (conditions.precipitationExpected()) {
             score += protectionPenalty(item, WATERPROOF_ATTRIBUTE);
         }
+
         if (conditions.windy()) {
             score += protectionPenalty(item, WINDPROOF_ATTRIBUTE);
         }
+
         return score;
     }
 

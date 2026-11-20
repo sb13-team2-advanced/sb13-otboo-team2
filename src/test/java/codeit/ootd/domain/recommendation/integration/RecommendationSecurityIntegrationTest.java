@@ -1,6 +1,12 @@
 package codeit.ootd.domain.recommendation.integration;
 
 import static org.hamcrest.Matchers.containsInAnyOrder;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.isNull;
+import static org.mockito.BDDMockito.given;
+import static org.mockito.Mockito.verify;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -17,6 +23,10 @@ import codeit.ootd.domain.clothes.repository.ClothesAttributeRepository;
 import codeit.ootd.domain.clothes.repository.ClothesRepository;
 import codeit.ootd.domain.profile.entity.Profile;
 import codeit.ootd.domain.profile.repository.ProfileRepository;
+import codeit.ootd.domain.recommendation.dto.response.OutfitColorVariant;
+import codeit.ootd.domain.recommendation.dto.response.StyleKnowledgeMatch;
+import codeit.ootd.domain.recommendation.enums.CombinationType;
+import codeit.ootd.domain.recommendation.service.StyleKnowledgeSearchService;
 import codeit.ootd.domain.user.entity.User;
 import codeit.ootd.domain.user.repository.UserRepository;
 import codeit.ootd.domain.weather.entity.Weather;
@@ -24,6 +34,8 @@ import codeit.ootd.domain.weather.entity.WeatherLocation;
 import codeit.ootd.domain.weather.repository.WeatherLocationRepository;
 import codeit.ootd.domain.weather.repository.WeatherRepository;
 import codeit.ootd.global.exception.ErrorCode;
+import codeit.ootd.infra.groq.GroqClient;
+import codeit.ootd.infra.groq.GroqExplanation;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.util.List;
@@ -31,10 +43,15 @@ import java.util.UUID;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
+import org.junit.jupiter.params.provider.ValueSource;
+import org.springframework.web.client.HttpClientErrorException;
+import org.springframework.http.HttpStatus;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.test.context.ActiveProfiles;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -59,6 +76,62 @@ class RecommendationSecurityIntegrationTest {
     @Autowired private WeatherLocationRepository locationRepository;
     @Autowired private WeatherRepository weatherRepository;
     @Autowired private ProfileRepository profileRepository;
+    @MockitoBean private StyleKnowledgeSearchService knowledgeSearchService;
+    @MockitoBean private GroqClient groqClient;
+
+    @ParameterizedTest
+    @ValueSource(booleans = {false, true})
+    void 생성_성공과_한도_초과에도_본인_의상과_설명과_검증된_출처를_반환한다(boolean quotaExceeded) throws Exception {
+        // given
+        User user = saveUser();
+        User other = saveUser();
+        String token = accessToken(user.getId());
+        Weather weather = saveWeather();
+        Clothes blueTop = saveClothes(user.getId(), ClothesType.TOP);
+        Clothes brownTop = saveClothes(user.getId(), ClothesType.TOP);
+        Clothes bottom = saveClothes(user.getId(), ClothesType.BOTTOM);
+        Clothes foreignTop = saveClothes(other.getId(), ClothesType.TOP);
+        ClothesAttributeDefinition color = definitionRepository.save(
+            new ClothesAttributeDefinition("색상", List.of("블루", "적갈색", "주황색")));
+        attributeRepository.save(new ClothesAttribute(blueTop.getId(), color.getId(), "블루"));
+        attributeRepository.save(new ClothesAttribute(brownTop.getId(), color.getId(), "적갈색"));
+        attributeRepository.save(new ClothesAttribute(bottom.getId(), color.getId(), "주황색"));
+        attributeRepository.save(new ClothesAttribute(foreignTop.getId(), color.getId(), "적갈색"));
+        given(knowledgeSearchService.search(anyString(), eq("오렌지"), isNull())).willReturn(List.of(
+            new StyleKnowledgeMatch("orange-tonal", "배색", "내용", "오렌지", CombinationType.TONAL,
+                "WEB_OBSERVED", "https://example.com/guide", List.of(OutfitColorVariant.of(
+                    ClothesType.BOTTOM, "적갈색", "오렌지", "카멜", "아이보리")), 0.9)));
+
+        given(groqClient.isConfigured()).willReturn(true);
+        given(groqClient.generate(anyString(), anyString())).willAnswer(invocation -> {
+            assertThat(TransactionSynchronizationManager.isActualTransactionActive()).isFalse();
+            if (quotaExceeded) {
+                throw new HttpClientErrorException(HttpStatus.TOO_MANY_REQUESTS);
+            }
+            return new GroqExplanation("적갈색 상의와 오렌지 하의가 배색 사례와 어울립니다.",
+                "orange-tonal", List.of(brownTop.getId().toString(), bottom.getId().toString()));
+        });
+
+        // when/then
+        mockMvc.perform(get("/api/recommendations")
+                .header("Authorization", "Bearer " + token)
+                .param("weatherId", weather.getId().toString())
+                .param("userId", other.getId().toString()))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.userId").value(user.getId().toString()))
+            .andExpect(jsonPath("$.clothes.length()").value(2))
+            .andExpect(jsonPath("$.clothes[*].clothesId", containsInAnyOrder(
+                brownTop.getId().toString(), bottom.getId().toString())))
+            .andExpect(jsonPath("$.explanation").value(quotaExceeded
+                ? "적갈색 상의, 오렌지 하의의 색상은 참고한 배색 사례와 일치합니다."
+                : "적갈색 상의와 오렌지 하의가 배색 사례와 어울립니다."))
+            .andExpect(jsonPath("$.sources[0].documentKey").value("orange-tonal"))
+            .andExpect(jsonPath("$.sources[0].url").value("https://example.com/guide"))
+            .andExpect(jsonPath("$.sources[0].matchedClothesIds", containsInAnyOrder(
+                brownTop.getId().toString(), bottom.getId().toString())));
+        verify(knowledgeSearchService).search(
+            "오렌지 하의를 기준으로 상의, 하의, 아우터와 어울리는 색 조합", "오렌지", null);
+    }
 
     @Test
     void JWT_사용자의_의상과_속성으로만_추천하고_다른_사용자_ID는_무시한다() throws Exception {

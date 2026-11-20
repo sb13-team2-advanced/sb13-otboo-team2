@@ -46,6 +46,8 @@ ootd:
   openapi:
     server-url: ${OOTD_SERVER_URL}
     server-description: 운영 배포 서버
+  embedding:
+    base-url: ${OOTD_EMBEDDING_BASE_URL}
 
 otboo:
   storage:
