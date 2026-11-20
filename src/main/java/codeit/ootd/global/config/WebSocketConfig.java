@@ -44,7 +44,7 @@ public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
     @Override
     public void configureMessageBroker(MessageBrokerRegistry registry) {
         registry.setApplicationDestinationPrefixes("/pub");
-        // 로컬 구독자에게 전달하는 브로커이며, 서버 간 중계는 별도의 Redis Pub/Sub 연동이 필요하다.
+        // Redis로 수신한 DM도 각 서버의 로컬 구독자에게 이 브로커로 전달한다.
         registry.enableSimpleBroker("/sub");
     }
 }
