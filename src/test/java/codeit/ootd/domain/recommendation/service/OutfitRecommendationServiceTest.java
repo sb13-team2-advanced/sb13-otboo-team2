@@ -17,6 +17,7 @@ import codeit.ootd.domain.recommendation.algorithm.ClothesColorResolver;
 import codeit.ootd.domain.recommendation.algorithm.OutfitColorMatcher;
 import codeit.ootd.domain.recommendation.algorithm.OutfitRecommender;
 import codeit.ootd.domain.recommendation.algorithm.RecommendationConditions;
+import codeit.ootd.domain.recommendation.dto.OutfitColorMatchResult;
 import codeit.ootd.domain.recommendation.dto.response.OutfitColorVariant;
 import codeit.ootd.domain.recommendation.dto.response.RecommendationClothesResponse;
 import codeit.ootd.domain.recommendation.dto.response.StyleKnowledgeMatch;
@@ -60,7 +61,8 @@ class OutfitRecommendationServiceTest {
             List.of(OutfitColorVariant.of(ClothesType.BOTTOM, "적갈색", "오렌지", "카멜", "아이보리")), 0.9));
         given(weatherRecommender.recommend(conditions, clothes)).willReturn(clothes);
         given(searchService.search(contains("오렌지 하의"), eq("오렌지"), isNull())).willReturn(documents);
-        given(matcher.match(conditions, clothes, clothes, bottom, documents)).willReturn(clothes);
+        given(matcher.match(conditions, clothes, clothes, bottom, documents))
+            .willReturn(OutfitColorMatchResult.withoutEvidence(clothes));
 
         // when
         List<RecommendationClothesResponse> result = service.recommend(conditions, clothes);
@@ -81,7 +83,8 @@ class OutfitRecommendationServiceTest {
         List<RecommendationClothesResponse> clothes = type.equals("TOP")
             ? List.of(anchor, unknownBottom) : List.of(unknownTop, unknownBottom, anchor);
         given(weatherRecommender.recommend(conditions, clothes)).willReturn(clothes);
-        given(matcher.match(conditions, clothes, clothes, anchor, List.of())).willReturn(clothes);
+        given(matcher.match(conditions, clothes, clothes, anchor, List.of()))
+            .willReturn(OutfitColorMatchResult.withoutEvidence(clothes));
 
         // when
         service.recommend(conditions, clothes);

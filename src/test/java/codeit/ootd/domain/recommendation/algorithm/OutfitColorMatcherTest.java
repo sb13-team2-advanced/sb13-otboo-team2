@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import codeit.ootd.domain.clothes.dto.response.ClothesAttributeWithDefDto;
 import codeit.ootd.domain.clothes.enums.ClothesType;
+import codeit.ootd.domain.recommendation.dto.OutfitColorMatchResult;
 import codeit.ootd.domain.recommendation.dto.response.OutfitColorVariant;
 import codeit.ootd.domain.recommendation.dto.response.RecommendationClothesResponse;
 import codeit.ootd.domain.recommendation.dto.response.StyleKnowledgeMatch;
@@ -33,12 +34,20 @@ class OutfitColorMatcherTest {
         List<RecommendationClothesResponse> baseline = List.of(blueTop, orangeBottom, blackOuter);
 
         // when
-        List<RecommendationClothesResponse> result = matcher.match(calm,
+        OutfitColorMatchResult result = matcher.match(calm,
             List.of(blueTop, brownTop, orangeBottom, blackOuter, camelOuter), baseline,
             orangeBottom, List.of(document("오렌지", tonal)));
 
         // then
-        assertThat(result).containsExactly(brownTop, orangeBottom, camelOuter);
+        assertThat(result.clothes()).containsExactly(brownTop, orangeBottom, camelOuter);
+        assertThat(result.changed()).isTrue();
+        assertThat(result.evidence()).hasValueSatisfying(evidence -> {
+            assertThat(evidence.document().documentKey()).isEqualTo("guide");
+            assertThat(evidence.document().sourceUrl()).isEqualTo("https://example.com/guide");
+            assertThat(evidence.variant()).isEqualTo(tonal);
+            assertThat(evidence.matchedClothesIds()).containsExactly(
+                brownTop.clothesId(), orangeBottom.clothesId(), camelOuter.clothesId());
+        });
     }
 
     @Test
@@ -48,12 +57,14 @@ class OutfitColorMatcherTest {
         List<RecommendationClothesResponse> baseline = List.of(blueTop, orangeBottom);
 
         // when
-        List<RecommendationClothesResponse> result = matcher.match(calm,
+        OutfitColorMatchResult result = matcher.match(calm,
             List.of(blueTop, thickTop, orangeBottom), baseline,
             orangeBottom, List.of(document("오렌지", tonal)));
 
         // then
-        assertThat(result).isSameAs(baseline);
+        assertThat(result.clothes()).isSameAs(baseline);
+        assertThat(result.changed()).isFalse();
+        assertThat(result.evidence()).isEmpty();
     }
 
     @ParameterizedTest
@@ -67,12 +78,12 @@ class OutfitColorMatcherTest {
         List<RecommendationClothesResponse> baseline = List.of(protectedTop, orangeBottom);
 
         // when
-        List<RecommendationClothesResponse> result = matcher.match(conditions,
+        OutfitColorMatchResult result = matcher.match(conditions,
             List.of(protectedTop, matchingTop, orangeBottom), baseline,
             orangeBottom, List.of(document("오렌지", tonal)));
 
         // then
-        assertThat(result).isSameAs(baseline);
+        assertThat(result.clothes()).isSameAs(baseline);
     }
 
     @Test
@@ -84,12 +95,12 @@ class OutfitColorMatcherTest {
         RecommendationClothesResponse bottom = item(ClothesType.BOTTOM, "오렌지", "얇음");
 
         // when
-        List<RecommendationClothesResponse> result = matcher.match(hot,
+        OutfitColorMatchResult result = matcher.match(hot,
             List.of(top, matchingTop, bottom, camelOuter), List.of(top, bottom),
             bottom, List.of(document("오렌지", tonal)));
 
         // then
-        assertThat(result).containsExactly(matchingTop, bottom);
+        assertThat(result.clothes()).containsExactly(matchingTop, bottom);
     }
 
     @Test
@@ -100,12 +111,12 @@ class OutfitColorMatcherTest {
         RecommendationClothesResponse matchingOuter = item(ClothesType.OUTER, "카멜", "얇음");
 
         // when
-        List<RecommendationClothesResponse> result = matcher.match(rain,
+        OutfitColorMatchResult result = matcher.match(rain,
             List.of(brownTop, orangeBottom, outer, camelOuter, matchingOuter),
             List.of(brownTop, orangeBottom, outer), orangeBottom, List.of(document("오렌지", tonal)));
 
         // then
-        assertThat(result).containsExactly(brownTop, orangeBottom, matchingOuter);
+        assertThat(result.clothes()).containsExactly(brownTop, orangeBottom, matchingOuter);
     }
 
     @Test
@@ -117,13 +128,21 @@ class OutfitColorMatcherTest {
             ClothesType.BOTTOM, "화이트", "오렌지", "틸", "카멜");
 
         // when
-        List<RecommendationClothesResponse> result = matcher.match(calm,
+        OutfitColorMatchResult result = matcher.match(calm,
             List.of(blueTop, whiteTop, brownTop, orangeBottom, blackOuter, camelOuter),
             List.of(blueTop, orangeBottom, blackOuter), orangeBottom,
-            List.of(document("오렌지", partial), document("오렌지", tonal)));
+            List.of(keyedDocument("orange-partial", "오렌지", partial),
+                keyedDocument("orange-tonal", "오렌지", tonal)));
 
         // then
-        assertThat(result).containsExactly(brownTop, orangeBottom, camelOuter);
+        assertThat(result.clothes()).containsExactly(brownTop, orangeBottom, camelOuter);
+        assertThat(result.changed()).isTrue();
+        assertThat(result.evidence()).hasValueSatisfying(evidence -> {
+            assertThat(evidence.document().documentKey()).isEqualTo("orange-tonal");
+            assertThat(evidence.variant()).isEqualTo(tonal);
+            assertThat(evidence.matchedClothesIds()).containsExactly(
+                brownTop.clothesId(), orangeBottom.clothesId(), camelOuter.clothesId());
+        });
     }
 
     @Test
@@ -134,12 +153,19 @@ class OutfitColorMatcherTest {
         List<RecommendationClothesResponse> baseline = List.of(blueTop, orangeBottom);
 
         // when
-        List<RecommendationClothesResponse> result = matcher.match(calm,
+        OutfitColorMatchResult result = matcher.match(calm,
             List.of(blueTop, brownTop, orangeBottom), baseline, orangeBottom,
-            List.of(document("오렌지", tonal), document("오렌지", basic)));
+            List.of(keyedDocument("orange-tonal", "오렌지", tonal),
+                keyedDocument("orange-basic", "오렌지", basic)));
 
         // then
-        assertThat(result).isSameAs(baseline);
+        assertThat(result.clothes()).isSameAs(baseline);
+        assertThat(result.changed()).isFalse();
+        assertThat(result.evidence()).hasValueSatisfying(evidence -> {
+            assertThat(evidence.document().documentKey()).isEqualTo("orange-basic");
+            assertThat(evidence.variant()).isEqualTo(basic);
+            assertThat(evidence.matchedClothesIds()).containsExactly(blueTop.clothesId(), orangeBottom.clothesId());
+        });
     }
 
     @Test
@@ -150,12 +176,15 @@ class OutfitColorMatcherTest {
             ClothesType.BOTTOM, "화이트", "오렌지", "블랙", "카멜");
 
         // when
-        List<RecommendationClothesResponse> result = matcher.match(calm,
+        OutfitColorMatchResult result = matcher.match(calm,
             List.of(blueTop, brownTop, whiteTop, orangeBottom), List.of(blueTop, orangeBottom),
-            orangeBottom, List.of(document("오렌지", tonal), document("오렌지", basic)));
+            orangeBottom, List.of(keyedDocument("first", "오렌지", tonal),
+                keyedDocument("second", "오렌지", basic)));
 
         // then
-        assertThat(result).containsExactly(brownTop, orangeBottom);
+        assertThat(result.clothes()).containsExactly(brownTop, orangeBottom);
+        assertThat(result.evidence()).hasValueSatisfying(evidence ->
+            assertThat(evidence.document().documentKey()).isEqualTo("first"));
     }
 
     @Test
@@ -165,12 +194,14 @@ class OutfitColorMatcherTest {
         RecommendationClothesResponse matchingShoes = item(ClothesType.SHOES, "아이보리", "보통");
 
         // when
-        List<RecommendationClothesResponse> result = matcher.match(calm,
+        OutfitColorMatchResult result = matcher.match(calm,
             List.of(blueTop, brownTop, orangeBottom, shoes, matchingShoes),
             List.of(blueTop, orangeBottom, shoes), orangeBottom, List.of(document("오렌지", tonal)));
 
         // then
-        assertThat(result).containsExactly(brownTop, orangeBottom, shoes);
+        assertThat(result.clothes()).containsExactly(brownTop, orangeBottom, shoes);
+        assertThat(result.evidence()).hasValueSatisfying(evidence ->
+            assertThat(evidence.matchedClothesIds()).containsExactly(brownTop.clothesId(), orangeBottom.clothesId()));
     }
 
     @Test
@@ -180,12 +211,12 @@ class OutfitColorMatcherTest {
             UUID.randomUUID(), "색상 없음", null, ClothesType.TOP, List.of());
 
         // when
-        List<RecommendationClothesResponse> result = matcher.match(calm,
+        OutfitColorMatchResult result = matcher.match(calm,
             List.of(unknown, brownTop, orangeBottom), List.of(unknown, orangeBottom),
             orangeBottom, List.of(document("오렌지", tonal)));
 
         // then
-        assertThat(result).containsExactly(brownTop, orangeBottom);
+        assertThat(result.clothes()).containsExactly(brownTop, orangeBottom);
     }
 
     @Test
@@ -198,13 +229,69 @@ class OutfitColorMatcherTest {
             ClothesType.BOTTOM, "적갈색", "핑크", "카멜", "아이보리");
 
         // when
-        List<RecommendationClothesResponse> result = matcher.match(calm,
+        OutfitColorMatchResult result = matcher.match(calm,
             List.of(blueTop, brownTop, orangeBottom), baseline, orangeBottom,
             List.of(document("핑크", tonal), document("오렌지", wrongType),
                 document("오렌지", wrongAnchor), document("오렌지")));
 
         // then
-        assertThat(result).isSameAs(baseline);
+        assertThat(result.clothes()).isSameAs(baseline);
+        assertThat(result.changed()).isFalse();
+        assertThat(result.evidence()).isEmpty();
+    }
+
+    @Test
+    void 같은_문서의_여러_색_배치_중_기준_의상과_일치하는_배치만_근거로_반환한다() {
+        // given
+        OutfitColorVariant topVariant = OutfitColorVariant.of(
+            ClothesType.TOP, "오렌지", "적갈색", "카멜", "아이보리");
+        OutfitColorVariant outerVariant = OutfitColorVariant.of(
+            ClothesType.OUTER, "적갈색", "카멜", "오렌지", "아이보리");
+        StyleKnowledgeMatch document = keyedDocument("orange-tonal", "오렌지",
+            topVariant, tonal, outerVariant);
+
+        // when
+        OutfitColorMatchResult result = matcher.match(calm,
+            List.of(blueTop, brownTop, orangeBottom), List.of(blueTop, orangeBottom),
+            orangeBottom, List.of(document));
+
+        // then
+        assertThat(result.clothes()).containsExactly(brownTop, orangeBottom);
+        assertThat(result.evidence()).hasValueSatisfying(evidence -> {
+            assertThat(evidence.document()).isSameAs(document);
+            assertThat(evidence.variant()).isSameAs(tonal);
+            assertThat(evidence.matchedClothesIds()).containsExactly(brownTop.clothesId(), orangeBottom.clothesId());
+        });
+    }
+
+    @Test
+    void 기존_코디의_근거_점수가_같으면_검색_순서가_앞선_문서를_보관한다() {
+        // given
+        List<RecommendationClothesResponse> baseline = List.of(brownTop, orangeBottom);
+
+        // when
+        OutfitColorMatchResult result = matcher.match(calm, baseline, baseline, orangeBottom,
+            List.of(keyedDocument("first", "오렌지", tonal), keyedDocument("second", "오렌지", tonal)));
+
+        // then
+        assertThat(result.clothes()).isSameAs(baseline);
+        assertThat(result.changed()).isFalse();
+        assertThat(result.evidence()).hasValueSatisfying(evidence ->
+            assertThat(evidence.document().documentKey()).isEqualTo("first"));
+    }
+
+    @Test
+    void 검색된_문서가_없으면_기존_의상과_근거_없는_결과를_반환한다() {
+        // given
+        List<RecommendationClothesResponse> baseline = List.of(blueTop, orangeBottom);
+
+        // when
+        OutfitColorMatchResult result = matcher.match(calm, baseline, baseline, orangeBottom, List.of());
+
+        // then
+        assertThat(result.clothes()).isSameAs(baseline);
+        assertThat(result.changed()).isFalse();
+        assertThat(result.evidence()).isEmpty();
     }
 
     private RecommendationClothesResponse item(ClothesType type, String color, String thickness) {
@@ -220,7 +307,11 @@ class OutfitColorMatcherTest {
     }
 
     private StyleKnowledgeMatch document(String baseColor, OutfitColorVariant... variants) {
-        return new StyleKnowledgeMatch("guide", "배색", "내용", baseColor, CombinationType.TONAL,
+        return keyedDocument("guide", baseColor, variants);
+    }
+
+    private StyleKnowledgeMatch keyedDocument(String key, String baseColor, OutfitColorVariant... variants) {
+        return new StyleKnowledgeMatch(key, "배색", "내용", baseColor, CombinationType.TONAL,
             "WEB_OBSERVED", "https://example.com/guide", List.of(variants), 0.9);
     }
 }

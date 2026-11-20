@@ -5,6 +5,8 @@ import codeit.ootd.domain.recommendation.algorithm.ClothesColorResolver;
 import codeit.ootd.domain.recommendation.algorithm.OutfitColorMatcher;
 import codeit.ootd.domain.recommendation.algorithm.OutfitRecommender;
 import codeit.ootd.domain.recommendation.algorithm.RecommendationConditions;
+import codeit.ootd.domain.recommendation.dto.OutfitColorEvidence;
+import codeit.ootd.domain.recommendation.dto.OutfitColorMatchResult;
 import codeit.ootd.domain.recommendation.dto.response.RecommendationClothesResponse;
 import codeit.ootd.domain.recommendation.dto.response.StyleKnowledgeMatch;
 import java.util.List;
@@ -91,29 +93,35 @@ public class OutfitRecommendationService {
             return baseline;
         }
 
-        List<RecommendationClothesResponse> result =
+        OutfitColorMatchResult result =
             colorMatcher.match(conditions, clothes, baseline, reference, documents);
 
         logResult(reference, baseColor, documents, baseline, result);
 
-        return result;
+        return result.clothes();
     }
 
     /**
-     * DEBUG가 켜져 있을 때만 ID 목록과 교체 내역을 계산한다. 같은 ID 목록이면 배색 적용으로 기록하지 않는다.
+     * DEBUG가 켜져 있을 때만 ID 목록과 교체 내역을 계산하고 매칭 결과의 변경 여부를 기록한다.
      * 검색 문서 없음, 유효한 색 배치 없음, 개선 없음, 실제 교체를 구분하여 최종 결과 한 줄에 기록한다.
+     * 검색된 전체 문서 키와 최종 코디의 근거 문서 키를 구분하고 일치한 의상 ID를 함께 기록한다.
      */
     private void logResult(RecommendationClothesResponse anchor, String baseColor,
         List<StyleKnowledgeMatch> documents, List<RecommendationClothesResponse> baseline,
-        List<RecommendationClothesResponse> result) {
+        OutfitColorMatchResult matchResult) {
 
         if (!log.isDebugEnabled()) {
             return;
         }
 
+        List<RecommendationClothesResponse> result = matchResult.clothes();
+
         List<UUID> beforeIds = baseline.stream().map(RecommendationClothesResponse::clothesId).toList();
+
         List<UUID> afterIds = result.stream().map(RecommendationClothesResponse::clothesId).toList();
-        boolean applied = !beforeIds.equals(afterIds);
+
+        boolean applied = matchResult.changed();
+
         String reason = documents.isEmpty() ? "NO_KNOWLEDGE_DOCUMENTS"
             : documents.stream().allMatch(document -> document.outfitVariants().isEmpty()) ? "NO_VALID_COLOR_VARIANTS"
             : applied ? "COLOR_MATCH_IMPROVED" : "NO_COLOR_IMPROVEMENT";
@@ -127,10 +135,14 @@ public class OutfitRecommendationService {
             .toList();
 
         log.debug("배색 추천 결과. anchorType={} anchorClothesId={} baseColor={} documentKeys={} "
-                + "applied={} reason={} beforeIds={} afterIds={} changes={}",
+                + "applied={} reason={} beforeIds={} afterIds={} changes={} "
+                + "evidenceDocumentKey={} evidenceSelectedType={} matchedClothesIds={}",
             anchor.type(), anchor.clothesId(), baseColor,
             documents.stream().map(StyleKnowledgeMatch::documentKey).toList(),
-            applied, reason, beforeIds, afterIds, changes);
+            applied, reason, beforeIds, afterIds, changes,
+            matchResult.evidence().map(evidence -> evidence.document().documentKey()).orElse(null),
+            matchResult.evidence().map(evidence -> evidence.variant().selectedType()).orElse(null),
+            matchResult.evidence().map(OutfitColorEvidence::matchedClothesIds).orElseGet(List::of));
     }
 
     /**
