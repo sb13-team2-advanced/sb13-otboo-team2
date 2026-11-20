@@ -2,6 +2,7 @@ package codeit.ootd.domain.auth.oauth2.handler;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import codeit.ootd.domain.auth.oauth2.linking.OAuth2LinkAuthorizationRequestRepository;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.HttpHeaders;
@@ -95,6 +96,46 @@ class OAuth2AuthenticationFailureHandlerTest {
                                 + "&error_message=oauth_link_failed"
                 );
     }
+
+    @Test
+    @DisplayName("소셜 계정 연동 실패 시 설정 페이지로 이동하고 오류 코드를 전달한다")
+    void linkFailure_redirectsToSettings() throws Exception {
+        // given
+        MockHttpServletRequest request = new MockHttpServletRequest();
+        MockHttpServletResponse response = new MockHttpServletResponse();
+
+        request.setAttribute(
+                OAuth2LinkAuthorizationRequestRepository.LINK_TOKEN_ATTRIBUTE,
+                "test-link-token"
+        );
+
+        OAuth2AuthenticationException exception =
+                new OAuth2AuthenticationException(
+                        "social_account_already_linked"
+                );
+
+        // when
+        handler.onAuthenticationFailure(
+                request,
+                response,
+                exception
+        );
+
+        // then
+        assertThat(response.getRedirectedUrl())
+                .isEqualTo(
+                        "/#/settings?error_message=social_account_already_linked"
+                );
+
+        assertThat(response.getHeaders(HttpHeaders.SET_COOKIE))
+                .anySatisfy(cookie -> {
+                    assertThat(cookie)
+                            .contains("OAUTH2_LINK_TOKEN=")
+                            .contains("Max-Age=0")
+                            .contains("Path=/oauth2/authorization");
+                });
+    }
+
 
 
 }
