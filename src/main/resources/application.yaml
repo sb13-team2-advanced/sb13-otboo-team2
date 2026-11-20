@@ -2,7 +2,7 @@ spring:
   application:
     name: sb13-otboo-team2
   profiles:
-    default: dev
+    default: dev,kafka
   jpa:
     open-in-view: false
   servlet:
@@ -65,6 +65,11 @@ springdoc:
     display-request-duration: true
 
 otboo:
+  kafka:
+    enabled: false
+  notification:
+    kafka:
+      enabled: false
   storage:
     type: local
     local:
