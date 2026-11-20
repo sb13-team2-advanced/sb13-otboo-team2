@@ -8,7 +8,10 @@ import codeit.ootd.domain.recommendation.algorithm.RecommendationConditions;
 import codeit.ootd.domain.recommendation.dto.response.RecommendationClothesResponse;
 import codeit.ootd.domain.recommendation.dto.response.StyleKnowledgeMatch;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
+import java.util.UUID;
+import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.dao.DataAccessException;
@@ -38,6 +41,7 @@ public class OutfitRecommendationService {
      * 원피스는 대응하는 문서가 없으므로 기존 추천을 유지한다.
      * 외부 HTTP 호출 때 상위 트랜잭션을 중지하고 지식 조회는 Repository의 별도 트랜잭션에서 실행한다.
      * 임베딩 통신·응답 검증 또는 지식 DB 조회가 실패하면 기존 날씨 추천으로 대체한다.
+     * 기준 의상과 검색 문서, 선택 결과 및 대체 이유를 기록하되 문서 본문과 임베딩은 출력하지 않는다.
      */
     @Transactional(propagation = Propagation.NOT_SUPPORTED)
     public List<RecommendationClothesResponse> recommend(RecommendationConditions conditions,
@@ -45,7 +49,13 @@ public class OutfitRecommendationService {
 
         List<RecommendationClothesResponse> baseline = weatherRecommender.recommend(conditions, clothes);
 
+        if (baseline.isEmpty()) {
+            log.debug("배색 추천 생략. applied=false reason=NO_COMPLETE_OUTFIT");
+            return baseline;
+        }
+
         if (baseline.stream().anyMatch(item -> item.type() == ClothesType.DRESS)) {
+            log.debug("배색 추천 생략. applied=false reason=UNSUPPORTED_OUTFIT_TYPE outfitType=DRESS");
             return baseline;
         }
 
@@ -55,6 +65,7 @@ public class OutfitRecommendationService {
             .findFirst();
 
         if (anchor.isEmpty()) {
+            log.debug("배색 추천 생략. applied=false reason=NO_KNOWN_ANCHOR_COLOR");
             return baseline;
         }
 
@@ -62,14 +73,64 @@ public class OutfitRecommendationService {
         String baseColor = colorResolver.resolve(reference).orElseThrow();
         List<StyleKnowledgeMatch> documents;
 
+        log.debug("배색 검색 시작. anchorType={} anchorClothesId={} baseColor={}",
+            reference.type(), reference.clothesId(), baseColor);
+
         try {
             documents = knowledgeSearchService.search(query(reference.type(), baseColor), baseColor, null);
         } catch (RestClientException | IllegalStateException | DataAccessException exception) {
-            log.warn("배색 검색에 실패해 날씨 추천을 사용합니다. cause={}", exception.getClass().getSimpleName());
+
+            String reason = exception instanceof DataAccessException ? "KNOWLEDGE_QUERY_FAILED"
+                : exception instanceof RestClientException ? "EMBEDDING_REQUEST_FAILED"
+                : "INVALID_EMBEDDING_RESPONSE";
+
+            log.warn("배색 검색에 실패해 날씨 추천을 사용합니다. applied=false reason={} "
+                    + "anchorType={} anchorClothesId={} baseColor={} cause={}",
+                reason, reference.type(), reference.clothesId(), baseColor, exception.getClass().getSimpleName());
+
             return baseline;
         }
 
-        return colorMatcher.match(conditions, clothes, baseline, reference, documents);
+        List<RecommendationClothesResponse> result =
+            colorMatcher.match(conditions, clothes, baseline, reference, documents);
+
+        logResult(reference, baseColor, documents, baseline, result);
+
+        return result;
+    }
+
+    /**
+     * DEBUG가 켜져 있을 때만 ID 목록과 교체 내역을 계산한다. 같은 ID 목록이면 배색 적용으로 기록하지 않는다.
+     * 검색 문서 없음, 유효한 색 배치 없음, 개선 없음, 실제 교체를 구분하여 최종 결과 한 줄에 기록한다.
+     */
+    private void logResult(RecommendationClothesResponse anchor, String baseColor,
+        List<StyleKnowledgeMatch> documents, List<RecommendationClothesResponse> baseline,
+        List<RecommendationClothesResponse> result) {
+
+        if (!log.isDebugEnabled()) {
+            return;
+        }
+
+        List<UUID> beforeIds = baseline.stream().map(RecommendationClothesResponse::clothesId).toList();
+        List<UUID> afterIds = result.stream().map(RecommendationClothesResponse::clothesId).toList();
+        boolean applied = !beforeIds.equals(afterIds);
+        String reason = documents.isEmpty() ? "NO_KNOWLEDGE_DOCUMENTS"
+            : documents.stream().allMatch(document -> document.outfitVariants().isEmpty()) ? "NO_VALID_COLOR_VARIANTS"
+            : applied ? "COLOR_MATCH_IMPROVED" : "NO_COLOR_IMPROVEMENT";
+
+        Map<ClothesType, UUID> previousIds = baseline.stream()
+            .collect(Collectors.toMap(RecommendationClothesResponse::type, RecommendationClothesResponse::clothesId));
+
+        List<String> changes = result.stream()
+            .filter(item -> !item.clothesId().equals(previousIds.get(item.type())))
+            .map(item -> "%s:%s->%s".formatted(item.type(), previousIds.get(item.type()), item.clothesId()))
+            .toList();
+
+        log.debug("배색 추천 결과. anchorType={} anchorClothesId={} baseColor={} documentKeys={} "
+                + "applied={} reason={} beforeIds={} afterIds={} changes={}",
+            anchor.type(), anchor.clothesId(), baseColor,
+            documents.stream().map(StyleKnowledgeMatch::documentKey).toList(),
+            applied, reason, beforeIds, afterIds, changes);
     }
 
     /**

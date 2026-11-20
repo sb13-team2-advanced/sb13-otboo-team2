@@ -81,6 +81,7 @@ class OutfitRecommendationServiceTest {
         List<RecommendationClothesResponse> clothes = type.equals("TOP")
             ? List.of(anchor, unknownBottom) : List.of(unknownTop, unknownBottom, anchor);
         given(weatherRecommender.recommend(conditions, clothes)).willReturn(clothes);
+        given(matcher.match(conditions, clothes, clothes, anchor, List.of())).willReturn(clothes);
 
         // when
         service.recommend(conditions, clothes);

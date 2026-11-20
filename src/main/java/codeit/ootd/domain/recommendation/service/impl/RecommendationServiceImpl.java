@@ -8,9 +8,11 @@ import codeit.ootd.domain.recommendation.service.RecommendationService;
 import java.util.List;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
 @Service
+@Slf4j
 @RequiredArgsConstructor
 public class RecommendationServiceImpl implements RecommendationService {
 
@@ -20,6 +22,7 @@ public class RecommendationServiceImpl implements RecommendationService {
     /**
      * 본인 의상과 날씨를 트랜잭션 안에서 조회한 뒤 배색 검색과 의상 선택을 수행한다.
      * 남은 예보나 본인 의상이 없으면 외부 검색 없이 빈 추천을 반환한다.
+     * 추천 조건이 없으면 옷장 비어 있음과 남은 예보 없음을 구분해 기록한다.
      */
     @Override
     public RecommendationResponse recommend(UUID userId, UUID weatherId) {
@@ -29,6 +32,10 @@ public class RecommendationServiceImpl implements RecommendationService {
         return new RecommendationResponse(weatherId, userId,
             context.conditions()
                 .map(conditions -> recommender.recommend(conditions, context.candidates()))
-                .orElseGet(List::of));
+                .orElseGet(() -> {
+                    log.debug("의상 추천 생략. applied=false reason={}",
+                        context.candidates().isEmpty() ? "EMPTY_WARDROBE" : "NO_REMAINING_FORECAST");
+                    return List.of();
+                }));
     }
 }
