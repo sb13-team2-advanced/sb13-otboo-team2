@@ -2,16 +2,19 @@ package codeit.ootd.domain.auth.oauth2.controller;
 
 import codeit.ootd.domain.auth.entity.OAuthProvider;
 import java.time.Duration;
+import java.util.Map;
 import java.util.UUID;
 
 import codeit.ootd.domain.auth.oauth2.linking.OAuth2LinkRequestService;
 import codeit.ootd.domain.auth.oauth2.linking.OAuth2LinkStartResponse;
+import codeit.ootd.domain.auth.service.SocialAccountService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.ResponseCookie;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -23,12 +26,15 @@ public class OAuth2LinkController {
 
     private final OAuth2LinkRequestService linkRequestService;
     private final boolean cookieSecure;
+    private final SocialAccountService socialAccountService;
 
     public OAuth2LinkController(
             OAuth2LinkRequestService linkRequestService,
+            SocialAccountService socialAccountService,
             @Value("${auth.cookie.secure:true}") boolean cookieSecure
     ) {
         this.linkRequestService = linkRequestService;
+        this.socialAccountService = socialAccountService;
         this.cookieSecure = cookieSecure;
     }
 
@@ -65,4 +71,15 @@ public class OAuth2LinkController {
                         "/oauth2/authorization/" + provider
                 ));
     }
+
+
+    @GetMapping("/linked-providers")
+    public ResponseEntity<Map<String, Boolean>> getLinkedProviders(
+            @AuthenticationPrincipal UUID userId
+    ) {
+        return ResponseEntity.ok(
+                socialAccountService.getLinkedProviders(userId)
+        );
+    }
+
 }
