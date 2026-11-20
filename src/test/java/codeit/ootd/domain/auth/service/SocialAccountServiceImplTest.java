@@ -3,6 +3,7 @@ package codeit.ootd.domain.auth.service;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.*;
 
 import codeit.ootd.domain.auth.entity.OAuthProvider;
@@ -13,8 +14,12 @@ import codeit.ootd.domain.auth.repository.SocialAccountRepository;
 import codeit.ootd.domain.auth.service.impl.SocialAccountServiceImpl;
 import codeit.ootd.domain.user.exception.UserNotFoundException;
 import codeit.ootd.domain.user.repository.UserRepository;
+
+import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
+
+import org.assertj.core.api.AssertionsForClassTypes;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -177,4 +182,52 @@ class SocialAccountServiceImplTest {
 
         verify(socialAccountRepository, never()).save(any());
     }
+
+    @Test
+    @DisplayName("Google과 Kakao의 계정 연동 여부를 조회한다")
+    void getLinkedProviders_returnsProviderStatus() {
+        // given
+        UUID userId = UUID.randomUUID();
+
+        given(userRepository.existsById(userId))
+                .willReturn(true);
+
+        given(socialAccountRepository.existsByUserIdAndProvider(
+                userId, OAuthProvider.GOOGLE
+        )).willReturn(true);
+
+        given(socialAccountRepository.existsByUserIdAndProvider(
+                userId, OAuthProvider.KAKAO
+        )).willReturn(false);
+
+        // when
+        Map<String, Boolean> result =
+                socialAccountService.getLinkedProviders(userId);
+
+        // then
+        assertThat(result)
+                .containsEntry("google", true)
+                .containsEntry("kakao", false)
+                .hasSize(2);
+    }
+
+    @Test
+    @DisplayName("존재하지 않는 사용자는 소셜 계정 연동 상태를 조회할 수 없다")
+    void getLinkedProviders_userNotFound() {
+        // given
+        UUID userId = UUID.randomUUID();
+
+        given(userRepository.existsById(userId))
+                .willReturn(false);
+
+        // when & then
+        AssertionsForClassTypes.assertThatThrownBy(() ->
+                socialAccountService.getLinkedProviders(userId)
+        ).isInstanceOf(UserNotFoundException.class);
+
+        verifyNoInteractions(socialAccountRepository);
+    }
+
+
+
 }

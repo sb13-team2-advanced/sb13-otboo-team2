@@ -42,6 +42,7 @@ import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
 import org.testcontainers.containers.PostgreSQLContainer;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
+import org.testcontainers.utility.DockerImageName;
 
 @Testcontainers
 @SpringBootTest(properties = {
@@ -54,10 +55,16 @@ class WeatherBatchAggregationFailureIntegrationTest {
     private static final ZoneId KOREA_ZONE =
         ZoneId.of("Asia/Seoul");
 
+    /**
+     * pgvector가 포함된 PostgreSQL 16에서 통합 테스트와 Flyway 마이그레이션을 실행한다.
+     */
     @Container
     @ServiceConnection
     static PostgreSQLContainer<?> postgres =
-        new PostgreSQLContainer<>("postgres:16-alpine")
+        new PostgreSQLContainer<>(
+            DockerImageName.parse("pgvector/pgvector:0.8.7-pg16-bookworm")
+                .asCompatibleSubstituteFor("postgres")
+        )
             .withDatabaseName("ootd_test")
             .withUsername("test")
             .withPassword("test");
