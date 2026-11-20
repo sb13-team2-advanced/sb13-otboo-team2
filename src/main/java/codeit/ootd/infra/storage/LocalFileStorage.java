@@ -7,7 +7,7 @@ import java.io.InputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Locale;
-import java.util.Set;
+import java.util.Map;
 import java.util.UUID;
 import lombok.Getter;
 import lombok.extern.slf4j.Slf4j;
@@ -25,7 +25,13 @@ import org.springframework.web.multipart.MultipartFile;
 @ConditionalOnProperty(name = "otboo.storage.type", havingValue = "local", matchIfMissing = true)
 public class LocalFileStorage implements FileStorage {
 
-    private static final Set<String> ALLOWED_EXTENSIONS = Set.of("jpg", "jpeg", "png", "gif", "webp");
+    private static final Map<String, String> ALLOWED_CONTENT_TYPES = Map.of(
+        "jpg", "image/jpeg",
+        "jpeg", "image/jpeg",
+        "png", "image/png",
+        "gif", "image/gif",
+        "webp", "image/webp"
+    );
 
     @Getter
     private final Path rootPath;
@@ -97,14 +103,18 @@ public class LocalFileStorage implements FileStorage {
         }
     }
 
+    /**
+     * 빈 파일을 차단하고 확장자별 허용 MIME 타입과 일치하는지 검증한다.
+     */
     private void validate(MultipartFile file) {
         if (file == null || file.isEmpty()) {
             throw new OtbooException(ErrorCode.FILE_EMPTY);
         }
 
-        String contentType = file.getContentType();
         String extension = extractExtension(file.getOriginalFilename());
-        if (contentType == null || !contentType.startsWith("image/") || !ALLOWED_EXTENSIONS.contains(extension)) {
+        String expectedContentType = ALLOWED_CONTENT_TYPES.get(extension);
+        if (expectedContentType == null
+            || !expectedContentType.equalsIgnoreCase(file.getContentType())) {
             throw new OtbooException(ErrorCode.FILE_INVALID_TYPE);
         }
     }

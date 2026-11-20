@@ -1,9 +1,11 @@
 package codeit.ootd.domain.user.service;
 
+import codeit.ootd.domain.auth.exception.SocialAccountPasswordResetNotAllowedException;
 import codeit.ootd.domain.auth.service.AuthSessionService;
 import codeit.ootd.domain.user.dto.request.UserCreateRequest;
 import codeit.ootd.domain.user.dto.response.UserDto;
 import codeit.ootd.domain.user.dto.response.UserListResponse;
+import codeit.ootd.domain.user.entity.SignupType;
 import codeit.ootd.domain.user.entity.User;
 import codeit.ootd.domain.user.entity.UserRole;
 import codeit.ootd.domain.user.entity.UserStatus;
@@ -737,6 +739,34 @@ class UserServiceImplTest {
                 .existsByEmailIgnoreCase("test@example.com");
 
         verify(userRepository).saveAndFlush(any(User.class));
+    }
+
+    @Test
+    @DisplayName("소셜 가입자는 비밀번호를 변경할 수 없다")
+    void updatePassword_socialAccount_throwsException() {
+        // given
+        UUID userId = UUID.randomUUID();
+        String newPassword = "NewPassword123!";
+
+        User user = User.create(
+                "소셜사용자",
+                "social@example.com",
+                "encoded-old-password"
+        );
+
+        ReflectionTestUtils.setField(user, "signupType", SignupType.SOCIAL);
+
+        when(userRepository.findById(userId))
+                .thenReturn(Optional.of(user));
+
+        // when & then
+        assertThatThrownBy(() ->
+                userService.updatePassword(userId, newPassword)
+        ).isInstanceOf(SocialAccountPasswordResetNotAllowedException.class);
+
+        assertThat(user.getPassword()).isEqualTo("encoded-old-password");
+
+        verifyNoInteractions(passwordEncoder, authSessionService);
     }
 
 

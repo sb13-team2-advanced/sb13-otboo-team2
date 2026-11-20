@@ -1,9 +1,11 @@
 package codeit.ootd.domain.user.service.impl;
 
+import codeit.ootd.domain.auth.exception.SocialAccountPasswordResetNotAllowedException;
 import codeit.ootd.domain.auth.service.AuthSessionService;
 import codeit.ootd.domain.user.dto.request.UserCreateRequest;
 import codeit.ootd.domain.user.dto.response.UserDto;
 import codeit.ootd.domain.user.dto.response.UserListResponse;
+import codeit.ootd.domain.user.entity.SignupType;
 import codeit.ootd.domain.user.entity.User;
 import codeit.ootd.domain.user.entity.UserRole;
 import codeit.ootd.domain.user.exception.DuplicateEmailException;
@@ -199,6 +201,10 @@ public class UserServiceImpl implements UserService {
         User user = userRepository.findById(userId)
                 .orElseThrow(UserNotFoundException::new);
 
+        if (user.getSignupType() == SignupType.SOCIAL) {
+            throw new SocialAccountPasswordResetNotAllowedException();
+        }
+
         String encodedPassword = passwordEncoder.encode(newPassword);
 
         user.changePassword(encodedPassword);
@@ -208,8 +214,6 @@ public class UserServiceImpl implements UserService {
 
         log.info("사용자 비밀번호 변경 완료: userId={}", userId);
     }
-
-
 
 
 }

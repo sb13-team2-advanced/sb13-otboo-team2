@@ -26,6 +26,7 @@ public enum ErrorCode {
     INVALID_AUTH_SESSION(HttpStatus.UNAUTHORIZED, "유효하지 않거나 만료된 인증 세션입니다."),
     ACCOUNT_LOCKED(HttpStatus.FORBIDDEN, "잠긴 계정입니다."),
     ACCOUNT_INACTIVE(HttpStatus.FORBIDDEN, "활성화되지 않은 계정입니다."),
+    SOCIAL_ACCOUNT_PASSWORD_RESET_NOT_ALLOWED(HttpStatus.FORBIDDEN, "소셜 로그인으로 가입한 계정은 비밀번호를 초기화할 수 없습니다."),
 
     // 소셜 계정 연동
     SOCIAL_ACCOUNT_ALREADY_LINKED(HttpStatus.CONFLICT, "이미 다른 사용자에게 연동된 소셜 계정입니다."),
@@ -46,6 +47,7 @@ public enum ErrorCode {
     CLOTHES_EXTRACTION_INVALID_URL(HttpStatus.BAD_REQUEST, "올바르지 않거나 접근할 수 없는 URL입니다."),
     CLOTHES_EXTRACTION_FETCH_FAILED(HttpStatus.BAD_GATEWAY, "구매 링크의 페이지를 불러오지 못했습니다."),
     CLOTHES_EXTRACTION_NOT_FOUND(HttpStatus.UNPROCESSABLE_CONTENT, "구매 링크에서 의상 정보를 찾지 못했습니다."),
+    CLOTHES_EXTRACTION_RATE_LIMIT_EXCEEDED(HttpStatus.TOO_MANY_REQUESTS, "구매 링크 불러오기 요청 횟수를 초과했습니다."),
 
     // 피드
     FEED_CREATE_INVALID_REQUEST(HttpStatus.BAD_REQUEST, "피드 등록 요청이 올바르지 않습니다."),

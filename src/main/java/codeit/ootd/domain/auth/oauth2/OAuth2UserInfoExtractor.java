@@ -3,6 +3,9 @@ package codeit.ootd.domain.auth.oauth2;
 import codeit.ootd.domain.auth.entity.OAuthProvider;
 import java.util.Map;
 import java.util.Objects;
+
+import org.springframework.security.oauth2.core.OAuth2AuthenticationException;
+import org.springframework.security.oauth2.core.OAuth2Error;
 import org.springframework.stereotype.Component;
 
 @Component
@@ -24,13 +27,26 @@ public class OAuth2UserInfoExtractor {
     private OAuth2UserInfo extractGoogle(
             Map<String, Object> attributes
     ) {
+        String providerUserId =
+                requiredString(attributes.get("sub"));
+
+        String email = optionalString(attributes.get("email"));
+
+        if (email == null) {
+            throw new OAuth2AuthenticationException(
+                    new OAuth2Error("email_required"),
+                    "Google 계정에서 이메일 정보를 제공하지 않았습니다."
+            );
+        }
+
         return new OAuth2UserInfo(
                 OAuthProvider.GOOGLE,
-                requiredString(attributes.get("sub")),
-                optionalString(attributes.get("email")),
+                providerUserId,
+                email,
                 optionalString(attributes.get("name"))
         );
     }
+
 
     private OAuth2UserInfo extractKakao(
             Map<String, Object> attributes
@@ -47,10 +63,27 @@ public class OAuth2UserInfoExtractor {
 
         if (email == null) {
             String emailName = nickname != null
-                    ? nickname
+                    ? nickname.replaceAll("[^가-힣a-zA-Z0-9]", "")
                     : "kakao";
 
-            email = emailName + "_" + providerUserId + "@kakao.com";
+            if (emailName.isBlank()) {
+                emailName = "kakao";
+            }
+
+            String suffix = "_" + providerUserId + "@kakao.com";
+            int maxNameLength = 100 - suffix.length();
+
+            if (maxNameLength <= 0) {
+                throw new IllegalArgumentException(
+                        "Kakao 사용자 ID가 너무 깁니다."
+                );
+            }
+
+            if (emailName.length() > maxNameLength) {
+                emailName = emailName.substring(0, maxNameLength);
+            }
+
+            email = emailName + suffix;
         }
 
         return new OAuth2UserInfo(
@@ -60,7 +93,6 @@ public class OAuth2UserInfoExtractor {
                 nickname
         );
     }
-
 
     private String requiredString(Object value) {
         String result = optionalString(value);

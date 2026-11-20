@@ -8,6 +8,7 @@ import codeit.ootd.domain.auth.exception.AccountLockedException;
 import codeit.ootd.domain.auth.exception.InvalidAuthSessionException;
 import codeit.ootd.domain.auth.exception.InvalidCredentialsException;
 import codeit.ootd.domain.auth.exception.InvalidRefreshTokenException;
+import codeit.ootd.domain.auth.exception.SocialAccountPasswordResetNotAllowedException;
 import codeit.ootd.domain.auth.jwt.JwtProvider;
 import codeit.ootd.domain.auth.service.AuthService;
 import codeit.ootd.domain.auth.service.AuthSessionService;
@@ -15,6 +16,7 @@ import codeit.ootd.domain.auth.service.RefreshTokenService;
 import codeit.ootd.domain.auth.service.TemporaryPasswordGenerator;
 import codeit.ootd.domain.auth.service.TemporaryPasswordMailSender;
 import codeit.ootd.domain.user.dto.response.UserDto;
+import codeit.ootd.domain.user.entity.SignupType;
 import codeit.ootd.domain.user.entity.User;
 import codeit.ootd.domain.user.entity.UserStatus;
 import codeit.ootd.domain.user.exception.UserNotFoundException;
@@ -196,6 +198,10 @@ public class AuthServiceImpl implements AuthService {
             throw new AccountInactiveException();
         }
 
+        if (user.getSignupType() == SignupType.SOCIAL) {
+            throw new SocialAccountPasswordResetNotAllowedException();
+        }
+
         String temporaryPassword = temporaryPasswordGenerator.generate();
         String encodedPassword = passwordEncoder.encode(temporaryPassword);
 
@@ -204,9 +210,13 @@ public class AuthServiceImpl implements AuthService {
                 clock.instant().plus(Duration.ofMinutes(3))
         );
 
-        temporaryPasswordMailSender.send(user.getEmail(), temporaryPassword);
+        temporaryPasswordMailSender.send(
+                user.getEmail(),
+                temporaryPassword
+        );
 
-        log.info("임시 비밀번호 발급 및 이메일 발송 처리 완료: userId={}", user.getId());
+        log.info("임시 비밀번호 발급 및 이메일 발송 처리 완료: userId={}",
+                user.getId());
     }
 
 

@@ -35,7 +35,7 @@ class CustomOAuth2UserServiceTest {
     private CustomOAuth2UserService userService;
 
     @Test
-    @DisplayName("Google 인증 성공 시 소셜 제공자와 사용자 ID를 전달한다")
+    @DisplayName("Google 인증 성공 시 사용자 ID와 이메일 및 이름을 전달한다")
     void load_user_success() {
         // given
         OAuth2UserRequest request = mock(OAuth2UserRequest.class);
@@ -76,6 +76,13 @@ class CustomOAuth2UserServiceTest {
 
         assertThat((String) result.getAttribute("otbooProviderUserId"))
                 .isEqualTo("google-123");
+
+        // 자동 회원가입에 필요한 정보 전달 검증
+        assertThat((String) result.getAttribute("otbooEmail"))
+                .isEqualTo("google@example.com");
+
+        assertThat((String) result.getAttribute("otbooName"))
+                .isEqualTo("구글 사용자");
 
         assertThat(result.getName()).isEqualTo("google-123");
 

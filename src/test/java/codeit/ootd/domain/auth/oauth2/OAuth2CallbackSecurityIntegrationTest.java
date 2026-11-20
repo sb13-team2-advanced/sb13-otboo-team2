@@ -2,6 +2,7 @@ package codeit.ootd.domain.auth.oauth2;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
@@ -9,11 +10,14 @@ import static org.mockito.Mockito.when;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 
+import codeit.ootd.domain.auth.dto.response.SignInResult;
 import codeit.ootd.domain.auth.entity.OAuthProvider;
 import codeit.ootd.domain.auth.oauth2.linking.OAuth2LinkRequest;
 import codeit.ootd.domain.auth.oauth2.linking.OAuth2LinkRequestService;
 import codeit.ootd.domain.auth.service.AuthService;
 import codeit.ootd.domain.auth.service.SocialAccountService;
+import codeit.ootd.domain.user.entity.User;
+import codeit.ootd.domain.user.repository.UserRepository;
 import jakarta.servlet.http.Cookie;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -45,6 +49,7 @@ import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.UUID;
 
 
@@ -79,6 +84,9 @@ class OAuth2CallbackSecurityIntegrationTest {
 
     @MockitoBean
     private OAuth2AccountResolver resolver;
+
+    @MockitoBean
+    private UserRepository userRepository;
 
     @Test
     @DisplayName("변조된 OAuth2 state로 콜백 요청 시 계정 연동을 차단한다")
@@ -321,8 +329,8 @@ class OAuth2CallbackSecurityIntegrationTest {
     }
 
     @Test
-    @DisplayName("연동 토큰 없는 미연동 소셜 계정은 일반 로그인을 거부한다")
-    void callback_unlinkedAccountWithoutToken_failsLogin() throws Exception {
+    @DisplayName("연동 토큰 없는 신규 소셜 계정은 자동 회원가입 후 로그인한다")
+    void callback_unlinkedAccountWithoutToken_signsIn() throws Exception {
         // given: 연동 쿠키 없이 일반 Google 로그인 시작
         var start = mockMvc.perform(
                 get("/oauth2/authorization/google")
@@ -359,10 +367,28 @@ class OAuth2CallbackSecurityIntegrationTest {
         when(delegate.loadUser(any(OAuth2UserRequest.class)))
                 .thenReturn(providerUser);
 
-        when(resolver.resolveUserId(any(OAuth2UserInfo.class)))
-                .thenThrow(
-                        new OAuth2AuthenticationException("user_not_exists")
-                );
+        UUID userId = UUID.randomUUID();
+        User user = mock(User.class);
+        SignInResult signInResult = mock(SignInResult.class);
+
+        OAuth2UserInfo userInfo = new OAuth2UserInfo(
+                OAuthProvider.GOOGLE,
+                "unlinked-google-123",
+                "unlinked@example.com",
+                "미연동 사용자"
+        );
+
+        when(resolver.resolveUserId(userInfo))
+                .thenReturn(userId);
+
+        when(userRepository.findById(userId))
+                .thenReturn(Optional.of(user));
+
+        when(authService.issueTokensForAuthenticatedUser(user))
+                .thenReturn(signInResult);
+
+        when(signInResult.refreshToken())
+                .thenReturn("refresh-token");
 
         // when
         var callback = mockMvc.perform(
@@ -373,30 +399,25 @@ class OAuth2CallbackSecurityIntegrationTest {
         ).andReturn();
 
         // then
-        assertThat(callback.getResponse().getRedirectedUrl())
-                .isEqualTo(
-                        "/#/auth/login?error=oauth_failed"
-                                + "&error_message=user_not_exists"
-                );
+        verify(resolver).resolveUserId(userInfo);
 
-        verify(resolver).resolveUserId(
-                new OAuth2UserInfo(
-                        OAuthProvider.GOOGLE,
-                        "unlinked-google-123",
-                        null,
-                        null
-                )
-        );
+        verify(authService).issueTokensForAuthenticatedUser(user);
 
         verifyNoInteractions(
                 linkRequestService,
-                socialAccountService,
-                authService
+                socialAccountService
         );
 
-        assertThat(callback.getResponse().getHeaders(HttpHeaders.SET_COOKIE))
-                .noneMatch(cookie -> cookie.startsWith("REFRESH_TOKEN="));
+        assertThat(callback.getResponse().getRedirectedUrl())
+                .isEqualTo("/#/recommendations");
+
+        assertThat(
+                callback.getResponse().getHeaders(HttpHeaders.SET_COOKIE)
+        ).anyMatch(cookie ->
+                cookie.startsWith("REFRESH_TOKEN=refresh-token")
+        );
     }
+
 
 
 }
