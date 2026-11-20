@@ -4,11 +4,13 @@ import codeit.ootd.domain.notification.dto.response.NotificationDto;
 import codeit.ootd.domain.notification.service.NotificationService;
 import codeit.ootd.domain.notification.service.NotificationSseService;
 import lombok.RequiredArgsConstructor;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.event.TransactionPhase;
 import org.springframework.transaction.event.TransactionalEventListener;
 
 @Component
+@ConditionalOnProperty(name = "otboo.notification.kafka.enabled", havingValue = "false", matchIfMissing = true)
 @RequiredArgsConstructor
 public class NotificationEventListener {
 
