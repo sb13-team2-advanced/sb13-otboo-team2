@@ -41,6 +41,7 @@ public class OutfitRecommendationService {
     /**
      * 날씨와 배색으로 선택한 의상 목록을 반환한다.
      */
+    @Transactional(propagation = Propagation.NOT_SUPPORTED)
     public List<RecommendationClothesResponse> recommend(RecommendationConditions conditions,
         List<RecommendationClothesResponse> clothes) {
         return recommendWithEvidence(conditions, clothes).clothes();
@@ -53,7 +54,7 @@ public class OutfitRecommendationService {
      * 임베딩 통신·응답 검증 또는 지식 DB 조회가 실패하면 기존 날씨 추천으로 대체한다.
      * 기준 의상과 검색 문서, 선택 결과 및 대체 이유를 기록하되 문서 본문과 임베딩은 출력하지 않는다.
      */
-
+    @Transactional(propagation = Propagation.NOT_SUPPORTED)
     public OutfitColorMatchResult recommendWithEvidence(RecommendationConditions conditions,
         List<RecommendationClothesResponse> clothes) {
 
