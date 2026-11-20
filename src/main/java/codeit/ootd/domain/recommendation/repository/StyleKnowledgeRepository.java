@@ -2,6 +2,7 @@ package codeit.ootd.domain.recommendation.repository;
 
 import codeit.ootd.domain.recommendation.dto.response.StyleKnowledgeMatch;
 import codeit.ootd.domain.recommendation.enums.CombinationType;
+import codeit.ootd.domain.recommendation.mapper.StyleKnowledgeMetadataParser;
 import codeit.ootd.infra.embedding.EmbeddingResponse;
 import java.sql.Types;
 import java.util.List;
@@ -31,10 +32,12 @@ public class StyleKnowledgeRepository {
         """;
 
     private final NamedParameterJdbcTemplate jdbcTemplate;
+    private final StyleKnowledgeMetadataParser metadataParser;
 
     /**
      * 검증된 임베딩과 동일한 모델의 문서를 기준색·배색 유형·검토 상태로 제한한 뒤
      * 코사인 거리순으로 정확 검색한다. 동점은 문서 키로 정렬하고 벡터는 SQL 매개변수로 전달한다.
+     * JSONB 메타데이터는 파서에서 검증한 색 배치 목록으로 변환한다.
      */
     @Transactional(readOnly = true)
     public List<StyleKnowledgeMatch> search(
@@ -66,7 +69,7 @@ public class StyleKnowledgeRepository {
                 CombinationType.valueOf(resultSet.getString("combination_type")),
                 resultSet.getString("source_type"),
                 resultSet.getString("source_url"),
-                resultSet.getString("metadata_json"),
+                metadataParser.parse(resultSet.getString("document_key"), resultSet.getString("metadata_json")),
                 1.0 - resultSet.getDouble("distance")
             ));
     }

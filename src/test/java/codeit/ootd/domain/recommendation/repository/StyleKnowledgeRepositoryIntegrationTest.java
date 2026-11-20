@@ -6,6 +6,8 @@ import static org.assertj.core.api.Assertions.within;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.verify;
 
+import codeit.ootd.domain.clothes.enums.ClothesType;
+import codeit.ootd.domain.recommendation.dto.response.OutfitColorVariant;
 import codeit.ootd.domain.recommendation.dto.response.StyleKnowledgeMatch;
 import codeit.ootd.domain.recommendation.enums.CombinationType;
 import codeit.ootd.domain.recommendation.service.StyleKnowledgeSearchService;
@@ -82,8 +84,31 @@ class StyleKnowledgeRepositoryIntegrationTest {
         assertThat(result.get(0).content()).isEqualTo("상의와 하의의 색 배치");
         assertThat(result.get(0).sourceType()).isEqualTo("WEB_OBSERVED");
         assertThat(result.get(0).sourceUrl()).isEqualTo("https://example.com/guide");
-        assertThat(result.get(0).metadataJson()).contains("outfitVariants", "BOTTOM", "적갈색");
+        assertThat(result.get(0).outfitVariants()).containsExactly(
+            OutfitColorVariant.of(ClothesType.BOTTOM, "적갈색", "오렌지", "카멜", "아이보리"));
         verify(embeddingClient).embed("오렌지 코디");
+    }
+
+    @Test
+    void 색_배치가_잘못된_문서도_검색은_유지하고_빈_색_배치를_반환한다() {
+        // given
+        insert("invalid-metadata", "오렌지", "TONAL", "APPROVED", MODEL, vector(1, 0));
+        insert("valid-metadata", "오렌지", "TONAL", "APPROVED", MODEL, vector(0.8, 0.6));
+        jdbcTemplate.update("""
+            UPDATE style_knowledge
+            SET metadata = '{"outfitVariants":[{"selectedType":"BOTTOM","topColor":"적갈색"}]}'::jsonb
+            WHERE document_key = 'invalid-metadata'
+            """);
+
+        // when
+        List<StyleKnowledgeMatch> result = repository.search(QUERY, "오렌지", null, false, 3);
+
+        // then
+        assertThat(result).extracting(StyleKnowledgeMatch::documentKey)
+            .containsExactly("invalid-metadata", "valid-metadata");
+        assertThat(result.get(0).outfitVariants()).isEmpty();
+        assertThat(result.get(1).outfitVariants()).containsExactly(
+            OutfitColorVariant.of(ClothesType.BOTTOM, "적갈색", "오렌지", "카멜", "아이보리"));
     }
 
     @Test
@@ -170,7 +195,8 @@ class StyleKnowledgeRepositoryIntegrationTest {
                 source_type, source_url, review_status, metadata, embedding_model, embedding
             ) VALUES (?, '배색 사례', '상의와 하의의 색 배치', ?, ?, 'WEB_OBSERVED',
                       'https://example.com/guide', ?,
-                      '{"outfitVariants":[{"selectedType":"BOTTOM","topColor":"적갈색"}]}'::jsonb,
+                      '{"outfitVariants":[{"selectedType":"BOTTOM","topColor":"적갈색",
+                        "bottomColor":"오렌지","outerColor":"카멜","accessoryColor":"아이보리"}]}'::jsonb,
                       ?, CAST(? AS vector))
             """, key, color, type, status, model, vector == null ? null : vector.toString());
     }
