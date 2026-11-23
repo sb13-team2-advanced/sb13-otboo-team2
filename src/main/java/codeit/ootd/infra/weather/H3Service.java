@@ -10,7 +10,7 @@ import org.springframework.stereotype.Component;
 @Component
 public class H3Service {
 
-    private static final int RESOLUTION = 8;
+    private static final int RESOLUTION = 7;
 
     private final H3Core h3Core;
 

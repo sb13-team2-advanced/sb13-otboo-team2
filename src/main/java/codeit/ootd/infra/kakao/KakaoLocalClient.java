@@ -2,6 +2,7 @@ package codeit.ootd.infra.kakao;
 
 import codeit.ootd.infra.weather.dto.KakaoRegionResponse;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpHeaders;
 import org.springframework.stereotype.Component;
@@ -15,12 +16,10 @@ public class KakaoLocalClient {
     private final String apiKey;
 
     public KakaoLocalClient(
-        RestClient.Builder restClientBuilder,
+        @Qualifier("kakaoLocalRestClient") RestClient restClient,
         @Value("${ootd.kakao.local.api-key}") String apiKey
     ) {
-        this.restClient = restClientBuilder
-            .baseUrl("https://dapi.kakao.com")
-            .build();
+        this.restClient = restClient;
         this.apiKey = apiKey;
     }
 

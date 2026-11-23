@@ -22,6 +22,7 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.context.ApplicationEventPublisher;
 
 @ExtendWith(MockitoExtension.class)
 @DisplayName("피드 좋아요 등록 서비스 테스트")
@@ -32,6 +33,9 @@ class FeedLikeServiceImplTest {
 
     @Mock
     private FeedLikeRepository feedLikeRepository;
+
+    @Mock
+    private ApplicationEventPublisher eventPublisher;
 
     @InjectMocks
     private FeedLikeServiceImpl feedLikeService;
@@ -49,7 +53,11 @@ class FeedLikeServiceImplTest {
         assertThat(exception.getErrorCode())
                 .isEqualTo(ErrorCode.AUTHENTICATION_REQUIRED);
 
-        verifyNoInteractions(feedRepository, feedLikeRepository);
+        verifyNoInteractions(
+                feedRepository,
+                feedLikeRepository,
+                eventPublisher
+        );
     }
 
     @Test
@@ -65,7 +73,11 @@ class FeedLikeServiceImplTest {
         assertThat(exception.getErrorCode())
                 .isEqualTo(ErrorCode.INVALID_REQUEST);
 
-        verifyNoInteractions(feedRepository, feedLikeRepository);
+        verifyNoInteractions(
+                feedRepository,
+                feedLikeRepository,
+                eventPublisher
+        );
     }
 
     @Test
@@ -85,7 +97,7 @@ class FeedLikeServiceImplTest {
         assertThat(exception.getErrorCode())
                 .isEqualTo(ErrorCode.FEED_NOT_FOUND);
 
-        verifyNoInteractions(feedLikeRepository);
+        verifyNoInteractions(feedLikeRepository, eventPublisher);
     }
 
     @Test
@@ -135,6 +147,7 @@ class FeedLikeServiceImplTest {
         verify(feedLikeRepository)
                 .existsByFeedIdAndUserId(feedId, userId);
         verifyNoMoreInteractions(feedLikeRepository);
+        verifyNoInteractions(eventPublisher);
     }
 
     private Feed feedWithLikeCount(long likeCount) {

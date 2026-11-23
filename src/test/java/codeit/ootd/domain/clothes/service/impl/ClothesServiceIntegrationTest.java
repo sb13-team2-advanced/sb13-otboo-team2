@@ -27,6 +27,8 @@ import codeit.ootd.domain.feed.entity.FeedClothes;
 import codeit.ootd.domain.feed.repository.FeedClothesRepository;
 import codeit.ootd.domain.user.entity.User;
 import codeit.ootd.domain.user.repository.UserRepository;
+import codeit.ootd.global.exception.ErrorCode;
+import codeit.ootd.global.exception.OtbooException;
 import codeit.ootd.infra.storage.LocalFileStorage;
 import jakarta.persistence.EntityManager;
 import java.time.Instant;
@@ -79,7 +81,7 @@ class ClothesServiceIntegrationTest {
         ClothesAttributeDefinition color = newDefinition("색상", "검정", "흰색");
 
         ClothesDto created = service.create(new ClothesCreateRequest(ownerId, "셔츠", ClothesType.TOP,
-                List.of(new ClothesAttributeRequest(color.getId(), "검정"))), null);
+                List.of(new ClothesAttributeRequest(color.getId(), "검정"))), null, ownerId);
         entityManager.flush();
         entityManager.clear();
 
@@ -173,13 +175,13 @@ class ClothesServiceIntegrationTest {
         ClothesAttributeDefinition material = newDefinition("소재", "면", "울");
         ClothesDto created = service.create(new ClothesCreateRequest(ownerId, "셔츠", ClothesType.TOP, List.of(
                 new ClothesAttributeRequest(color.getId(), "검정"),
-                new ClothesAttributeRequest(size.getId(), "M"))), null);
+                new ClothesAttributeRequest(size.getId(), "M"))), null, ownerId);
         entityManager.flush();
         entityManager.clear();
 
         ClothesDto updated = service.update(created.id(), new ClothesUpdateRequest("긴팔 셔츠", ClothesType.OUTER,
                 List.of(new ClothesAttributeRequest(color.getId(), "흰색"),
-                        new ClothesAttributeRequest(material.getId(), "면"))), null);
+                        new ClothesAttributeRequest(material.getId(), "면"))), null, ownerId);
         entityManager.flush();
         entityManager.clear();
 
@@ -197,11 +199,11 @@ class ClothesServiceIntegrationTest {
         UUID ownerId = newOwner();
         ClothesAttributeDefinition color = newDefinition("색상", "검정", "흰색");
         ClothesDto created = service.create(new ClothesCreateRequest(ownerId, "셔츠", ClothesType.TOP,
-                List.of(new ClothesAttributeRequest(color.getId(), "검정"))), null);
+                List.of(new ClothesAttributeRequest(color.getId(), "검정"))), null, ownerId);
         entityManager.flush();
         entityManager.clear();
 
-        ClothesDto updated = service.update(created.id(), new ClothesUpdateRequest("새 이름", null, null), null);
+        ClothesDto updated = service.update(created.id(), new ClothesUpdateRequest("새 이름", null, null), null, ownerId);
 
         assertThat(updated.name()).isEqualTo("새 이름");
         assertThat(updated.attributes()).hasSize(1);
@@ -213,11 +215,11 @@ class ClothesServiceIntegrationTest {
         UUID ownerId = newOwner();
         ClothesAttributeDefinition color = newDefinition("색상", "검정", "흰색");
         ClothesDto created = service.create(new ClothesCreateRequest(ownerId, "셔츠", ClothesType.TOP,
-                List.of(new ClothesAttributeRequest(color.getId(), "검정"))), null);
+                List.of(new ClothesAttributeRequest(color.getId(), "검정"))), null, ownerId);
         entityManager.flush();
         entityManager.clear();
 
-        service.delete(created.id());
+        service.delete(created.id(), ownerId);
         entityManager.flush();
         entityManager.clear();
 
@@ -232,7 +234,7 @@ class ClothesServiceIntegrationTest {
         UUID ownerId = newOwner();
         stubStorage("/files/clothes/new.png");
 
-        service.create(new ClothesCreateRequest(ownerId, "셔츠", ClothesType.TOP, null), image());
+        service.create(new ClothesCreateRequest(ownerId, "셔츠", ClothesType.TOP, null), image(), ownerId);
         verify(fileStorage, never()).delete(any());
 
         TestTransaction.flagForRollback();
@@ -248,7 +250,7 @@ class ClothesServiceIntegrationTest {
                 new Clothes(ownerId, "셔츠", ClothesType.TOP, "/files/clothes/old.png"));
         stubStorage("/files/clothes/new.png");
 
-        service.update(clothes.getId(), new ClothesUpdateRequest(null, null, null), image());
+        service.update(clothes.getId(), new ClothesUpdateRequest(null, null, null), image(), ownerId);
         verify(fileStorage, never()).delete(any());
 
         TestTransaction.flagForRollback();
@@ -265,7 +267,7 @@ class ClothesServiceIntegrationTest {
                 new Clothes(ownerId, "셔츠", ClothesType.TOP, "/files/clothes/old.png"));
         stubStorage("/files/clothes/new.png");
 
-        service.update(clothes.getId(), new ClothesUpdateRequest(null, null, null), image());
+        service.update(clothes.getId(), new ClothesUpdateRequest(null, null, null), image(), ownerId);
         verify(fileStorage, never()).delete(any());
 
         TestTransaction.flagForCommit();
@@ -285,7 +287,7 @@ class ClothesServiceIntegrationTest {
                 new Clothes(ownerId, "셔츠", ClothesType.TOP, "/files/clothes/old.png"));
         stubStorage("/files/clothes/new.png");
 
-        service.delete(clothes.getId());
+        service.delete(clothes.getId(), ownerId);
         TestTransaction.flagForRollback();
         TestTransaction.end();
 
@@ -299,7 +301,7 @@ class ClothesServiceIntegrationTest {
                 new Clothes(ownerId, "셔츠", ClothesType.TOP, "/files/clothes/old.png"));
         stubStorage("/files/clothes/new.png");
 
-        service.delete(clothes.getId());
+        service.delete(clothes.getId(), ownerId);
         verify(fileStorage, never()).delete(any());
 
         TestTransaction.flagForCommit();
@@ -319,9 +321,73 @@ class ClothesServiceIntegrationTest {
         entityManager.clear();
 
         assertThat(clothesRepository.existsInFeed(clothes.getId())).isTrue();
-        assertThatThrownBy(() -> service.delete(clothes.getId())).isInstanceOf(ClothesInUseException.class);
+        assertThatThrownBy(() -> service.delete(clothes.getId(), ownerId))
+                .isInstanceOf(ClothesInUseException.class);
 
         assertThat(clothesRepository.findById(clothes.getId())).isPresent();
+    }
+
+    // ---------- 소유자가 아니면 거절한다 ----------
+
+    @Test
+    void 다른_사용자의_의상을_수정하면_접근이_거절되고_의상과_이미지는_그대로다() {
+        UUID ownerId = newOwner();
+        UUID otherId = newOwner();
+        Clothes clothes = clothesRepository.saveAndFlush(
+                new Clothes(ownerId, "셔츠", ClothesType.TOP, "/files/clothes/old.png"));
+        stubStorage("/files/clothes/new.png");
+        entityManager.clear();
+
+        assertThatThrownBy(() -> service.update(clothes.getId(),
+                new ClothesUpdateRequest("바뀐 이름", ClothesType.OUTER, null), image(), otherId))
+                .isInstanceOfSatisfying(OtbooException.class,
+                        e -> assertThat(e.getErrorCode()).isEqualTo(ErrorCode.ACCESS_DENIED));
+
+        entityManager.clear();
+        Clothes found = clothesRepository.findById(clothes.getId()).orElseThrow();
+        assertThat(found.getName()).isEqualTo("셔츠");
+        assertThat(found.getType()).isEqualTo(ClothesType.TOP);
+        assertThat(found.getImageUrl()).isEqualTo("/files/clothes/old.png");
+        verify(fileStorage, never()).upload(any(), any());
+        verify(fileStorage, never()).delete(any());
+    }
+
+    @Test
+    void 다른_사용자의_의상을_삭제하면_접근이_거절되고_의상과_속성이_남는다() {
+        UUID ownerId = newOwner();
+        UUID otherId = newOwner();
+        ClothesAttributeDefinition color = newDefinition("색상", "검정", "흰색");
+        Clothes clothes = clothesRepository.saveAndFlush(
+                new Clothes(ownerId, "셔츠", ClothesType.TOP, "/files/clothes/old.png"));
+        attributeRepository.save(new ClothesAttribute(clothes.getId(), color.getId(), "검정"));
+        entityManager.flush();
+        entityManager.clear();
+
+        assertThatThrownBy(() -> service.delete(clothes.getId(), otherId))
+                .isInstanceOfSatisfying(OtbooException.class,
+                        e -> assertThat(e.getErrorCode()).isEqualTo(ErrorCode.ACCESS_DENIED));
+
+        entityManager.clear();
+        assertThat(clothesRepository.findById(clothes.getId())).isPresent();
+        assertThat(attributeRepository.findAllByClothesId(clothes.getId())).hasSize(1);
+        verify(fileStorage, never()).delete(any());
+    }
+
+    @Test
+    void 다른_사용자_ID로_의상을_등록하면_접근이_거절되고_저장되지_않는다() {
+        UUID ownerId = newOwner();
+        UUID otherId = newOwner();
+        stubStorage("/files/clothes/new.png");
+
+        assertThatThrownBy(() -> service.create(
+                new ClothesCreateRequest(ownerId, "셔츠", ClothesType.TOP, null), image(), otherId))
+                .isInstanceOfSatisfying(OtbooException.class,
+                        e -> assertThat(e.getErrorCode()).isEqualTo(ErrorCode.ACCESS_DENIED));
+
+        entityManager.flush();
+        entityManager.clear();
+        assertThat(clothesRepository.findAll()).extracting(Clothes::getUserId).doesNotContain(ownerId);
+        verify(fileStorage, never()).upload(any(), any());
     }
 
     // ---------- 준비 ----------

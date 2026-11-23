@@ -16,6 +16,9 @@ import codeit.ootd.domain.feed.repository.FeedQueryRepository;
 import codeit.ootd.domain.feed.repository.FeedRepository;
 import codeit.ootd.domain.feed.service.FeedResponseAssembler;
 import codeit.ootd.domain.feed.service.FeedService;
+import codeit.ootd.domain.follow.repository.FollowRepository;
+import codeit.ootd.domain.notification.enums.NotificationLevel;
+import codeit.ootd.domain.notification.event.NotificationRequestedEvent;
 import codeit.ootd.domain.user.entity.User;
 import codeit.ootd.domain.user.repository.UserRepository;
 import codeit.ootd.domain.weather.dto.response.WeatherDto;
@@ -34,6 +37,7 @@ import java.util.UUID;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -54,6 +58,8 @@ public class FeedServiceImpl implements FeedService {
     private final FeedQueryRepository feedQueryRepository;
     private final FeedLikeRepository feedLikeRepository;
     private final FeedCommentRepository feedCommentRepository;
+    private final FollowRepository followRepository;
+    private final ApplicationEventPublisher eventPublisher;
 
     @Override
     @Transactional
@@ -135,7 +141,12 @@ public class FeedServiceImpl implements FeedService {
                 .map(feedResponseAssembler::toOotdDto)
                 .toList();
 
-        return feedMapper.toCreateResponse(savedFeed, authorDto, ootds);
+        FeedDto response =
+                feedMapper.toCreateResponse(savedFeed, authorDto, ootds);
+
+        publishNewFeedNotifications(userId);
+
+        return response;
     }
 
     @Override
@@ -255,6 +266,20 @@ public class FeedServiceImpl implements FeedService {
         feedLikeRepository.deleteAllByFeedId(feedId);
         feedCommentRepository.deleteAllByFeedId(feedId);
         feedRepository.delete(feed);
+    }
+
+    private void publishNewFeedNotifications(UUID authorId) {
+        List<UUID> followerIds =
+                followRepository.findFollowerIdsByFolloweeId(authorId);
+
+        for (UUID followerId : followerIds) {
+            eventPublisher.publishEvent(new NotificationRequestedEvent(
+                    followerId,
+                    "새 피드가 등록되었습니다.",
+                    "팔로우한 사용자가 새로운 피드를 등록했습니다.",
+                    NotificationLevel.INFO
+            ));
+        }
     }
 
     private void validateSearchRequest(FeedSearchRequest request) {

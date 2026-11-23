@@ -11,6 +11,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.EnumSource;
 import org.mockito.ArgumentCaptor;
+import org.springframework.context.ApplicationEventPublisher;
 
 import java.time.Clock;
 import java.time.Duration;
@@ -41,7 +42,8 @@ class AuthSessionServiceImplTest {
 
         authSessionService = new AuthSessionServiceImpl(
                 authSessionRepository,
-                clock
+                clock,
+                mock(ApplicationEventPublisher.class)
         );
     }
 

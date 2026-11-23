@@ -30,6 +30,7 @@ import static org.assertj.core.api.AssertionsForClassTypes.assertThat;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.mockito.Mockito.*;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -50,6 +51,23 @@ class SecurityConfigTest {
 
     @MockitoBean
     private UserRepository userRepository;
+
+    @Test
+    @DisplayName("SockJS 연결 정보는 인증 없이 조회할 수 있다")
+    void sockJsInfo_withoutToken_returnsOk() throws Exception {
+        mockMvc.perform(get("/ws/info"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.websocket").value(true));
+    }
+
+    @Test
+    @DisplayName("SockJS 전송은 CSRF 없이 통과하고 없는 세션은 404를 반환한다")
+    void sockJsSend_withoutCsrf_reachesTransport() throws Exception {
+        mockMvc.perform(post("/ws/000/security-test/xhr_send")
+                        .contentType("application/json")
+                        .content("[]"))
+                .andExpect(status().isNotFound());
+    }
 
     @Test
     @DisplayName("인증 없이 보호된 API에 접근하면 401과 오류 응답을 반환한다")
@@ -227,6 +245,13 @@ class SecurityConfigTest {
     }
 
     @Test
+    @DisplayName("프로필 이미지 조회는 JWT 인증 없이 접근할 수 있다")
+    void profileImage_withoutAuthentication_shouldReturnOk() throws Exception {
+        mockMvc.perform(get("/files/profiles/test.jpg"))
+                .andExpect(status().isOk());
+    }
+
+    @Test
     @DisplayName("보호된 API는 인증 없이 접근하면 401을 반환한다")
     void protectedApi_withoutAuthentication_shouldReturn401() throws Exception {
         mockMvc.perform(get("/api/security-test/protected"))
@@ -238,6 +263,11 @@ class SecurityConfigTest {
 
         @GetMapping("/files/clothes/test.jpeg")
         ResponseEntity<Void> image() {
+            return ResponseEntity.ok().build();
+        }
+
+        @GetMapping("/files/profiles/test.jpg")
+        ResponseEntity<Void> profileImage() {
             return ResponseEntity.ok().build();
         }
 
@@ -263,6 +293,11 @@ class SecurityConfigTest {
         TestAuthController testAuthController() {
             return new TestAuthController();
         }
+
+        @Bean
+        TestController testController() {
+            return new TestController();
+        }
     }
 
     @RestController
@@ -281,6 +316,13 @@ class SecurityConfigTest {
 
     }
 
-
+    @Test
+    @DisplayName("비인증 사용자가 보호된 API에 접근하면 401을 반환한다")
+    void unauthenticated_api_returns_401() throws Exception {
+        mockMvc.perform(get("/api/recommendations")
+                        .param("weatherId", UUID.randomUUID().toString()))
+                .andExpect(status().isUnauthorized());
+    }
 }
+
 

@@ -1,0 +1,6 @@
+**
+!deploy/
+!deploy/embedding/
+!deploy/embedding/requirements.txt
+!scripts/
+!scripts/embedding_server.py

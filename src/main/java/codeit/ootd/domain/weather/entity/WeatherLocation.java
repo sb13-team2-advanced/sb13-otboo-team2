@@ -20,7 +20,7 @@ public class WeatherLocation extends BaseTimeEntity {
     private String cellId;
 
     @Column(nullable = false)
-    private short resolution = 8;
+    private short resolution = 7;
 
     @Column(nullable = false)
     private double latitude;

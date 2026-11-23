@@ -6,7 +6,9 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 
 import codeit.ootd.domain.clothes.dto.request.ClothesAttributeDefCreateRequest;
 import codeit.ootd.domain.clothes.dto.request.ClothesAttributeDefUpdateRequest;
@@ -18,16 +20,21 @@ import codeit.ootd.domain.clothes.exception.ClothesAttributeValuesDuplicatedExce
 import codeit.ootd.domain.clothes.exception.InvalidSortFieldException;
 import codeit.ootd.domain.clothes.repository.ClothesAttributeDefinitionRepository;
 import codeit.ootd.domain.clothes.repository.ClothesAttributeRepository;
+import codeit.ootd.domain.notification.enums.NotificationLevel;
+import codeit.ootd.domain.notification.event.NotificationRequestedEvent;
+import codeit.ootd.domain.user.repository.UserRepository;
 import codeit.ootd.global.enums.SortDirection;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.InOrder;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.domain.Sort;
 import org.springframework.test.util.ReflectionTestUtils;
@@ -40,6 +47,12 @@ class ClothesAttributeDefinitionServiceImplTest {
 
     @Mock
     private ClothesAttributeRepository attributeRepository;
+
+    @Mock
+    private UserRepository userRepository;
+
+    @Mock
+    private ApplicationEventPublisher eventPublisher;
 
     @InjectMocks
     private ClothesAttributeDefinitionServiceImpl service;
@@ -86,6 +99,41 @@ class ClothesAttributeDefinitionServiceImplTest {
                 .isInstanceOf(ClothesAttributeValuesDuplicatedException.class);
 
         verify(definitionRepository, never()).saveAndFlush(any());
+    }
+
+    @Test
+    void 속성_정의를_등록하면_활성_사용자_모두에게_알림_이벤트를_발행한다() {
+        UUID firstUserId = UUID.randomUUID();
+        UUID secondUserId = UUID.randomUUID();
+        given(definitionRepository.existsByName("두께")).willReturn(false);
+        given(definitionRepository.saveAndFlush(any(ClothesAttributeDefinition.class)))
+                .willAnswer(invocation -> invocation.getArgument(0));
+        given(userRepository.findActiveUserIds()).willReturn(List.of(firstUserId, secondUserId));
+
+        service.create(new ClothesAttributeDefCreateRequest(" 두께 ", List.of("얇음", "두꺼움")));
+
+        ArgumentCaptor<NotificationRequestedEvent> captor =
+                ArgumentCaptor.forClass(NotificationRequestedEvent.class);
+        verify(eventPublisher, times(2)).publishEvent(captor.capture());
+        List<NotificationRequestedEvent> events = captor.getAllValues();
+        assertThat(events).extracting(NotificationRequestedEvent::receiverId)
+                .containsExactlyInAnyOrder(firstUserId, secondUserId);
+        assertThat(events).allSatisfy(event -> {
+            assertThat(event.title()).isEqualTo("새로운 의상 속성이 추가되었습니다.");
+            assertThat(event.content()).isEqualTo("'두께' 속성이 추가되었습니다.");
+            assertThat(event.level()).isEqualTo(NotificationLevel.INFO);
+        });
+    }
+
+    @Test
+    void 이름이_중복되어_등록에_실패하면_알림_이벤트를_발행하지_않는다() {
+        given(definitionRepository.existsByName("두께")).willReturn(true);
+
+        assertThatThrownBy(() -> service.create(
+                new ClothesAttributeDefCreateRequest("두께", List.of("얇음"))))
+                .isInstanceOf(ClothesAttributeDefinitionNameDuplicatedException.class);
+
+        verifyNoInteractions(eventPublisher);
     }
 
     @Test

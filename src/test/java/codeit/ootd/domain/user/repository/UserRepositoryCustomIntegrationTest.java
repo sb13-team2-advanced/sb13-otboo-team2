@@ -659,9 +659,31 @@ class UserRepositoryCustomIntegrationTest {
         assertEquals(1L, totalCount);
     }
 
+    @Test
+    @DisplayName("활성 사용자 ID 조회는 비활성과 탈퇴 사용자를 제외한다")
+    void findActiveUserIds_excludesDeactivatedAndDeletedUsers() {
+        // given
+        User active = User.create(
+                "활성", "active-ids@example.com", "encoded-password"
+        );
+        User deactivated = User.create(
+                "비활성", "deactivated-ids@example.com", "encoded-password"
+        );
+        User deleted = User.create(
+                "탈퇴", "deleted-ids@example.com", "encoded-password"
+        );
+        deactivated.deactivate();
+        deleted.markDeleted();
 
+        userRepository.saveAllAndFlush(List.of(active, deactivated, deleted));
+        entityManager.clear();
 
+        // when
+        List<UUID> ids = userRepository.findActiveUserIds();
 
-
-
+        // then
+        assertTrue(ids.contains(active.getId()));
+        assertFalse(ids.contains(deactivated.getId()));
+        assertFalse(ids.contains(deleted.getId()));
+    }
 }

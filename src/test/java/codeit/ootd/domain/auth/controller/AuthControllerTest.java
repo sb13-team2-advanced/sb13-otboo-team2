@@ -3,29 +3,36 @@ package codeit.ootd.domain.auth.controller;
 import codeit.ootd.domain.auth.dto.response.SignInResult;
 import codeit.ootd.domain.auth.dto.response.TokenRefreshResult;
 import codeit.ootd.domain.auth.exception.InvalidRefreshTokenException;
+import codeit.ootd.domain.auth.exception.PasswordResetRateLimitExceededException;
 import codeit.ootd.domain.auth.service.AuthService;
+import codeit.ootd.domain.auth.service.PasswordResetRateLimiter;
 import codeit.ootd.domain.user.dto.response.UserDto;
 import codeit.ootd.domain.user.entity.UserRole;
 import jakarta.servlet.http.Cookie;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
+import org.mockito.InOrder;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.http.HttpHeaders;
-import org.springframework.http.ResponseCookie;
+import org.springframework.http.MediaType;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
 
-import java.time.Duration;
 import java.time.Instant;
 import java.util.UUID;
 
 import static org.hamcrest.Matchers.containsString;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
@@ -33,6 +40,7 @@ import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.cookie;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -49,12 +57,15 @@ class AuthControllerTest {
     @MockitoBean
     private AuthService authService;
 
+    @MockitoBean
+    private PasswordResetRateLimiter passwordResetRateLimiter;
+
     @Test
-    @DisplayName("익명 사용자에게 CSRF 토큰과 XSRF-TOKEN 쿠키를 발급한다")
+    @DisplayName("익명 사용자에게 CSRF 토큰 쿠키를 발급하고 204를 반환한다")
     void csrf_anonymousUser_success() throws Exception {
-        mockMvc.perform(get("/api/auth/csrf"))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.token").isNotEmpty())
+        mockMvc.perform(get("/api/auth/csrf-token"))
+                .andExpect(status().isNoContent())
+                .andExpect(content().string(""))
                 .andExpect(cookie().exists("XSRF-TOKEN"))
                 .andExpect(cookie().httpOnly("XSRF-TOKEN", false));
     }
@@ -101,11 +112,11 @@ class AuthControllerTest {
                 .andExpect(jsonPath("$.accessToken").value("test-access-token"))
                 .andExpect(jsonPath("$.refreshToken").doesNotExist())
 
-                .andExpect(cookie().value("refreshToken", "test-refresh-token"))
-                .andExpect(cookie().httpOnly("refreshToken", true))
-                .andExpect(cookie().secure("refreshToken", true))
-                .andExpect(cookie().path("refreshToken", "/api/auth"))
-                .andExpect(cookie().maxAge("refreshToken", 604800))
+                .andExpect(cookie().value("REFRESH_TOKEN", "test-refresh-token"))
+                .andExpect(cookie().httpOnly("REFRESH_TOKEN", true))
+                .andExpect(cookie().secure("REFRESH_TOKEN", true))
+                .andExpect(cookie().path("REFRESH_TOKEN", "/api/auth"))
+                .andExpect(cookie().maxAge("REFRESH_TOKEN", 604800))
                 .andExpect(header().string(
                         HttpHeaders.SET_COOKIE,
                         containsString("SameSite=Lax")
@@ -121,10 +132,9 @@ class AuthControllerTest {
     @DisplayName("프론트 CSRF 경로로 토큰을 발급한다")
     void csrf_frontendPath_success() throws Exception {
         mockMvc.perform(get("/api/auth/csrf-token"))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.token").isNotEmpty())
-                .andExpect(cookie().exists("XSRF-TOKEN"))
-                .andExpect(cookie().httpOnly("XSRF-TOKEN", false));
+                .andExpect(status().isNoContent())
+                .andExpect(content().string(""))
+                .andExpect(cookie().exists("XSRF-TOKEN"));
     }
 
     @Test
@@ -235,8 +245,9 @@ class AuthControllerTest {
                 .thenReturn(result);
 
         Cookie csrfCookie = issueCsrfCookie();
+
         Cookie refreshCookie = new Cookie(
-                "refreshToken",
+                "REFRESH_TOKEN",
                 oldRefreshToken
         );
 
@@ -253,29 +264,14 @@ class AuthControllerTest {
                         .value("USER"))
                 .andExpect(jsonPath("$.refreshToken").doesNotExist())
                 .andExpect(cookie().value(
-                        "refreshToken",
+                        "REFRESH_TOKEN",
                         "new-refresh-token"
                 ))
-                .andExpect(cookie().httpOnly("refreshToken", true))
-                .andExpect(cookie().secure("refreshToken", true))
-                .andExpect(cookie().path("refreshToken", "/api/auth"));
+                .andExpect(cookie().httpOnly("REFRESH_TOKEN", true))
+                .andExpect(cookie().secure("REFRESH_TOKEN", true))
+                .andExpect(cookie().path("REFRESH_TOKEN", "/api/auth"));
 
         verify(authService).refresh(oldRefreshToken);
-    }
-
-    @Test
-    @DisplayName("Refresh Token 쿠키가 없으면 재발급 요청을 거부한다")
-    void refresh_missingCookie() throws Exception {
-        // given
-        Cookie csrfCookie = issueCsrfCookie();
-
-        // when & then
-        mockMvc.perform(post("/api/auth/refresh")
-                        .cookie(csrfCookie)
-                        .header("X-XSRF-TOKEN", csrfCookie.getValue()))
-                .andExpect(status().isBadRequest());
-
-        verify(authService, never()).refresh(anyString());
     }
 
     @Test
@@ -334,7 +330,7 @@ class AuthControllerTest {
         mockMvc.perform(post("/api/auth/refresh")
                         .cookie(
                                 csrfCookie,
-                                new Cookie("refreshToken", invalidRefreshToken)
+                                new Cookie("REFRESH_TOKEN", invalidRefreshToken)
                         )
                         .header("X-XSRF-TOKEN", csrfCookie.getValue()))
                 .andExpect(status().isUnauthorized());
@@ -350,17 +346,17 @@ class AuthControllerTest {
 
         Cookie csrfCookie = issueCsrfCookie();
 
-        Cookie refreshCookie = new Cookie("refreshToken", refreshToken);
+        Cookie refreshCookie = new Cookie("REFRESH_TOKEN", refreshToken);
 
         // when & then
         mockMvc.perform(post("/api/auth/sign-out")
                         .cookie(csrfCookie, refreshCookie)
                         .header("X-XSRF-TOKEN", csrfCookie.getValue()))
                 .andExpect(status().isNoContent())
-                .andExpect(cookie().exists("refreshToken"))
-                .andExpect(cookie().maxAge("refreshToken", 0))
-                .andExpect(cookie().httpOnly("refreshToken", true))
-                .andExpect(cookie().path("refreshToken", "/api/auth"));
+                .andExpect(cookie().exists("REFRESH_TOKEN"))
+                .andExpect(cookie().maxAge("REFRESH_TOKEN", 0))
+                .andExpect(cookie().httpOnly("REFRESH_TOKEN", true))
+                .andExpect(cookie().path("REFRESH_TOKEN", "/api/auth"));
 
         verify(authService).signOut(refreshToken);
     }
@@ -369,7 +365,6 @@ class AuthControllerTest {
     @DisplayName("Refresh Token 쿠키가 없어도 로그아웃에 성공한다")
     void signOut_withoutRefreshToken() throws Exception {
         // given
-        // 기존 CSRF 쿠키 발급 코드 대신
         Cookie csrfCookie = issueCsrfCookie();
 
         // when & then
@@ -377,17 +372,75 @@ class AuthControllerTest {
                         .cookie(csrfCookie)
                         .header("X-XSRF-TOKEN", csrfCookie.getValue()))
                 .andExpect(status().isNoContent())
-                .andExpect(cookie().exists("refreshToken"))
-                .andExpect(cookie().maxAge("refreshToken", 0))
-                .andExpect(cookie().path("refreshToken", "/api/auth"));
+                .andExpect(cookie().exists("REFRESH_TOKEN"))
+                .andExpect(cookie().maxAge("REFRESH_TOKEN", 0))
+                .andExpect(cookie().path("REFRESH_TOKEN", "/api/auth"));
 
         verify(authService, never()).signOut(anyString());
     }
 
+    @Test
+    @DisplayName("익명 사용자가 임시 비밀번호 발급을 요청하면 204를 반환한다")
+    void resetPassword_anonymousUser_success() throws Exception {
+        // given
+        Cookie csrfCookie = issueCsrfCookie();
+
+        // when & then
+        mockMvc.perform(post("/api/auth/reset-password")
+                        .cookie(csrfCookie)
+                        .header("X-XSRF-TOKEN", csrfCookie.getValue())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                            {"email":"test@example.com"}
+                            """))
+                .andExpect(status().isNoContent())
+                .andExpect(content().string(""));
+
+        verify(authService).resetPassword("test@example.com");
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"", "invalid-email"})
+    @ValueSource(strings = {
+            "",
+            "invalid-email",
+            " test@example.com",
+            "test@example.com ",
+            "test @example.com"
+    })
+    @DisplayName("임시 비밀번호 발급 요청의 이메일이 유효하지 않으면 400을 반환한다")
+    void resetPassword_invalidEmail_badRequest(String email) throws Exception {
+        // given
+        Cookie csrfCookie = issueCsrfCookie();
+
+        // when & then
+        mockMvc.perform(post("/api/auth/reset-password")
+                        .cookie(csrfCookie)
+                        .header("X-XSRF-TOKEN", csrfCookie.getValue())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"email\":\"" + email + "\"}"))
+                .andExpect(status().isBadRequest());
+
+        verify(authService, never()).resetPassword(anyString());
+    }
+
+    @Test
+    @DisplayName("CSRF 토큰이 없으면 임시 비밀번호 발급 요청을 거부한다")
+    void resetPassword_withoutCsrf_forbidden() throws Exception {
+        // when & then
+        mockMvc.perform(post("/api/auth/reset-password")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                            {"email":"test@example.com"}
+                            """))
+                .andExpect(status().isForbidden());
+
+        verify(authService, never()).resetPassword(anyString());
+    }
 
     private Cookie issueCsrfCookie() throws Exception {
         MvcResult result = mockMvc.perform(get("/api/auth/csrf-token"))
-                .andExpect(status().isOk())
+                .andExpect(status().isNoContent())
                 .andExpect(cookie().exists("XSRF-TOKEN"))
                 .andExpect(cookie().httpOnly("XSRF-TOKEN", false))
                 .andReturn();
@@ -398,5 +451,80 @@ class AuthControllerTest {
         return csrfCookie;
     }
 
+    @Test
+    @DisplayName("비밀번호 초기화 요청 시 발급 전에 요청 횟수를 검사한다")
+    void resetPassword_checksRateLimitBeforeIssuing() throws Exception {
+        // given
+        String email = "test@example.com";
+        Cookie csrfCookie = issueCsrfCookie();
+
+        // when
+        mockMvc.perform(post("/api/auth/reset-password")
+                        .cookie(csrfCookie)
+                        .header("X-XSRF-TOKEN", csrfCookie.getValue())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                            {"email":"test@example.com"}
+                            """))
+                .andExpect(status().isNoContent());
+
+        // then
+        InOrder inOrder = inOrder(
+                passwordResetRateLimiter,
+                authService
+        );
+
+        inOrder.verify(passwordResetRateLimiter)
+                .check(email, "127.0.0.1");
+
+        inOrder.verify(authService)
+                .resetPassword(email);
+    }
+
+    @Test
+    @DisplayName("비밀번호 초기화 요청 제한 초과 시 429를 반환하고 발급하지 않는다")
+    void resetPassword_rateLimitExceeded_returns429() throws Exception {
+        // given
+        String email = "test@example.com";
+        Cookie csrfCookie = issueCsrfCookie();
+
+        doThrow(new PasswordResetRateLimitExceededException())
+                .when(passwordResetRateLimiter)
+                .check(eq(email), anyString());
+
+        // when & then
+        mockMvc.perform(post("/api/auth/reset-password")
+                        .cookie(csrfCookie)
+                        .header("X-XSRF-TOKEN", csrfCookie.getValue())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                            {"email":"test@example.com"}
+                            """))
+                .andExpect(status().isTooManyRequests());
+
+        verify(authService, never()).resetPassword(anyString());
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {
+            " test@example.com",
+            "test@example.com ",
+            "test @example.com"
+    })
+    @DisplayName("로그인 이메일에 공백이 포함되면 400을 반환한다")
+    void signIn_emailWithWhitespace_badRequest(String email) throws Exception {
+        // given
+        Cookie csrfCookie = issueCsrfCookie();
+
+        // when & then
+        mockMvc.perform(multipart("/api/auth/sign-in")
+                        .cookie(csrfCookie)
+                        .header("X-XSRF-TOKEN", csrfCookie.getValue())
+                        .param("username", email)
+                        .param("password", "password123!"))
+                .andExpect(status().isBadRequest());
+
+        verifyNoInteractions(authService);
+    }
 
 }

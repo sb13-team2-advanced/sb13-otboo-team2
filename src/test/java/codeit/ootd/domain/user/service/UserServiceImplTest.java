@@ -1,9 +1,11 @@
 package codeit.ootd.domain.user.service;
 
+import codeit.ootd.domain.auth.exception.SocialAccountPasswordResetNotAllowedException;
 import codeit.ootd.domain.auth.service.AuthSessionService;
 import codeit.ootd.domain.user.dto.request.UserCreateRequest;
 import codeit.ootd.domain.user.dto.response.UserDto;
 import codeit.ootd.domain.user.dto.response.UserListResponse;
+import codeit.ootd.domain.user.entity.SignupType;
 import codeit.ootd.domain.user.entity.User;
 import codeit.ootd.domain.user.entity.UserRole;
 import codeit.ootd.domain.user.entity.UserStatus;
@@ -26,6 +28,7 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.test.util.ReflectionTestUtils;
 
 import java.sql.SQLException;
+import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -72,7 +75,7 @@ class UserServiceImplTest {
                 "password123!"
         );
 
-        given(userRepository.existsByEmail(request.email()))
+        given(userRepository.existsByEmailIgnoreCase(request.email()))
                 .willReturn(true);
 
         // when & then
@@ -122,7 +125,7 @@ class UserServiceImplTest {
                 DuplicateEmailException.class,
                 () -> userService.signup(request)
         );
-        verify(userRepository).existsByEmail(request.email());
+        verify(userRepository).existsByEmailIgnoreCase(request.email());
         verify(userRepository).saveAndFlush(any(User.class));
     }
 
@@ -601,6 +604,171 @@ class UserServiceImplTest {
 
         verifyNoInteractions(passwordEncoder, authSessionService);
     }
+
+    @Test
+    @DisplayName("비밀번호 변경 시 임시 비밀번호를 파기한다")
+    void updatePassword_clearsTemporaryPassword() {
+        // given
+        UUID userId = UUID.randomUUID();
+        String newPassword = "newPassword123!";
+        String encodedPassword = "encoded-new-password";
+
+        User user = User.create(
+                "테스트 사용자",
+                "test@example.com",
+                "encoded-old-password"
+        );
+
+        user.issueTemporaryPassword(
+                "encoded-temporary-password",
+                Instant.parse("2026-11-12T00:03:00Z")
+        );
+
+        when(userRepository.findById(userId))
+                .thenReturn(Optional.of(user));
+
+        when(passwordEncoder.encode(newPassword))
+                .thenReturn(encodedPassword);
+
+        // when
+        userService.updatePassword(userId, newPassword);
+
+        // then
+        assertThat(user.getPassword())
+                .isEqualTo(encodedPassword);
+
+        assertThat(user.getTemporaryPassword()).isNull();
+        assertThat(user.getTemporaryPasswordExpiresAt()).isNull();
+
+        verify(authSessionService).revokeAllSessions(userId);
+    }
+
+    @Test
+    @DisplayName("대문자 이메일로 회원가입하면 소문자로 정규화하여 저장한다")
+    void signup_uppercaseEmail_savesNormalizedEmail() {
+        // given
+        UserCreateRequest request = new UserCreateRequest(
+                "테스트 사용자",
+                "TEST@Example.com",
+                "password123!"
+        );
+
+        given(passwordEncoder.encode(request.password()))
+                .willReturn("encoded-password");
+
+        given(userRepository.saveAndFlush(any(User.class)))
+                .willAnswer(invocation -> invocation.getArgument(0));
+
+        // when
+        UserDto result = userService.signup(request);
+
+        // then
+        verify(userRepository)
+                .existsByEmailIgnoreCase("test@example.com");
+
+        ArgumentCaptor<User> captor =
+                ArgumentCaptor.forClass(User.class);
+
+        verify(userRepository).saveAndFlush(captor.capture());
+
+        assertEquals("test@example.com", captor.getValue().getEmail());
+        assertEquals("test@example.com", result.email());
+    }
+
+    @Test
+    @DisplayName("대소문자만 다른 이메일도 중복 가입을 차단한다")
+    void signup_uppercaseDuplicateEmail_throwsException() {
+        // given
+        UserCreateRequest request = new UserCreateRequest(
+                "테스트 사용자",
+                "TEST@Example.com",
+                "password123!"
+        );
+
+        given(userRepository.existsByEmailIgnoreCase("test@example.com"))
+                .willReturn(true);
+
+        // when & then
+        assertThrows(
+                DuplicateEmailException.class,
+                () -> userService.signup(request)
+        );
+
+        verify(userRepository)
+                .existsByEmailIgnoreCase("test@example.com");
+
+        verify(userRepository, never())
+                .saveAndFlush(any(User.class));
+
+        verifyNoInteractions(passwordEncoder);
+    }
+
+    @Test
+    @DisplayName("소문자 이메일 UNIQUE 인덱스 위반 시 중복 이메일 예외가 발생한다")
+    void signup_lowercaseEmailUniqueViolation_throwsDuplicateEmailException() {
+        // given
+        UserCreateRequest request = new UserCreateRequest(
+                "테스트사용자",
+                "TEST@Example.com",
+                "password123!"
+        );
+
+        when(passwordEncoder.encode(request.password()))
+                .thenReturn("encoded-password");
+
+        ConstraintViolationException cause =
+                new ConstraintViolationException(
+                        "소문자 이메일 UNIQUE 인덱스 위반",
+                        new SQLException("duplicate key", "23505"),
+                        "uk_users_email_lower"
+                );
+
+        DataIntegrityViolationException exception =
+                new DataIntegrityViolationException("이메일 중복", cause);
+
+        when(userRepository.saveAndFlush(any(User.class)))
+                .thenThrow(exception);
+
+        // when & then
+        assertThrows(
+                DuplicateEmailException.class,
+                () -> userService.signup(request)
+        );
+
+        verify(userRepository)
+                .existsByEmailIgnoreCase("test@example.com");
+
+        verify(userRepository).saveAndFlush(any(User.class));
+    }
+
+    @Test
+    @DisplayName("소셜 가입자는 비밀번호를 변경할 수 없다")
+    void updatePassword_socialAccount_throwsException() {
+        // given
+        UUID userId = UUID.randomUUID();
+        String newPassword = "NewPassword123!";
+
+        User user = User.create(
+                "소셜사용자",
+                "social@example.com",
+                "encoded-old-password"
+        );
+
+        ReflectionTestUtils.setField(user, "signupType", SignupType.SOCIAL);
+
+        when(userRepository.findById(userId))
+                .thenReturn(Optional.of(user));
+
+        // when & then
+        assertThatThrownBy(() ->
+                userService.updatePassword(userId, newPassword)
+        ).isInstanceOf(SocialAccountPasswordResetNotAllowedException.class);
+
+        assertThat(user.getPassword()).isEqualTo("encoded-old-password");
+
+        verifyNoInteractions(passwordEncoder, authSessionService);
+    }
+
 
 
 

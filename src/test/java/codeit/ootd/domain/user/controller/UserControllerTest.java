@@ -12,6 +12,8 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.http.MediaType;
@@ -650,8 +652,30 @@ class UserControllerTest {
         verifyNoInteractions(userService);
     }
 
+    @ParameterizedTest
+    @ValueSource(strings = {
+            " test@example.com",
+            "test@example.com ",
+            "test @example.com"
+    })
+    @DisplayName("회원가입 이메일에 공백이 포함되면 400을 반환한다")
+    void signup_emailWithWhitespace_returnsBadRequest(String email)
+            throws Exception {
+        // given
+        UserCreateRequest request = new UserCreateRequest(
+                "테스트사용자",
+                email,
+                "password123!"
+        );
 
+        // when & then
+        mockMvc.perform(post("/api/users")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isBadRequest());
 
+        verifyNoInteractions(userService);
+    }
 
 
 

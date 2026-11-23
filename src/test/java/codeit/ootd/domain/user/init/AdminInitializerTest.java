@@ -49,7 +49,7 @@ class AdminInitializerTest {
     @DisplayName("초기 관리자 계정이 없으면 ADMIN 권한으로 생성한다")
     void initialize_adminNotExists_createsAdmin() {
         // given
-        when(userRepository.findByEmail(ADMIN_EMAIL))
+        when(userRepository.findByEmailIgnoreCase(ADMIN_EMAIL))
                 .thenReturn(Optional.empty());
 
         when(passwordEncoder.encode(ADMIN_PASSWORD))
@@ -80,7 +80,7 @@ class AdminInitializerTest {
         when(existingAdmin.getStatus()).thenReturn(UserStatus.ACTIVE);
         when(existingAdmin.isLocked()).thenReturn(false);
 
-        when(userRepository.findByEmail(ADMIN_EMAIL))
+        when(userRepository.findByEmailIgnoreCase(ADMIN_EMAIL))
                 .thenReturn(Optional.of(existingAdmin));
 
         // when
@@ -98,7 +98,7 @@ class AdminInitializerTest {
         User existingUser = mock(User.class);
 
         when(existingUser.getRole()).thenReturn(UserRole.USER);
-        when(userRepository.findByEmail(ADMIN_EMAIL))
+        when(userRepository.findByEmailIgnoreCase(ADMIN_EMAIL))
                 .thenReturn(Optional.of(existingUser));
 
         // when & then
@@ -123,7 +123,7 @@ class AdminInitializerTest {
         // when & then
         assertThatThrownBy(initializer::initialize)
                 .isInstanceOf(IllegalStateException.class)
-                .hasMessage("초기 관리자 이메일과 비밀번호 설정이 필요합니다.");
+                .hasMessage("초기 관리자 이메일과 비밀번호 설정을 확인해 주세요.");
 
         verifyNoInteractions(userRepository, passwordEncoder);
     }
@@ -137,7 +137,7 @@ class AdminInitializerTest {
         when(existingAdmin.getRole()).thenReturn(UserRole.ADMIN);
         when(existingAdmin.getStatus()).thenReturn(UserStatus.ACTIVE);
         when(existingAdmin.isLocked()).thenReturn(true);
-        when(userRepository.findByEmail(ADMIN_EMAIL))
+        when(userRepository.findByEmailIgnoreCase(ADMIN_EMAIL))
                 .thenReturn(Optional.of(existingAdmin));
 
         // when & then
@@ -147,6 +147,57 @@ class AdminInitializerTest {
 
         verify(userRepository, never()).save(any(User.class));
         verifyNoInteractions(passwordEncoder);
+    }
+
+    @Test
+    @DisplayName("초기 관리자 이메일은 소문자로 정규화하여 저장한다")
+    void initialize_uppercaseEmail_savesNormalizedEmail() {
+        // given
+        AdminInitializer initializer = new AdminInitializer(
+                userRepository,
+                passwordEncoder,
+                "관리자",
+                "ADMIN@Example.com",
+                ADMIN_PASSWORD
+        );
+
+        when(userRepository.findByEmailIgnoreCase(ADMIN_EMAIL))
+                .thenReturn(Optional.empty());
+
+        when(passwordEncoder.encode(ADMIN_PASSWORD))
+                .thenReturn("encoded-password");
+
+        // when
+        initializer.initialize();
+
+        // then
+        ArgumentCaptor<User> captor = ArgumentCaptor.forClass(User.class);
+        verify(userRepository).save(captor.capture());
+
+        assertThat(captor.getValue().getEmail())
+                .isEqualTo("admin@example.com");
+
+        verify(userRepository).findByEmailIgnoreCase(ADMIN_EMAIL);
+    }
+
+    @Test
+    @DisplayName("초기 관리자 이메일에 공백이 포함되면 초기화에 실패한다")
+    void initialize_emailWithWhitespace_throwsException() {
+        // given
+        AdminInitializer initializer = new AdminInitializer(
+                userRepository,
+                passwordEncoder,
+                "관리자",
+                " admin@example.com",
+                ADMIN_PASSWORD
+        );
+
+        // when & then
+        assertThatThrownBy(initializer::initialize)
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessage("초기 관리자 이메일과 비밀번호 설정을 확인해 주세요.");
+
+        verifyNoInteractions(userRepository, passwordEncoder);
     }
 
 

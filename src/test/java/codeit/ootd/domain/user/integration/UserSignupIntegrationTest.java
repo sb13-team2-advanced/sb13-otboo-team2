@@ -65,7 +65,7 @@ class UserSignupIntegrationTest {
         entityManager.clear();
 
         // then
-        User savedUser = userRepository.findByEmail(email)
+        User savedUser = userRepository.findByEmailIgnoreCase(email)
                 .orElseThrow();
 
         assertAll(

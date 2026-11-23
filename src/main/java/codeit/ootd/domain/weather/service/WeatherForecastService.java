@@ -5,13 +5,15 @@ import codeit.ootd.domain.notification.event.NotificationRequestedEvent;
 import codeit.ootd.domain.weather.entity.WeatherForecast;
 import codeit.ootd.domain.weather.entity.WeatherLocation;
 import codeit.ootd.domain.weather.repository.WeatherForecastRepository;
+import codeit.ootd.infra.weather.OwmHourlyForecastConverter.ThreeHourForecast;
 import codeit.ootd.infra.weather.dto.OwmForecastResponse;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
+import java.util.HashMap;
 import java.util.LinkedHashSet;
+import java.util.List;
 import java.util.Map;
-import java.util.Optional;
 import java.util.Set;
 import java.util.TreeMap;
 import java.util.UUID;
@@ -44,6 +46,22 @@ public class WeatherForecastService {
 
         Instant windowEnd = collectedAt.plus(Duration.ofHours(6));
 
+        List<Instant> forecastAts = response.list().stream()
+            .map(item -> Instant.ofEpochSecond(item.dt()))
+            .distinct()
+            .toList();
+
+        Map<Instant, WeatherForecast> existingForecasts = new HashMap<>();
+
+        if (!forecastAts.isEmpty()) {
+            weatherForecastRepository.findByLocationIdAndForecastAtIn(
+                location.getId(),
+                forecastAts
+            ).forEach(forecast ->
+                existingForecasts.put(forecast.getForecastAt(), forecast)
+            );
+        }
+
         Map<Instant, WeatherChangeDetector.WeatherChange> changes = new TreeMap<>();
 
         for (OwmForecastResponse.ForecastItem item : response.list()) {
@@ -66,15 +84,9 @@ public class WeatherForecastService {
 
             double windSpeed = item.wind().speed();
 
-            Optional<WeatherForecast> existingForecast =
-                weatherForecastRepository.findByLocationIdAndForecastAt(
-                    location.getId(),
-                    forecastAt
-                );
+            WeatherForecast forecast = existingForecasts.get(forecastAt);
 
-            if (existingForecast.isPresent()) {
-
-                WeatherForecast forecast = existingForecast.get();
+            if (forecast != null) {
 
                 if (forecastAt.isAfter(collectedAt)
                     && !forecastAt.isAfter(windowEnd)) {
@@ -98,11 +110,9 @@ public class WeatherForecastService {
                     windSpeed
                 );
 
-                weatherForecastRepository.save(forecast);
-
             } else {
 
-                WeatherForecast forecast = new WeatherForecast(
+                forecast = new WeatherForecast(
                     location.getId(),
                     forecastAt,
                     collectedAt,
@@ -114,9 +124,10 @@ public class WeatherForecastService {
                     snowAmount,
                     windSpeed
                 );
-
-                weatherForecastRepository.save(forecast);
             }
+
+            weatherForecastRepository.save(forecast);
+            existingForecasts.put(forecastAt, forecast);
         }
 
         if (changes.isEmpty()) {
@@ -126,8 +137,7 @@ public class WeatherForecastService {
         boolean temperatureUp = false;
         boolean temperatureDown = false;
 
-        Set<WeatherChangeDetector.PrecipitationType> precipitationTypes =
-            new LinkedHashSet<>();
+        Set<WeatherChangeDetector.PrecipitationType> precipitationTypes = new LinkedHashSet<>();
 
         for (WeatherChangeDetector.WeatherChange change : changes.values()) {
 
@@ -148,12 +158,13 @@ public class WeatherForecastService {
             precipitationTypes
         );
 
-        Set<UUID> recipientIds = recipientFinder.findRecipientIds(location.getCellId());
+        Set<UUID> recipientIds =
+            recipientFinder.findRecipientIds(location.getCellId());
 
-        for (UUID receiverId : recipientIds) {
+        for (UUID recipientId : recipientIds) {
             eventPublisher.publishEvent(
                 new NotificationRequestedEvent(
-                    receiverId,
+                    recipientId,
                     NOTIFICATION_TITLE,
                     content,
                     NotificationLevel.INFO
@@ -161,4 +172,74 @@ public class WeatherForecastService {
             );
         }
     }
+
+    @Transactional
+    public void saveHistoricalForecasts(
+        WeatherLocation location,
+        List<ThreeHourForecast> forecasts
+    ) {
+        Instant collectedAt = clock.instant();
+
+        List<Instant> forecastAts = forecasts.stream()
+            .map(ThreeHourForecast::forecastAt)
+            .filter(forecastAt -> forecastAt.isBefore(collectedAt))
+            .distinct()
+            .toList();
+
+        if (forecastAts.isEmpty()) {
+            return;
+        }
+
+        Map<Instant, WeatherForecast> existingForecasts = new HashMap<>();
+
+        weatherForecastRepository.findByLocationIdAndForecastAtIn(
+            location.getId(),
+            forecastAts
+        ).forEach(forecast ->
+            existingForecasts.put(forecast.getForecastAt(), forecast)
+        );
+
+        for (ThreeHourForecast item : forecasts) {
+
+            Instant forecastAt = item.forecastAt();
+
+            if (!forecastAt.isBefore(collectedAt)) {
+                continue;
+            }
+
+            WeatherForecast forecast = existingForecasts.get(forecastAt);
+
+            if (forecast != null) {
+
+                forecast.updateForecast(
+                    collectedAt,
+                    item.temperature(),
+                    item.humidity(),
+                    item.weatherCode(),
+                    item.precipitationProbability(),
+                    item.rainAmount(),
+                    item.snowAmount(),
+                    item.windSpeed()
+                );
+
+            } else {
+
+                forecast = new WeatherForecast(
+                    location.getId(),
+                    forecastAt,
+                    collectedAt,
+                    item.temperature(),
+                    item.humidity(),
+                    item.weatherCode(),
+                    item.precipitationProbability(),
+                    item.rainAmount(),
+                    item.snowAmount(),
+                    item.windSpeed()
+                );
+            }
+
+            weatherForecastRepository.save(forecast);
+            existingForecasts.put(forecastAt, forecast);
+        }
+    }   
 }
