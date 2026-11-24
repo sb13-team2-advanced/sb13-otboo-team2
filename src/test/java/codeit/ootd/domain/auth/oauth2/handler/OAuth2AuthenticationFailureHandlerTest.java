@@ -13,8 +13,13 @@ import org.springframework.security.oauth2.core.OAuth2AuthenticationException;
 
 class OAuth2AuthenticationFailureHandlerTest {
 
+    private static final String BASE_URL =
+            "https://d32h6socf0ryd3.cloudfront.net";
+
     private final OAuth2AuthenticationFailureHandler handler =
-            new OAuth2AuthenticationFailureHandler();
+            new OAuth2AuthenticationFailureHandler(
+                    new OAuth2RedirectUrlResolver(BASE_URL)
+            );
 
     @Test
     @DisplayName("미연동 소셜 계정은 로그인 화면으로 오류 코드와 함께 이동한다")
@@ -33,16 +38,16 @@ class OAuth2AuthenticationFailureHandlerTest {
         // then
         assertThat(response.getStatus()).isEqualTo(302);
         assertThat(response.getRedirectedUrl()).isEqualTo(
-                "/#/auth/login?error=oauth_failed"
+                BASE_URL + "/#/auth/login?error=oauth_failed"
                         + "&error_message=user_not_exists"
         );
+
         assertThat(response.getHeaders(HttpHeaders.SET_COOKIE))
                 .anySatisfy(cookie -> assertThat(cookie)
                         .contains("OAUTH2_LINK_TOKEN=")
                         .contains("Path=/oauth2/authorization")
                         .contains("Max-Age=0")
                 );
-
     }
 
     @Test
@@ -62,13 +67,13 @@ class OAuth2AuthenticationFailureHandlerTest {
         // then
         assertThat(response.getStatus()).isEqualTo(302);
         assertThat(response.getRedirectedUrl()).isEqualTo(
-                "/#/auth/login?error=oauth_failed"
+                BASE_URL + "/#/auth/login?error=oauth_failed"
                         + "&error_message=oauth_failed"
         );
     }
 
     @Test
-    @DisplayName("소셜 계정 연동 실패는 oauth_link_failed 오류 코드로 전달한다")
+    @DisplayName("소셜 계정 연동 실패 오류 코드는 일반 로그인 실패 경로로 전달된다")
     void authenticationFailure_linkError_redirectsToLogin()
             throws Exception {
         // given
@@ -76,25 +81,17 @@ class OAuth2AuthenticationFailureHandlerTest {
         var response = new MockHttpServletResponse();
 
         OAuth2AuthenticationException exception =
-                new OAuth2AuthenticationException(
-                        "oauth_link_failed"
-                );
+                new OAuth2AuthenticationException("oauth_link_failed");
 
         // when
-        handler.onAuthenticationFailure(
-                request,
-                response,
-                exception
-        );
+        handler.onAuthenticationFailure(request, response, exception);
 
         // then
         assertThat(response.getStatus()).isEqualTo(302);
-
-        assertThat(response.getRedirectedUrl())
-                .isEqualTo(
-                        "/#/auth/login?error=oauth_failed"
-                                + "&error_message=oauth_link_failed"
-                );
+        assertThat(response.getRedirectedUrl()).isEqualTo(
+                BASE_URL + "/#/auth/login?error=oauth_failed"
+                        + "&error_message=oauth_link_failed"
+        );
     }
 
     @Test
@@ -115,27 +112,20 @@ class OAuth2AuthenticationFailureHandlerTest {
                 );
 
         // when
-        handler.onAuthenticationFailure(
-                request,
-                response,
-                exception
-        );
+        handler.onAuthenticationFailure(request, response, exception);
 
         // then
-        assertThat(response.getRedirectedUrl())
-                .isEqualTo(
-                        "/#/settings?error_message=social_account_already_linked"
-                );
+        assertThat(response.getStatus()).isEqualTo(302);
+        assertThat(response.getRedirectedUrl()).isEqualTo(
+                BASE_URL + "/#/settings?error_message=social_account_already_linked"
+        );
 
         assertThat(response.getHeaders(HttpHeaders.SET_COOKIE))
-                .anySatisfy(cookie -> {
-                    assertThat(cookie)
-                            .contains("OAUTH2_LINK_TOKEN=")
-                            .contains("Max-Age=0")
-                            .contains("Path=/oauth2/authorization");
-                });
+                .anySatisfy(cookie -> assertThat(cookie)
+                        .contains("OAUTH2_LINK_TOKEN=")
+                        .contains("Max-Age=0")
+                        .contains("Path=/oauth2/authorization")
+                );
     }
-
-
 
 }

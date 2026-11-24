@@ -62,6 +62,9 @@ class OAuth2AuthenticationSuccessHandlerTest {
 
     private OAuth2AuthenticationSuccessHandler handler;
 
+    private static final String BASE_URL =
+            "https://d32h6socf0ryd3.cloudfront.net";
+
     @BeforeEach
     void setUp() {
         handler = new OAuth2AuthenticationSuccessHandler(
@@ -71,7 +74,8 @@ class OAuth2AuthenticationSuccessHandlerTest {
                 resolver,
                 linkRequestService,
                 socialAccountService,
-                failureHandler
+                failureHandler,
+                new OAuth2RedirectUrlResolver(BASE_URL)
         );
     }
 
@@ -126,7 +130,7 @@ class OAuth2AuthenticationSuccessHandlerTest {
 
         assertThat(response.getStatus()).isEqualTo(302);
         assertThat(response.getRedirectedUrl())
-                .isEqualTo("/#/recommendations");
+                .isEqualTo(BASE_URL + "/#/recommendations");
     }
 
 
@@ -180,7 +184,7 @@ class OAuth2AuthenticationSuccessHandlerTest {
                 .noneMatch(cookie -> cookie.startsWith("REFRESH_TOKEN="));
 
         assertThat(response.getRedirectedUrl())
-                .isEqualTo("/#/settings?link_success=true");
+                .isEqualTo(BASE_URL + "/#/settings?link_success=true");
     }
 
     @Test
