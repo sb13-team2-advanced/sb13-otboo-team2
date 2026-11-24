@@ -16,6 +16,7 @@ import zipfile
 ROOT = Path(__file__).resolve().parent
 CONTROLLER = 'http://127.0.0.1:8300'
 AUTH = 'Basic ' + base64.b64encode(b'admin:admin').decode()
+EMBEDDING_METRICS_URL = None
 
 
 def request(path, fields=None):
@@ -34,6 +35,35 @@ def snapshot(port):
             tags = dict(re.findall(r'(\w+)="([^"]*)"', line))
             values[tags['outcome'] + ':' + tags['reason']] = float(line.rsplit(' ', 1)[1])
     return values
+
+
+def observe(port):
+    with urllib.request.urlopen(f'http://127.0.0.1:{port}/actuator/prometheus', timeout=15) as response:
+        lines = response.read().decode().splitlines()
+    result = {'time_ms': round(time.time() * 1000), 'pools': {}, 'calls': {}}
+    for line in lines:
+        if line.startswith('#') or not line.strip():
+            continue
+        metric, number = line.rsplit(' ', 1)
+        if metric.startswith('outbound_http_pool_'):
+            tags = dict(re.findall(r'(\w+)="([^"]*)"', metric))
+            name = metric.split('{', 1)[0].removeprefix('outbound_http_pool_')
+            result['pools'].setdefault(tags['client'], {})[name] = float(number)
+        elif metric.startswith(('http_client_requests_seconds_count{', 'http_client_requests_seconds_sum{')):
+            tags = dict(re.findall(r'(\w+)="([^"]*)"', metric))
+            uri = tags.get('uri', '')
+            if uri in ['/embeddings', '/openai/v1/chat/completions']:
+                kind = 'count' if metric.startswith('http_client_requests_seconds_count') else 'sum'
+                group = result['calls'].setdefault(uri, {'count': 0, 'sum': 0})
+                group[kind] += float(number)
+        elif metric.startswith('process_cpu_usage'):
+            result['cpu'] = float(number)
+        elif metric.startswith('hikaricp_connections_pending'):
+            result['db_pending'] = float(number)
+    if EMBEDDING_METRICS_URL:
+        with urllib.request.urlopen(EMBEDDING_METRICS_URL, timeout=5) as response:
+            result['embedding_server'] = json.load(response)
+    return result
 
 
 def probe(port):
@@ -68,7 +98,9 @@ def diagnostics(port):
 def run(options):
     port = 8082 if options.mode == 'mock' else 8081
     before = snapshot(port)
-    fields = dict(testName=f'{options.mode}-{options.rps}rps-{options.threads}t-{options.runs}runs',
+    resources_before = observe(port)
+    observations = []
+    fields = dict(testName=f'{options.label}-{options.mode}-{options.rps}rps-{options.threads}t-{options.runs}runs',
                   scriptName='RecommendationLoadTest.groovy', scm='svn', scriptRevision='-1',
                   status='READY', threshold='R', runCount=options.runs, duration=600000,
                   agentCount=1, vuserPerAgent=options.threads, processes=1, threads=options.threads,
@@ -82,15 +114,17 @@ def run(options):
     while time.monotonic() < deadline:
         model = json.loads(request(f'/perftest/api/{test_id}'))
         status = model['status']['name']
+        observations.append(observe(port))
         if status != previous:
             print(json.dumps({'test_id': test_id, 'status': status}), flush=True)
             previous = status
         if status in {'FINISHED', 'FINISHED_WITH_WARNING', 'STOP_BY_ERROR', 'CANCELED'}:
             break
-        time.sleep(2)
+        time.sleep(0.5)
     else:
         raise TimeoutError('nGrinder did not finish within 600 seconds')
     after = snapshot(port)
+    resources_after = observe(port)
     delta = {key: after.get(key, 0) - before.get(key, 0) for key in after.keys() | before.keys()}
     filenames = json.loads(request(f'/perftest/api/{test_id}/logs'))
     samples = []
@@ -119,27 +153,61 @@ def run(options):
               'p95_ms': latencies[math.ceil(len(latencies) * .95) - 1],
               'p99_ms': latencies[math.ceil(len(latencies) * .99) - 1], 'max_ms': latencies[-1],
               'explanations': delta, 'ngrinder_status': model['status']['name']}
+    active = [sample for sample in observations if min(row[0] for row in samples) <= sample['time_ms'] <= max(row[1] for row in samples)]
+    result['label'] = options.label
+    result['pool_metrics'] = {}
+    for name, settings in resources_before['pools'].items():
+        result['pool_metrics'][name] = {'configured': settings}
+        for metric in ['leased', 'pending', 'available']:
+            values = [sample['pools'].get(name, {}).get(metric, 0) for sample in active]
+            result['pool_metrics'][name][metric + '_max'] = max(values, default=None)
+            result['pool_metrics'][name][metric + '_mean'] = round(sum(values) / len(values), 3) if values else None
+    result['http_client_mean_ms'] = {}
+    for uri, total in resources_after['calls'].items():
+        old = resources_before['calls'].get(uri, {'count': 0, 'sum': 0})
+        count = total['count'] - old['count']
+        result['http_client_mean_ms'][uri] = round((total['sum'] - old['sum']) * 1000 / count, 3) if count else None
+    result['cpu_max'] = max((sample.get('cpu', 0) for sample in active), default=None)
+    result['db_pending_max'] = max((sample.get('db_pending', 0) for sample in active), default=None)
+    result['monitor_samples'] = len(active)
+    if 'embedding_server' in resources_after:
+        result['embedding_server_mean_ms'] = {}
+        for name in ['encode', 'http']:
+            current = resources_after['embedding_server']
+            old = resources_before['embedding_server']
+            count = current[name + '_count'] - old[name + '_count']
+            result['embedding_server_mean_ms'][name] = round(
+                (current[name + '_seconds'] - old[name + '_seconds']) * 1000 / count, 3) if count else None
+            result['embedding_server_mean_ms'][name + '_count'] = count
+    (output / f'{test_id}-resources.json').write_text(json.dumps(observations))
     (output / f'{test_id}-summary.json').write_text(json.dumps(result, indent=2))
     print(json.dumps(result), flush=True)
+    return result
 
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
-    parser.add_argument('action', choices=['probe', 'run', 'mock-suite', 'diagnostics'])
+    parser.add_argument('action', choices=['probe', 'run', 'mock-suite', 'pool-suite', 'diagnostics'])
+    parser.add_argument('--label', default='pool-check')
+    parser.add_argument('--embedding-metrics-url')
     parser.add_argument('--port', type=int, default=8081)
     parser.add_argument('--mode', choices=['real', 'mock'], default='mock')
     parser.add_argument('--rps', type=float, default=8.3)
     parser.add_argument('--threads', type=int, default=20)
     parser.add_argument('--runs', type=int, default=13)
     options = parser.parse_args()
+    EMBEDDING_METRICS_URL = options.embedding_metrics_url
     if options.action == 'probe':
         probe(options.port)
     elif options.action == 'diagnostics':
         diagnostics(options.port)
-    elif options.action == 'mock-suite':
+    elif options.action in ['mock-suite', 'pool-suite']:
         options.mode = 'mock'
-        for rate, threads, runs in [(1, 1, 5), (8.3, 20, 13), (16.7, 30, 17), (100, 100, 30)]:
+        stages = [(1, 1, 5), (8.3, 20, 13), (16.7, 30, 17), (100, 100, 15 if options.action == 'pool-suite' else 30)]
+        for rate, threads, runs in stages:
             options.rps, options.threads, options.runs = rate, threads, runs
-            run(options)
+            result = run(options)
+            if not result['complete'] or result['errors'] or result['ngrinder_status'] != 'FINISHED':
+                raise RuntimeError(f"Test {result['test_id']} failed validation; remaining stages were not started")
     else:
         run(options)

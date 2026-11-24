@@ -115,6 +115,7 @@ python3 ngrinder/recommendation/run_measurement.py mock-suite
 | 측정 3 |  100회/초 |     100 |        30 |     3,000 |
 
 자동 도구는 Controller `127.0.0.1:8300`, 실제 백엔드 `8081`, 모의 백엔드 `8082`를 사용한다.
+순차 실행에서는 표본 누락·검증 실패·비정상 종료가 발생하면 다음 단계를 시작하지 않는다.
 `--port`는 `probe`와 `diagnostics`에 적용되며 `run`의 지표 수집 포트를 변경하지 않는다.
 리소스의 대상 주소를 바꾸면 도구의 고정 지표 수집 주소와 일치하는지 확인해야 한다.
 
@@ -168,6 +169,88 @@ python3 ngrinder/recommendation/run_measurement.py diagnostics --port 8082
 
 `diagnostics`는 조회 시점의 지표이며 실행별 증가분이나 전체 구간 모니터링이 아니다.
 GC·메모리·연결 풀 대기 등 추가 원인 분석에는 별도 지표나 스레드 덤프를 사용한다.
+
+## HTTP 연결 풀 비교
+
+Groq과 임베딩은 각각 독립된 Apache HTTP 연결 풀을 사용한다. 기본값은 각 풀의 전체 최대 25개,
+동일 목적지 최대 5개다. Groq 목적지가 하나이면 전체 최대값보다 목적지 최대값이 먼저 적용된다.
+
+같은 JAR·계정·날씨·모의 지연 500ms로 아래 두 구성을 각각 실행한다.
+두 실행 사이에는 측정용 백엔드만 재시작하고 임베딩 풀과 제한 시간은 유지한다.
+
+| 설정 | 기준 | Groq 풀 확대 |
+|------|-----:|-------------:|
+| `ootd.groq.pool.max-total` | 25 | 100 |
+| `ootd.groq.pool.max-per-route` | 5 | 100 |
+| `ootd.embedding.pool.max-total` | 25 | 25 |
+| `ootd.embedding.pool.max-per-route` | 5 | 5 |
+
+연결 획득 대기는 `ootd.groq.pool.acquire-timeout`, `ootd.embedding.pool.acquire-timeout`으로
+설정하며 기본값은 기존 Apache 기본값과 같은 `3m`다. 이 비교에서는 대기 제한 시간을 변경하지 않는다.
+연결 제한 시간은 각각 2초, 응답 제한 시간은 Groq 8초·임베딩 10초다.
+연결 획득 대기는 전체 API 응답 제한 시간과 다르므로 응답 목표 2초를 보장하지 않는다.
+
+```sh
+python3 ngrinder/recommendation/run_measurement.py pool-suite --label baseline
+# Groq 풀 크기를 변경하여 측정용 백엔드를 재시작한 다음 실행한다.
+python3 ngrinder/recommendation/run_measurement.py pool-suite --label tuned
+```
+
+`pool-suite`는 `mock-suite`와 같은 워밍업·8.3·16.7 목표 단계를 사용한다.
+100 목표 단계만 100스레드 × 15회 = 1,500건으로 실행하며 기준·확대 양쪽에 동일하게 적용한다.
+최대 100개 작업 스레드를 사용하는 비교 실험이며 서비스 동접 500~1,000명 검증을 의미하지 않는다.
+
+도구는 약 0.5초 간격으로 서버 지표를 조회하고, 첫 요청 시작부터 마지막 응답 완료 사이의 표본만 요약한다.
+수집 비용과 간격 오차가 있으며 순간적인 대기를 놓칠 수 있으므로 관측 최대값을 절대 최대값으로 해석하지 않는다.
+원본 표본은 `results/{test_id}-resources.json`에 저장한다.
+
+| 지표 / 결과 필드 | 의미 |
+|------------------|------|
+| `outbound.http.pool.leased` | 사용 중인 연결 수 |
+| `outbound.http.pool.pending` | 연결을 받기 위해 대기 중인 요청 수 |
+| `outbound.http.pool.available` | 재사용 가능한 유휴 연결 수 |
+| `outbound.http.pool.max`, `outbound.http.pool.per.route.max` | 전체·동일 목적지 연결 상한 |
+| `pool_metrics` | `client=groq/embedding`별 설정과 사용·대기·유휴의 관측 최대 및 평균 |
+| `http_client_mean_ms` | 실행 전후 HTTP 클라이언트 카운터 차이로 계산한 호출 평균 시간. 연결 획득 대기도 포함 |
+| `db_pending_max`, `cpu_max` | 측정 구간에서 관측한 DB 연결 대기 수·프로세스 CPU 사용률 최대값 |
+
+Groq 사용 연결 수가 목적지 상한에 도달하고 대기 요청이 쌓이는지 먼저 확인한다.
+풀 확대 후 같은 부하에서 대기 수·호출 지연이 줄고 처리량이 증가하면 Groq 풀 제한의 영향을 뒷받침한다.
+이후 임베딩 풀이나 CPU가 새 제한이 될 수 있으므로 Groq 풀 확대만으로 전체 병목 해소를 단정하지 않는다.
+이 비교는 모의 Groq를 사용하므로 실제 Groq의 호출 한도와 지연 개선을 증명하지 않는다.
+
+### 임베딩 연결 풀 비교
+
+Groq 풀을 전체·목적지별 100개로 고정한 뒤, 임베딩 전체 상한 25개를 유지하면서
+`ootd.embedding.pool.max-per-route`만 5·10·20개로 순차 변경한다.
+각 설정에서 별도 워밍업과 동일한 `pool-suite`를 실행한다.
+오류 발생 또는 처리량 정체와 지연 악화가 관측되면 다음 확대를 진행하지 않는다.
+
+`embedding_observer.py`는 기존 임베딩 이미지의 `/app/scripts/embedding_observer.py`에
+읽기 전용으로 마운트해 다음 진입점으로 실행할 수 있다.
+모델·입력·반환값은 유지하고 추론과 HTTP 처리의 누적 횟수·시간만 측정한다.
+
+```text
+python -m uvicorn scripts.embedding_observer:app --host 0.0.0.0 --port 8001 --workers 1
+```
+
+측정 시 같은 이미지·플랫폼·워커 수·CPU·메모리 제한을 유지하고 기존 컨테이너는 잠시 중지한다.
+실험 종료 후 임시 컨테이너를 중지하고 기존 컨테이너를 다시 시작한다.
+
+```sh
+python3 ngrinder/recommendation/monitor_embedding.py --output ngrinder/recommendation/results/embedding-container-resources.jsonl
+python3 ngrinder/recommendation/run_measurement.py pool-suite --label embedding-5 --embedding-metrics-url http://127.0.0.1:8001/_loadtest/metrics
+```
+
+서버를 해당 풀 크기로 재시작한 다음 `--label embedding-10`, `embedding-20`으로 반복한다.
+`embedding_server_mean_ms.encode`는 모델 encode 벽시계 시간이며 CPU 연산 시간만을 의미하지 않는다.
+`embedding_server_mean_ms.http`는 서버 미들웨어 진입부터 응답 객체 반환까지의 시간으로,
+서버 내부 스레드 대기·추론·직렬화 등을 포함하지만 클라이언트 연결 획득 대기와 전체 응답 전송 시간은 포함하지 않는다.
+각 count와 완료 요청 수의 일치도 확인한다.
+
+자원 수집기는 Docker CPU·메모리 표본을 JSONL로 저장한다. CPU 100%는 약 1코어 사용에 해당하며,
+메모리는 Docker가 보고한 작업 집합 값이다. 각 테스트의 실제 요청 시간 구간에 해당하는 표본끼리 비교한다.
+로컬 Docker의 CPU·메모리 및 에뮬레이션 조건은 운영 서버 성능과 다를 수 있다.
 
 ## 종료
 

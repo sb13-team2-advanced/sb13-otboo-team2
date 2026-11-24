@@ -26,7 +26,7 @@ repositories {
 sourceSets {
     ngrinder {
         groovy {
-            srcDir 'performance/ngrinder'
+            srcDir 'ngrinder/recommendation'
             include '**/*.groovy'
         }
     }
@@ -54,6 +54,7 @@ dependencies {
 
     // 외부 API 호출용 RestClient
     implementation 'org.springframework.boot:spring-boot-starter-restclient'
+    implementation 'org.apache.httpcomponents.client5:httpclient5'
 
     // 구매 링크 HTML 파싱 (의상 속성 추출)
     implementation 'org.jsoup:jsoup:1.18.3'
