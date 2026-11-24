@@ -1,0 +1,4 @@
+target.properties
+resources/target.properties
+results/
+__pycache__/

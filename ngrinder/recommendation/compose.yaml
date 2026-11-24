@@ -1,0 +1,19 @@
+name: otboo-ngrinder
+services:
+  controller:
+    image: ngrinder/controller:3.5.9-p1
+    platform: linux/amd64
+    ports:
+      - "127.0.0.1:8300:80"
+    volumes:
+      - controller-data:/opt/ngrinder-controller
+  agent:
+    image: ngrinder/agent:3.5.9-p1
+    platform: linux/amd64
+    depends_on:
+      - controller
+    restart: on-failure
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+volumes:
+  controller-data:

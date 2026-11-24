@@ -15,6 +15,11 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.MethodSource;
 import org.junit.jupiter.params.provider.ValueSource;
+import org.junit.jupiter.params.provider.CsvSource;
+import ch.qos.logback.classic.Logger;
+import ch.qos.logback.classic.spi.ILoggingEvent;
+import ch.qos.logback.core.read.ListAppender;
+import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
@@ -115,6 +120,33 @@ class GroqClientTest {
 
         // when/then
         assertThatThrownBy(() -> client.generate("지시", "입력")).isInstanceOf(RestClientException.class);
+    }
+
+    @ParameterizedTest
+    @CsvSource({"tokens per minute,TPM", "requests per minute,RPM", "tokens per day,TPD", "requests per day,RPD", "other,UNKNOWN"})
+    void 제한_종류와_숫자만_기록하고_조직과_오류_원문은_노출하지_않는다(String dimension, String expected) {
+        // given
+        Logger logger = (Logger) LoggerFactory.getLogger(GroqClient.class);
+        ListAppender<ILoggingEvent> appender = new ListAppender<>();
+        appender.start();
+        logger.addAppender(appender);
+        String body = JSON.writeValueAsString(Map.of("error", Map.of("message",
+            "Rate limit on " + dimension + ": Limit 8000 org_private test-key")));
+        server.expect(requestTo(URL)).andRespond(withStatus(HttpStatus.TOO_MANY_REQUESTS)
+            .contentType(MediaType.APPLICATION_JSON).body(body));
+
+        try {
+            // when
+            assertThatThrownBy(() -> client.generate("지시", "입력")).isInstanceOf(RestClientException.class);
+
+            // then
+            assertThat(appender.list).singleElement().satisfies(event ->
+                assertThat(event.getFormattedMessage()).contains("dimension=" + expected, "limit=8000")
+                    .doesNotContain("org_private", "test-key", body));
+        } finally {
+            logger.detachAppender(appender);
+            appender.stop();
+        }
     }
 
     private static Stream<String> invalidResponses() {
