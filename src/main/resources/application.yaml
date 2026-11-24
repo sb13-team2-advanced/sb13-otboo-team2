@@ -125,3 +125,6 @@ management:
 auth:
   cookie:
     secure: true
+
+server:
+  forward-headers-strategy: framework
