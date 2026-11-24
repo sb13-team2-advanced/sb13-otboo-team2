@@ -11,8 +11,19 @@ services:
     image: grafana/grafana:latest
     ports:
       - "127.0.0.1:3000:3000"
+    environment:
+      AWS_PROFILE: grafana
+      AWS_SHARED_CREDENTIALS_FILE: /usr/share/grafana/.aws/credentials
+      AWS_REGION: ap-northeast-2
+      GF_PLUGINS_PREINSTALL_SYNC: grafana-amazonprometheus-datasource
     volumes:
       - grafana-data:/var/lib/grafana
+      - type: bind
+        source: ${HOME}/.aws/credentials
+        target: /usr/share/grafana/.aws/credentials
+        read_only: true
+        bind:
+          create_host_path: false
 
 volumes:
   prometheus-data:
