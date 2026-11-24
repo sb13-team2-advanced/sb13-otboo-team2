@@ -3,9 +3,13 @@ package codeit.ootd.infra.groq;
 import java.util.List;
 import java.util.Map;
 import java.util.regex.Pattern;
+import java.util.regex.Matcher;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.client.HttpClientErrorException;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestClient;
 import tools.jackson.core.JacksonException;
@@ -13,12 +17,15 @@ import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.json.JsonMapper;
 
 @Component
+@Slf4j
 public class GroqClient {
 
     private static final int MAX_COMPLETION_TOKENS = 768;
     private static final int MAX_EXPLANATION_LENGTH = 500;
+    private static final int RATE_LIMIT_STATUS = 429;
     private static final double TEMPERATURE = 0.2;
     private static final Pattern KOREAN = Pattern.compile("[가-힣]");
+    private static final Pattern RATE_LIMIT = Pattern.compile("Limit\\s+(\\d+)");
     private static final Map<String, Object> RESPONSE_FORMAT = Map.of(
         "type", "json_schema", "json_schema", Map.of(
             "name", "outfit_explanation", "strict", true,
@@ -60,7 +67,9 @@ public class GroqClient {
         if (!isConfigured()) {
             throw new IllegalStateException("Groq가 설정되지 않았습니다.");
         }
-        JsonNode response = restClient.post().uri("/chat/completions")
+        ResponseEntity<JsonNode> entity;
+        try {
+            entity = restClient.post().uri("/chat/completions")
             .headers(headers -> headers.setBearerAuth(apiKey))
             .contentType(MediaType.APPLICATION_JSON)
             .body(Map.of("model", model, "messages", List.of(
@@ -69,7 +78,19 @@ public class GroqClient {
                 "response_format", RESPONSE_FORMAT, "reasoning_effort", "low",
                 "max_completion_tokens", MAX_COMPLETION_TOKENS, "temperature", TEMPERATURE,
                 "stream", false))
-            .retrieve().body(JsonNode.class);
+            .retrieve().toEntity(JsonNode.class);
+        } catch (HttpClientErrorException exception) {
+            if (exception.getStatusCode().value() == RATE_LIMIT_STATUS) {
+                logRateLimit(exception);
+            }
+            throw exception;
+        }
+        log.info("Groq quota model={} tpm={} rpd={} remainingTokens={} remainingRequests={}", model,
+            entity.getHeaders().getFirst("x-ratelimit-limit-tokens"),
+            entity.getHeaders().getFirst("x-ratelimit-limit-requests"),
+            entity.getHeaders().getFirst("x-ratelimit-remaining-tokens"),
+            entity.getHeaders().getFirst("x-ratelimit-remaining-requests"));
+        JsonNode response = entity.getBody();
 
         JsonNode choices = response == null ? null : response.get("choices");
         if (choices == null || !choices.isArray() || choices.isEmpty()
@@ -97,5 +118,21 @@ public class GroqClient {
             throw new IllegalStateException("Groq 설명의 필수 값이 올바르지 않습니다.");
         }
         return result;
+    }
+
+    /** 한도 오류 원문·조직 ID·키를 출력하지 않고 제한 종류와 숫자만 기록한다. */
+    private void logRateLimit(HttpClientErrorException exception) {
+        try {
+            String message = jsonMapper.readTree(exception.getResponseBodyAsString()).path("error").path("message").asString("");
+            String dimension = message.contains("tokens per minute") ? "TPM"
+                : message.contains("requests per minute") ? "RPM"
+                : message.contains("tokens per day") ? "TPD"
+                : message.contains("requests per day") ? "RPD" : "UNKNOWN";
+            Matcher limit = RATE_LIMIT.matcher(message);
+            log.warn("Groq rate limit model={} dimension={} limit={}", model, dimension,
+                limit.find() ? limit.group(1) : "unknown");
+        } catch (JacksonException exceptionBody) {
+            log.warn("Groq rate limit model={} dimension=UNKNOWN", model);
+        }
     }
 }

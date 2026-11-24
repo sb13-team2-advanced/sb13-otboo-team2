@@ -1,0 +1,4 @@
+realBaseUrl=http://host.docker.internal:8081
+mockBaseUrl=http://host.docker.internal:8082
+weatherId=REPLACE_WITH_LOCAL_WEATHER_UUID
+accessToken=REPLACE_WITH_SHORT_LIVED_TEST_ACCESS_TOKEN

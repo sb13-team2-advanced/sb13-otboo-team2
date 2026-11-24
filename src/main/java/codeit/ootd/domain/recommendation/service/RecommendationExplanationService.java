@@ -10,6 +10,7 @@ import codeit.ootd.domain.recommendation.dto.response.RecommendationClothesRespo
 import codeit.ootd.domain.recommendation.dto.response.RecommendationSource;
 import codeit.ootd.infra.groq.GroqClient;
 import codeit.ootd.infra.groq.GroqExplanation;
+import io.micrometer.core.instrument.MeterRegistry;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -21,6 +22,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.client.RestClientException;
+import org.springframework.web.client.RestClientResponseException;
 import tools.jackson.databind.json.JsonMapper;
 import tools.jackson.core.JacksonException;
 
@@ -35,6 +37,7 @@ public class RecommendationExplanationService {
     private static final int MINIMUM_MATCHED_CLOTHES = 2;
     private static final int MAX_DOCUMENT_LENGTH = 2000;
     private static final int MAX_TITLE_LENGTH = 200;
+    private static final int RATE_LIMIT_STATUS = 429;
     private static final String WEATHER_EXPLANATION = "날씨 조건과 보유 의상을 기준으로 구성한 코디입니다.";
     private static final Map<ClothesType, String> TYPE_NAMES = Map.of(
         ClothesType.TOP, "상의", ClothesType.BOTTOM, "하의", ClothesType.OUTER, "아우터");
@@ -50,6 +53,7 @@ public class RecommendationExplanationService {
     private final GroqClient groqClient;
     private final ClothesColorResolver colorResolver;
     private final JsonMapper jsonMapper;
+    private final MeterRegistry meterRegistry;
 
     /**
      * 실제 일치 의상과 출처를 확인한 뒤 근거가 있을 때만 Groq를 호출한다.
@@ -59,9 +63,11 @@ public class RecommendationExplanationService {
     @Transactional(propagation = Propagation.NOT_SUPPORTED)
     public RecommendationExplanation explain(RecommendationConditions conditions, OutfitColorMatchResult result) {
         if (result.clothes().isEmpty()) {
+            record("skipped", "empty_outfit");
             return RecommendationExplanation.of("추천할 수 있는 의상이 없습니다.", List.of());
         }
         if (result.evidence().isEmpty()) {
+            record("fallback", "no_evidence");
             return RecommendationExplanation.of(WEATHER_EXPLANATION, List.of());
         }
         OutfitColorEvidence evidence = result.evidence().get();
@@ -72,6 +78,7 @@ public class RecommendationExplanationService {
         Set<String> expectedIds = matched.stream().map(item -> item.clothesId().toString()).collect(Collectors.toSet());
         if (matched.size() < MINIMUM_MATCHED_CLOTHES || expectedIds.size() != evidence.matchedClothesIds().size()) {
             log.warn("추천 설명의 의상 근거가 유효하지 않아 기본 설명을 사용합니다.");
+            record("fallback", "invalid_evidence");
             return RecommendationExplanation.of(WEATHER_EXPLANATION, List.of());
         }
 
@@ -81,6 +88,7 @@ public class RecommendationExplanationService {
         RecommendationExplanation fallback = RecommendationExplanation.of(
             description + "의 색상은 참고한 배색 사례와 일치합니다.", List.of(RecommendationSource.from(evidence)));
         if (!groqClient.isConfigured()) {
+            record("fallback", "not_configured");
             log.debug("추천 기본 설명 사용. reason=GROQ_NOT_CONFIGURED");
             return fallback;
         }
@@ -100,15 +108,25 @@ public class RecommendationExplanationService {
                 || generated.matchedClothesIds().size() != expectedIds.size()
                 || !new HashSet<>(generated.matchedClothesIds()).equals(expectedIds)) {
                 log.warn("추천 설명 근거가 일치하지 않아 기본 설명을 사용합니다. reason=EVIDENCE_MISMATCH");
+                record("fallback", "evidence_mismatch");
                 return fallback;
             }
             log.debug("추천 설명 생성 완료. documentKey={} matchedCount={}",
                 evidence.document().documentKey(), matched.size());
+            record("generated", "validated");
             return RecommendationExplanation.of(generated.explanation().strip(), fallback.sources());
         } catch (RestClientException | IllegalStateException | JacksonException exception) {
+            record("fallback", exception instanceof RestClientResponseException responseException
+                && responseException.getStatusCode().value() == RATE_LIMIT_STATUS
+                ? "rate_limited" : "generation_error");
             log.warn("추천 설명 생성에 실패해 기본 설명을 사용합니다. cause={}", exception.getClass().getSimpleName());
             return fallback;
         }
+    }
+
+    /** 의상·문서 ID를 태그로 사용하지 않고 검증된 생성 결과와 대체 이유를 집계한다. */
+    private void record(String outcome, String reason) {
+        meterRegistry.counter("recommendation.explanations", "outcome", outcome, "reason", reason).increment();
     }
 
     /**
