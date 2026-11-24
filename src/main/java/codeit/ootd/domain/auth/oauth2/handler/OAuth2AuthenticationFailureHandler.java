@@ -7,6 +7,8 @@ import jakarta.servlet.http.HttpServletResponse;
 import java.io.IOException;
 import java.time.Duration;
 
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.ResponseCookie;
 import org.springframework.security.core.AuthenticationException;
@@ -15,8 +17,12 @@ import org.springframework.security.web.authentication.AuthenticationFailureHand
 import org.springframework.stereotype.Component;
 
 @Component
+@Slf4j
+@RequiredArgsConstructor
 public class OAuth2AuthenticationFailureHandler
         implements AuthenticationFailureHandler {
+
+    private final OAuth2RedirectUrlResolver redirectUrlResolver;
 
     @Override
     public void onAuthenticationFailure(
@@ -30,6 +36,8 @@ public class OAuth2AuthenticationFailureHandler
         if (exception instanceof OAuth2AuthenticationException oauthException) {
             String errorCode = oauthException.getError().getErrorCode();
 
+            log.warn("OAuth2 인증 실패: errorCode={}", errorCode);
+
             if ("user_not_exists".equals(errorCode)
                     || "oauth_link_failed".equals(errorCode)
                     || "email_already_exists".equals(errorCode)
@@ -37,6 +45,11 @@ public class OAuth2AuthenticationFailureHandler
                     || "social_account_already_linked".equals(errorCode)
                     || "oauth_provider_already_linked".equals(errorCode)) {
                 errorMessage = errorCode;
+            } else {
+                log.warn(
+                        "OAuth2 인증 실패: exceptionType={}",
+                        exception.getClass().getSimpleName()
+                );
             }
         }
 
@@ -57,14 +70,18 @@ public class OAuth2AuthenticationFailureHandler
 
         if (isLinkRequest) {
             response.sendRedirect(
-                    "/#/settings?error_message=" + errorMessage
+                    redirectUrlResolver.resolve(
+                            "/#/settings?error_message=" + errorMessage
+                    )
             );
-            return;
+            return; // 이 줄이 반드시 필요해!
         }
 
         response.sendRedirect(
-                "/#/auth/login?error=oauth_failed"
-                        + "&error_message=" + errorMessage
+                redirectUrlResolver.resolve(
+                        "/#/auth/login?error=oauth_failed"
+                                + "&error_message=" + errorMessage
+                )
         );
     }
 }
