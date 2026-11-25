@@ -4,6 +4,7 @@ import codeit.ootd.global.security.StompJwtAuthenticationInterceptor;
 import codeit.ootd.global.security.AuthSessionWebSocketHandlerDecorator;
 import codeit.ootd.global.security.AuthSessionWebSocketRegistry;
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.core.Ordered;
 import org.springframework.core.annotation.Order;
@@ -23,6 +24,9 @@ public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
     private final StompJwtAuthenticationInterceptor authenticationInterceptor;
     private final AuthSessionWebSocketRegistry sessions;
 
+    @Value("${otboo.websocket.allowed-origins:}")
+    private String[] allowedOrigins;
+
     @Override
     public void configureWebSocketTransport(WebSocketTransportRegistration registration) {
         registration.addDecoratorFactory(handler ->
@@ -38,6 +42,8 @@ public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
     @Override
     public void registerStompEndpoints(StompEndpointRegistry registry) {
         registry.addEndpoint("/ws")
+                // 프록시 내부 주소와 달라도 명시한 브라우저 Origin은 허용한다.
+                .setAllowedOrigins(allowedOrigins)
                 .withSockJS();
     }
 

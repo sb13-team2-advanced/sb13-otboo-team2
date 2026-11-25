@@ -14,11 +14,11 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import codeit.ootd.domain.notification.dto.response.NotificationDto;
 import codeit.ootd.domain.notification.dto.response.NotificationDtoCursorResponse;
 import codeit.ootd.domain.notification.enums.NotificationLevel;
+import codeit.ootd.domain.notification.exception.NotificationNotFoundException;
 import codeit.ootd.domain.notification.service.NotificationService;
 import codeit.ootd.global.enums.SortDirection;
 import codeit.ootd.global.exception.ErrorCode;
 import codeit.ootd.global.exception.GlobalExceptionHandler;
-import codeit.ootd.global.exception.OtbooException;
 import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
@@ -120,11 +120,12 @@ class NotificationControllerTest {
     @DisplayName("읽을 수 없는 알림은 400을 반환한다")
     void readNotifications_returnsBadRequest() throws Exception {
         UUID notificationId = UUID.randomUUID();
-        doThrow(new OtbooException(ErrorCode.INVALID_REQUEST))
+        doThrow(new NotificationNotFoundException())
                 .when(notificationService).readNotification(notificationId, userId);
 
         mockMvc.perform(delete("/api/notifications/{notificationId}", notificationId))
                 .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.message").value(ErrorCode.INVALID_REQUEST.getMessage()));
+                .andExpect(jsonPath("$.exceptionName").value("NotificationNotFoundException"))
+                .andExpect(jsonPath("$.message").value(ErrorCode.NOTIFICATION_NOT_FOUND.getMessage()));
     }
 }

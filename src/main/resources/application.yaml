@@ -70,7 +70,7 @@ otboo:
   realtime:
     redis:
       enabled: ${OTBOO_REALTIME_REDIS_ENABLED:true}
-      channel-prefix: otboo:realtime:v1
+      channel-prefix: ${OTBOO_REALTIME_REDIS_CHANNEL_PREFIX:otboo:realtime:v1}
   kafka:
     enabled: false
   notification:
