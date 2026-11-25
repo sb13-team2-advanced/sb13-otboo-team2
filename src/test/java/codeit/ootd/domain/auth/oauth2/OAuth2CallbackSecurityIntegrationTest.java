@@ -60,7 +60,8 @@ import java.util.UUID;
         "MAIL_HOST=localhost",
         "MAIL_PORT=1025",
         "MAIL_USERNAME=test@example.com",
-        "MAIL_PASSWORD=test-password"
+        "MAIL_PASSWORD=test-password",
+        "OAUTH2_REDIRECT_BASE_URL=http://localhost:8080"
 })
 @AutoConfigureMockMvc
 @ActiveProfiles("test")
@@ -87,6 +88,9 @@ class OAuth2CallbackSecurityIntegrationTest {
 
     @MockitoBean
     private UserRepository userRepository;
+
+    private static final String BASE_URL =
+            "http://localhost:8080";
 
     @Test
     @DisplayName("변조된 OAuth2 state로 콜백 요청 시 계정 연동을 차단한다")
@@ -120,7 +124,7 @@ class OAuth2CallbackSecurityIntegrationTest {
 
         assertThat(callback.getResponse().getRedirectedUrl())
                 .isEqualTo(
-                        "/#/auth/login?error=oauth_failed"
+                        BASE_URL +"/#/auth/login?error=oauth_failed"
                                 + "&error_message=oauth_failed"
                 );
 
@@ -197,7 +201,7 @@ class OAuth2CallbackSecurityIntegrationTest {
         assertThat(callback.getResponse().getStatus()).isEqualTo(302);
 
         assertThat(callback.getResponse().getRedirectedUrl())
-                .isEqualTo("/#/settings?link_success=true");
+                .isEqualTo(BASE_URL + "/#/settings?link_success=true");
 
         verify(linkRequestService).consume(
                 "test-link-token",
@@ -299,7 +303,7 @@ class OAuth2CallbackSecurityIntegrationTest {
         ).andReturn();
 
         assertThat(first.getResponse().getRedirectedUrl())
-                .isEqualTo("/#/settings?link_success=true");
+                .isEqualTo(BASE_URL + "/#/settings?link_success=true");
 
         // when: 같은 state로 두 번째 콜백
         var second = mockMvc.perform(
@@ -312,7 +316,7 @@ class OAuth2CallbackSecurityIntegrationTest {
         // then
         assertThat(second.getResponse().getRedirectedUrl())
                 .isEqualTo(
-                        "/#/auth/login?error=oauth_failed"
+                        BASE_URL + "/#/auth/login?error=oauth_failed"
                                 + "&error_message=oauth_failed"
                 );
 
@@ -409,7 +413,7 @@ class OAuth2CallbackSecurityIntegrationTest {
         );
 
         assertThat(callback.getResponse().getRedirectedUrl())
-                .isEqualTo("/#/recommendations");
+                .isEqualTo(BASE_URL +"/#/recommendations");
 
         assertThat(
                 callback.getResponse().getHeaders(HttpHeaders.SET_COOKIE)

@@ -25,6 +25,7 @@ import java.time.Duration;
 import java.util.UUID;
 
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.ResponseCookie;
 import org.springframework.security.core.Authentication;
@@ -36,6 +37,7 @@ import org.springframework.stereotype.Component;
 
 @Component
 @RequiredArgsConstructor
+@Slf4j
 public class OAuth2AuthenticationSuccessHandler
         implements AuthenticationSuccessHandler {
 
@@ -46,6 +48,7 @@ public class OAuth2AuthenticationSuccessHandler
     private final OAuth2LinkRequestService linkRequestService;
     private final SocialAccountService socialAccountService;
     private final OAuth2AuthenticationFailureHandler failureHandler;
+    private final OAuth2RedirectUrlResolver redirectUrlResolver;
 
 
     @Override
@@ -94,7 +97,7 @@ public class OAuth2AuthenticationSuccessHandler
                 );
 
                 response.sendRedirect(
-                        "/#/settings?link_success=true"
+                        redirectUrlResolver.resolve("/#/settings?link_success=true")
                 );
                 return;
             }
@@ -121,7 +124,9 @@ public class OAuth2AuthenticationSuccessHandler
                     cookieFactory.create(result.refreshToken()).toString()
             );
 
-            response.sendRedirect("/#/recommendations");
+            response.sendRedirect(
+                    redirectUrlResolver.resolve("/#/recommendations")
+            );
 
         } catch (OAuth2AuthenticationException e) {
             failureHandler.onAuthenticationFailure(request, response, e);
@@ -156,19 +161,31 @@ public class OAuth2AuthenticationSuccessHandler
                             e
                     )
             );
-        } catch(OtbooException e){
-                String errorCode = linkToken != null
-                        ? "oauth_link_failed"
-                        : "oauth_failed";
 
-                failureHandler.onAuthenticationFailure(
-                        request,
-                        response,
-                        new OAuth2AuthenticationException(errorCode)
-                );
-            }
+        } catch (OtbooException e) {
+            String errorCode = linkToken != null
+                    ? "oauth_link_failed"
+                    : "oauth_failed";
 
+            log.error(
+                    "OAuth2 사용자 처리 실패: exceptionType={}, errorCode={}",
+                    e.getClass().getSimpleName(),
+                    errorCode,
+                    e
+            );
+
+            failureHandler.onAuthenticationFailure(
+                    request,
+                    response,
+                    new OAuth2AuthenticationException(
+                            new OAuth2Error(errorCode),
+                            "OAuth2 사용자 처리 실패",
+                            e
+                    )
+            );
         }
+
+    }
 
         private OAuthProvider resolveProvider (Object rawProvider){
             if (!(rawProvider instanceof String providerName)) {

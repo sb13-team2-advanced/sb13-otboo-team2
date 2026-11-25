@@ -234,4 +234,104 @@ class S3FileStorageTest {
         assertThatCode(() -> storage.delete(BASE_URL + "/" + OBJECT_KEY))
                 .doesNotThrowAnyException();
     }
+
+    @ParameterizedTest
+    @CsvSource({
+            "image, application/octet-stream, PNG, png, image/png",
+            "image.jpg?w=500, application/octet-stream, PNG, png, image/png",
+            "photo.avif, application/octet-stream, JPEG, jpg, image/jpeg",
+            "item, , GIF, gif, image/gif",
+            "item.png, '', WEBP, webp, image/webp"
+    })
+    void 콘텐츠_타입이_없거나_octet_stream이면_파일_내용으로_형식을_판별해_업로드한다(
+            String filename, String contentType, String kind,
+            String expectedExtension, String expectedContentType
+    ) {
+        // given
+        MockMultipartFile file = new MockMultipartFile(
+                "image", filename, contentType, imageBytes(kind)
+        );
+
+        // when
+        String url = storage.upload(file, "clothes");
+
+        // then
+        ArgumentCaptor<PutObjectRequest> request =
+                ArgumentCaptor.forClass(PutObjectRequest.class);
+        verify(s3Client).putObject(request.capture(), any(RequestBody.class));
+        assertThat(request.getValue().key())
+                .startsWith("images/clothes/")
+                .endsWith("." + expectedExtension);
+        assertThat(request.getValue().contentType()).isEqualTo(expectedContentType);
+        assertThat(url).isEqualTo(BASE_URL + "/" + request.getValue().key());
+    }
+
+    @ParameterizedTest
+    @CsvSource({
+            "note.txt, application/octet-stream, hello",
+            "fake.png, application/octet-stream, not-an-image",
+            "image, , '<svg xmlns=\"http://www.w3.org/2000/svg\"></svg>'"
+    })
+    void 콘텐츠_타입이_없어도_내용이_이미지가_아니면_S3에_전송하지_않는다(
+            String filename, String contentType, String content
+    ) {
+        // given
+        MockMultipartFile file = new MockMultipartFile(
+                "image", filename, contentType, content.getBytes(StandardCharsets.UTF_8)
+        );
+
+        // when/then
+        assertThatThrownBy(() -> storage.upload(file, "clothes"))
+                .isInstanceOfSatisfying(OtbooException.class,
+                        e -> assertThat(e.getErrorCode())
+                                .isEqualTo(ErrorCode.FILE_INVALID_TYPE));
+        verifyNoInteractions(s3Client);
+    }
+
+    @Test
+    void 내용이_너무_짧아_형식을_판별할_수_없으면_S3에_전송하지_않는다() {
+        // given
+        MockMultipartFile file = new MockMultipartFile(
+                "image", "image", "application/octet-stream", new byte[]{1}
+        );
+
+        // when/then
+        assertThatThrownBy(() -> storage.upload(file, "clothes"))
+                .isInstanceOfSatisfying(OtbooException.class,
+                        e -> assertThat(e.getErrorCode())
+                                .isEqualTo(ErrorCode.FILE_INVALID_TYPE));
+        verifyNoInteractions(s3Client);
+    }
+
+    @Test
+    void 이미지가_아닌_타입을_명시했다면_내용이_이미지여도_거절한다() {
+        // given
+        MockMultipartFile file = new MockMultipartFile(
+                "image", "shirt.png", "text/plain", imageBytes("PNG")
+        );
+
+        // when/then
+        assertThatThrownBy(() -> storage.upload(file, "clothes"))
+                .isInstanceOfSatisfying(OtbooException.class,
+                        e -> assertThat(e.getErrorCode())
+                                .isEqualTo(ErrorCode.FILE_INVALID_TYPE));
+        verifyNoInteractions(s3Client);
+    }
+
+    /**
+     * 각 이미지 형식의 시그니처(매직 바이트)로 시작하는 최소 바이트열을 만든다.
+     */
+    private byte[] imageBytes(String kind) {
+        return switch (kind) {
+            case "PNG" -> new byte[]{
+                    (byte) 0x89, 'P', 'N', 'G', 0x0D, 0x0A, 0x1A, 0x0A, 0, 0, 0, 0
+            };
+            case "JPEG" -> new byte[]{
+                    (byte) 0xFF, (byte) 0xD8, (byte) 0xFF, (byte) 0xE0, 0, 0x10, 'J', 'F', 'I', 'F', 0, 1
+            };
+            case "GIF" -> "GIF89a\u0001\u0000\u0001\u0000".getBytes(StandardCharsets.ISO_8859_1);
+            case "WEBP" -> new byte[]{'R', 'I', 'F', 'F', 0, 0, 0, 0, 'W', 'E', 'B', 'P'};
+            default -> throw new IllegalArgumentException(kind);
+        };
+    }
 }
