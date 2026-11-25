@@ -1,5 +1,6 @@
 plugins {
     id 'java'
+    id 'groovy'
     id 'jacoco'
     id 'org.springframework.boot' version '4.1.1'
     id 'io.spring.dependency-management' version '1.1.7'
@@ -19,6 +20,29 @@ repositories {
     mavenCentral()
 }
 
+/**
+ * nGrinder 스크립트를 별도 소스로 컴파일해 IDE에서 인식하고 일반 테스트와 의존성을 분리한다.
+ */
+sourceSets {
+    ngrinder {
+        groovy {
+            srcDir 'ngrinder/recommendation'
+            include '**/*.groovy'
+        }
+    }
+}
+
+/**
+ * nGrinder의 Groovy 3 모듈을 Java 17을 지원하는 버전으로 맞춰 로컬 컴파일한다.
+ */
+configurations.matching { it.name.startsWith('ngrinder') }.configureEach {
+    resolutionStrategy.eachDependency {
+        if (requested.group == 'org.codehaus.groovy') {
+            useVersion '3.0.22'
+        }
+    }
+}
+
 dependencies {
 
     // Kafka (Confluent Cloud)
@@ -30,6 +54,7 @@ dependencies {
 
     // 외부 API 호출용 RestClient
     implementation 'org.springframework.boot:spring-boot-starter-restclient'
+    implementation 'org.apache.httpcomponents.client5:httpclient5'
 
     // 구매 링크 HTML 파싱 (의상 속성 추출)
     implementation 'org.jsoup:jsoup:1.18.3'
@@ -107,6 +132,9 @@ dependencies {
     // Prometheus
     runtimeOnly 'io.micrometer:micrometer-registry-prometheus'
 
+    // NGrinder
+    ngrinderImplementation 'org.ngrinder:ngrinder-groovy:3.5.9-p1'
+
     // Test
     testImplementation 'org.springframework.boot:spring-boot-starter-actuator-test'
     testImplementation 'org.springframework.boot:spring-boot-starter-batch-test'
@@ -159,6 +187,7 @@ tasks.named('jacocoTestCoverageVerification', JacocoCoverageVerification) {
 }
 
 tasks.named('check') {
+    dependsOn tasks.named('ngrinderClasses')
     dependsOn tasks.named('jacocoTestCoverageVerification')
 }
 

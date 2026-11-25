@@ -3,8 +3,6 @@ package codeit.ootd.infra.storage;
 import codeit.ootd.global.exception.ErrorCode;
 import codeit.ootd.global.exception.OtbooException;
 import java.io.IOException;
-import java.util.Locale;
-import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 import java.util.regex.Pattern;
@@ -30,13 +28,6 @@ public class S3FileStorage implements FileStorage {
 
     private static final String KEY_PREFIX = "images/";
     private static final Set<String> ALLOWED_DIRECTORIES = Set.of("clothes", "profiles");
-    private static final Map<String, String> ALLOWED_CONTENT_TYPES = Map.of(
-            "jpg", "image/jpeg",
-            "jpeg", "image/jpeg",
-            "png", "image/png",
-            "gif", "image/gif",
-            "webp", "image/webp"
-    );
     private static final Pattern OBJECT_KEY_PATTERN = Pattern.compile(
             "images/(clothes|profiles)/[0-9a-f-]{36}\\.(jpg|jpeg|png|gif|webp)"
     );
@@ -61,7 +52,7 @@ public class S3FileStorage implements FileStorage {
      */
     @Override
     public String upload(MultipartFile file, String directory) {
-        validate(file);
+        ImageTypeResolver.ImageType imageType = ImageTypeResolver.resolve(file);
 
         if (directory == null || !ALLOWED_DIRECTORIES.contains(directory)) {
             throw new IllegalArgumentException(
@@ -69,13 +60,13 @@ public class S3FileStorage implements FileStorage {
             );
         }
 
-        String extension = extractExtension(file.getOriginalFilename());
-        String objectKey = KEY_PREFIX + directory + "/" + UUID.randomUUID() + "." + extension;
+        String objectKey = KEY_PREFIX + directory + "/" + UUID.randomUUID()
+                + "." + imageType.extension();
 
         PutObjectRequest request = PutObjectRequest.builder()
                 .bucket(bucket)
                 .key(objectKey)
-                .contentType(ALLOWED_CONTENT_TYPES.get(extension))
+                .contentType(imageType.contentType())
                 .build();
 
         try {
@@ -127,39 +118,5 @@ public class S3FileStorage implements FileStorage {
                     bucket, objectKey, e
             );
         }
-    }
-
-    /**
-     * 빈 파일을 차단하고 확장자별 허용 MIME 타입과 일치하는지 검증한다.
-     */
-    private void validate(MultipartFile file) {
-
-        if (file == null || file.isEmpty()) {
-            throw new OtbooException(ErrorCode.FILE_EMPTY);
-        }
-
-        String extension = extractExtension(file.getOriginalFilename());
-        String expectedContentType = ALLOWED_CONTENT_TYPES.get(extension);
-        if (expectedContentType == null
-                || !expectedContentType.equalsIgnoreCase(file.getContentType())) {
-            throw new OtbooException(ErrorCode.FILE_INVALID_TYPE);
-        }
-    }
-
-    /**
-     * 원본 파일명에서 마지막 확장자를 추출하고 소문자로 통일한다.
-     */
-    private String extractExtension(String filename) {
-
-        if (filename == null) {
-            return "";
-        }
-
-        int dotIndex = filename.lastIndexOf('.');
-        if (dotIndex < 0 || dotIndex == filename.length() - 1) {
-            return "";
-        }
-
-        return filename.substring(dotIndex + 1).toLowerCase(Locale.ROOT);
     }
 }

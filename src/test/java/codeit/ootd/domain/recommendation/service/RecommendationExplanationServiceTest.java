@@ -20,6 +20,7 @@ import codeit.ootd.domain.recommendation.dto.response.StyleKnowledgeMatch;
 import codeit.ootd.domain.recommendation.enums.CombinationType;
 import codeit.ootd.infra.groq.GroqClient;
 import codeit.ootd.infra.groq.GroqExplanation;
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -52,10 +53,12 @@ class RecommendationExplanationServiceTest {
         List.of(variant), 0.9);
     @Mock private GroqClient client;
     private RecommendationExplanationService service;
+    private SimpleMeterRegistry registry;
 
     @BeforeEach
     void setUp() {
-        service = new RecommendationExplanationService(client, new ClothesColorResolver(), jsonMapper);
+        registry = new SimpleMeterRegistry();
+        service = new RecommendationExplanationService(client, new ClothesColorResolver(), jsonMapper, registry);
     }
 
     @Test
@@ -70,6 +73,7 @@ class RecommendationExplanationServiceTest {
 
         // then
         assertThat(result.text()).startsWith("적갈색 상의");
+        assertThat(registry.get("recommendation.explanations").tag("outcome", "generated").counter().count()).isEqualTo(1);
         assertThat(result.sources()).singleElement().satisfies(source -> {
             assertThat(source.documentKey()).isEqualTo("orange-tonal");
             assertThat(source.url()).isEqualTo("https://example.com/source");
@@ -96,6 +100,7 @@ class RecommendationExplanationServiceTest {
         // then
         assertThat(result.text()).contains("적갈색 상의", "오렌지 하의").doesNotContain("아우터", "신발");
         assertThat(result.sources()).hasSize(1);
+        assertThat(registry.get("recommendation.explanations").tag("reason", "not_configured").counter().count()).isEqualTo(1);
         verify(client, never()).generate(anyString(), anyString());
     }
 
@@ -168,6 +173,8 @@ class RecommendationExplanationServiceTest {
         // then
         assertThat(result.text()).contains("적갈색 상의", "오렌지 하의");
         assertThat(result.sources()).hasSize(1);
+        assertThat(registry.get("recommendation.explanations")
+            .tag("reason", failure.equals("quota") ? "rate_limited" : "generation_error").counter().count()).isEqualTo(1);
     }
 
     private List<String> ids() {
