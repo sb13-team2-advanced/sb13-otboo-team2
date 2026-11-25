@@ -50,6 +50,8 @@ ootd:
     base-url: ${OOTD_EMBEDDING_BASE_URL}
 
 otboo:
+  websocket:
+    allowed-origins: ${OTBOO_WEBSOCKET_ALLOWED_ORIGINS:https://d32h6socf0ryd3.cloudfront.net}
   storage:
     type: s3
     s3:
