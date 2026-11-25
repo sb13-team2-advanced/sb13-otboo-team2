@@ -6,8 +6,6 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.util.Locale;
-import java.util.Map;
 import java.util.UUID;
 import lombok.Getter;
 import lombok.extern.slf4j.Slf4j;
@@ -25,14 +23,6 @@ import org.springframework.web.multipart.MultipartFile;
 @ConditionalOnProperty(name = "otboo.storage.type", havingValue = "local", matchIfMissing = true)
 public class LocalFileStorage implements FileStorage {
 
-    private static final Map<String, String> ALLOWED_CONTENT_TYPES = Map.of(
-        "jpg", "image/jpeg",
-        "jpeg", "image/jpeg",
-        "png", "image/png",
-        "gif", "image/gif",
-        "webp", "image/webp"
-    );
-
     @Getter
     private final Path rootPath;
 
@@ -49,15 +39,14 @@ public class LocalFileStorage implements FileStorage {
 
     @Override
     public String upload(MultipartFile file, String directory) {
-        validate(file);
+        ImageTypeResolver.ImageType imageType = ImageTypeResolver.resolve(file);
 
         Path targetDirectory = rootPath.resolve(directory).normalize();
         if (!targetDirectory.startsWith(rootPath)) {
             throw new IllegalArgumentException("저장소 밖의 경로에는 저장할 수 없습니다: " + directory);
         }
 
-        String extension = extractExtension(file.getOriginalFilename());
-        Path target = targetDirectory.resolve(UUID.randomUUID() + "." + extension);
+        Path target = targetDirectory.resolve(UUID.randomUUID() + "." + imageType.extension());
 
         try (InputStream inputStream = file.getInputStream()) {
             Files.createDirectories(targetDirectory);
@@ -101,32 +90,5 @@ public class LocalFileStorage implements FileStorage {
         } catch (IOException e) {
             log.warn("파일 삭제 실패: target={}", target, e);
         }
-    }
-
-    /**
-     * 빈 파일을 차단하고 확장자별 허용 MIME 타입과 일치하는지 검증한다.
-     */
-    private void validate(MultipartFile file) {
-        if (file == null || file.isEmpty()) {
-            throw new OtbooException(ErrorCode.FILE_EMPTY);
-        }
-
-        String extension = extractExtension(file.getOriginalFilename());
-        String expectedContentType = ALLOWED_CONTENT_TYPES.get(extension);
-        if (expectedContentType == null
-            || !expectedContentType.equalsIgnoreCase(file.getContentType())) {
-            throw new OtbooException(ErrorCode.FILE_INVALID_TYPE);
-        }
-    }
-
-    private String extractExtension(String filename) {
-        if (filename == null) {
-            return "";
-        }
-        int dotIndex = filename.lastIndexOf('.');
-        if (dotIndex < 0 || dotIndex == filename.length() - 1) {
-            return "";
-        }
-        return filename.substring(dotIndex + 1).toLowerCase(Locale.ROOT);
     }
 }

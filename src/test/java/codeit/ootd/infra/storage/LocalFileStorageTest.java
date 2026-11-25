@@ -298,4 +298,94 @@ class LocalFileStorageTest {
     private MockMultipartFile image(String filename, String contentType, String content) {
         return new MockMultipartFile("image", filename, contentType, content.getBytes(StandardCharsets.UTF_8));
     }
+
+    @ParameterizedTest
+    @CsvSource({
+        "image, application/octet-stream, PNG, .png",
+        "image.jpg?w=500, application/octet-stream, PNG, .png",
+        "photo.avif, application/octet-stream, JPEG, .jpg",
+        "item, , GIF, .gif",
+        "item.png, '', WEBP, .webp"
+    })
+    void 콘텐츠_타입이_없거나_octet_stream이면_파일_내용으로_형식을_판별해_저장한다(
+        String filename, String contentType, String kind, String expectedExtension
+    ) throws IOException {
+        // given
+        byte[] content = imageBytes(kind);
+        MockMultipartFile file = new MockMultipartFile("image", filename, contentType, content);
+
+        // when
+        String url = storage.upload(file, "clothes");
+
+        // then
+        assertThat(url).startsWith("/files/clothes/").endsWith(expectedExtension);
+        Path saved = root.resolve(url.substring("/files/".length()));
+        assertThat(Files.readAllBytes(saved)).isEqualTo(content);
+    }
+
+    @ParameterizedTest
+    @CsvSource({
+        "note.txt, application/octet-stream, hello",
+        "fake.png, application/octet-stream, not-an-image",
+        "image, , '<svg xmlns=\"http://www.w3.org/2000/svg\"></svg>'"
+    })
+    void 콘텐츠_타입이_없어도_내용이_이미지가_아니면_파일을_저장하지_않는다(
+        String filename, String contentType, String content
+    ) {
+        // given
+        MockMultipartFile file = new MockMultipartFile(
+            "image", filename, contentType, content.getBytes(StandardCharsets.UTF_8)
+        );
+
+        // when/then
+        assertThatThrownBy(() -> storage.upload(file, "clothes"))
+            .isInstanceOfSatisfying(OtbooException.class,
+                e -> assertThat(e.getErrorCode()).isSameAs(ErrorCode.FILE_INVALID_TYPE));
+        assertThat(root).doesNotExist();
+    }
+
+    @Test
+    void 내용이_너무_짧아_형식을_판별할_수_없으면_파일을_저장하지_않는다() {
+        // given
+        MockMultipartFile file = new MockMultipartFile(
+            "image", "image", "application/octet-stream", new byte[]{1}
+        );
+
+        // when/then
+        assertThatThrownBy(() -> storage.upload(file, "clothes"))
+            .isInstanceOfSatisfying(OtbooException.class,
+                e -> assertThat(e.getErrorCode()).isSameAs(ErrorCode.FILE_INVALID_TYPE));
+        assertThat(root).doesNotExist();
+    }
+
+    @Test
+    void 이미지가_아닌_타입을_명시했다면_내용이_이미지여도_거절한다() {
+        // given
+        MockMultipartFile file = new MockMultipartFile(
+            "image", "shirt.png", "text/plain", imageBytes("PNG")
+        );
+
+        // when/then
+        assertThatThrownBy(() -> storage.upload(file, "clothes"))
+            .isInstanceOfSatisfying(OtbooException.class,
+                e -> assertThat(e.getErrorCode()).isSameAs(ErrorCode.FILE_INVALID_TYPE));
+        assertThat(root).doesNotExist();
+    }
+
+    /**
+     * 각 이미지 형식의 시그니처(매직 바이트)로 시작하는 최소 바이트열을 만든다.
+     */
+    private byte[] imageBytes(String kind) {
+        return switch (kind) {
+            case "PNG" -> new byte[]{
+                (byte) 0x89, 'P', 'N', 'G', 0x0D, 0x0A, 0x1A, 0x0A, 0, 0, 0, 0
+            };
+            case "JPEG" -> new byte[]{
+                (byte) 0xFF, (byte) 0xD8, (byte) 0xFF, (byte) 0xE0, 0, 0x10, 'J', 'F', 'I', 'F', 0, 1
+            };
+            case "GIF" -> "GIF89a\u0001\u0000\u0001\u0000".getBytes(StandardCharsets.ISO_8859_1);
+            case "WEBP" -> new byte[]{'R', 'I', 'F', 'F', 0, 0, 0, 0, 'W', 'E', 'B', 'P'};
+            default -> throw new IllegalArgumentException(kind);
+        };
+    }
 }
