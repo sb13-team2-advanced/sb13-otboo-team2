@@ -142,7 +142,7 @@ class DirectMessageQueryIntegrationTest {
                         error -> assertThat(error.getErrorCode()).isEqualTo(ErrorCode.AUTHENTICATION_REQUIRED));
         assertThatThrownBy(() -> service.getMessages(mine, UUID.randomUUID(), null, null, 20))
                 .isInstanceOfSatisfying(OtbooException.class,
-                        error -> assertThat(error.getErrorCode()).isEqualTo(ErrorCode.USER_NOT_FOUND));
+                        error -> assertThat(error.getErrorCode()).isEqualTo(ErrorCode.DIRECT_MESSAGE_USER_NOT_FOUND));
     }
 
     @ParameterizedTest
@@ -157,7 +157,7 @@ class DirectMessageQueryIntegrationTest {
     private void assertInvalidCursor(String cursor, UUID idAfter) {
         assertThatThrownBy(() -> service.getMessages(mine, other, cursor, idAfter, 2))
                 .isInstanceOfSatisfying(OtbooException.class,
-                        error -> assertThat(error.getErrorCode()).isEqualTo(ErrorCode.INVALID_REQUEST));
+                        error -> assertThat(error.getErrorCode()).isEqualTo(ErrorCode.DIRECT_MESSAGE_INVALID_CURSOR));
     }
 
     private UUID createUser(String name) {

@@ -5,6 +5,8 @@ import codeit.ootd.domain.directmessage.dto.DirectMessageDtoCursorResponse;
 import codeit.ootd.domain.directmessage.dto.request.DirectMessageSendRequest;
 import codeit.ootd.domain.directmessage.entity.DirectMessage;
 import codeit.ootd.domain.directmessage.event.DirectMessageSentEvent;
+import codeit.ootd.domain.directmessage.exception.DirectMessageInvalidCursorException;
+import codeit.ootd.domain.directmessage.exception.DirectMessageUserNotFoundException;
 import codeit.ootd.domain.directmessage.repository.DirectMessageQueryRepository;
 import codeit.ootd.domain.directmessage.repository.DirectMessageRepository;
 import codeit.ootd.domain.notification.enums.NotificationLevel;
@@ -108,24 +110,24 @@ public class DirectMessageService {
         try {
             if (cursor != null) after = Instant.parse(cursor);
         } catch (DateTimeParseException exception) {
-            throw new OtbooException(ErrorCode.INVALID_REQUEST);
+            throw new DirectMessageInvalidCursorException();
         }
-        if (after != null && idAfter == null) throw new OtbooException(ErrorCode.INVALID_REQUEST);
+        if (after != null && idAfter == null) throw new DirectMessageInvalidCursorException();
         if (idAfter == null) return null;
         DirectMessage anchor = directMessageRepository.findById(idAfter)
-                .orElseThrow(() -> new OtbooException(ErrorCode.INVALID_REQUEST));
+                .orElseThrow(DirectMessageInvalidCursorException::new);
         boolean belongsToConversation =
                 anchor.getSenderId().equals(currentUserId) && anchor.getReceiverId().equals(userId)
                 || anchor.getSenderId().equals(userId) && anchor.getReceiverId().equals(currentUserId);
         if (!belongsToConversation || after != null && !after.equals(anchor.getCreatedAt())) {
-            throw new OtbooException(ErrorCode.INVALID_REQUEST);
+            throw new DirectMessageInvalidCursorException();
         }
         return anchor.getCreatedAt();
     }
 
     private User user(UUID userId) {
         return userRepository.findById(userId)
-                .orElseThrow(() -> new OtbooException(ErrorCode.USER_NOT_FOUND));
+                .orElseThrow(DirectMessageUserNotFoundException::new);
     }
 
     private UserSummary summary(User user) {

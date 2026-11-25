@@ -4,6 +4,10 @@ import codeit.ootd.domain.follow.dto.response.FollowDto;
 import codeit.ootd.domain.follow.dto.request.FollowCreateRequest;
 import codeit.ootd.domain.follow.entity.Follow;
 import codeit.ootd.domain.follow.exception.FollowAlreadyExistsException;
+import codeit.ootd.domain.follow.exception.FollowInvalidCursorException;
+import codeit.ootd.domain.follow.exception.FollowNotFoundException;
+import codeit.ootd.domain.follow.exception.FollowSelfNotAllowedException;
+import codeit.ootd.domain.follow.exception.FollowUserNotFoundException;
 import codeit.ootd.domain.follow.repository.FollowRepository;
 import codeit.ootd.domain.follow.service.FollowService;
 import codeit.ootd.domain.profile.repository.ProfileRepository;
@@ -112,7 +116,7 @@ class FollowServiceTest {
     @DisplayName("자기 자신을 팔로우하면 예외가 발생하고 저장하지 않는다")
     void create_rejectsSelfFollow() {
         assertEquals(FOLLOW_SELF_NOT_ALLOWED,
-            assertThrows(OtbooException.class,
+            assertThrows(FollowSelfNotAllowedException.class,
                 () -> service.create(new FollowCreateRequest(me, me), me)).getErrorCode());
         verifyNoInteractions(follows, queries, users, profiles);
     }
@@ -269,7 +273,7 @@ class FollowServiceTest {
         when(users.findAllById(List.of(target, me))).thenReturn(List.of(user(me)));
 
         assertEquals(FOLLOW_USER_NOT_FOUND,
-            assertThrows(OtbooException.class,
+            assertThrows(FollowUserNotFoundException.class,
                 () -> service.getList(me, true, null, null, 10, null)).getErrorCode());
         verifyNoInteractions(profiles);
     }
@@ -279,7 +283,7 @@ class FollowServiceTest {
     void getList_rejectsInvalidCursor() {
         when(users.findById(me)).thenReturn(Optional.of(user(me)));
         assertEquals(FOLLOW_INVALID_CURSOR,
-            assertThrows(OtbooException.class, () -> service.getList(me, true, "bad", null, 10, null)).getErrorCode());
+            assertThrows(FollowInvalidCursorException.class, () -> service.getList(me, true, "bad", null, 10, null)).getErrorCode());
         verifyNoInteractions(follows, queries);
     }
 
@@ -389,7 +393,7 @@ class FollowServiceTest {
     @DisplayName("존재하지 않는 팔로우를 취소하면 팔로우 없음 예외가 발생한다")
     void cancel_rejectsMissingRelation() {
         assertEquals(FOLLOW_NOT_FOUND,
-            assertThrows(OtbooException.class, () -> service.cancel(UUID.randomUUID(), me)).getErrorCode());
+            assertThrows(FollowNotFoundException.class, () -> service.cancel(UUID.randomUUID(), me)).getErrorCode());
         verify(follows, never()).delete(any());
     }
 }

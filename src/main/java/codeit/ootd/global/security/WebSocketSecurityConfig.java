@@ -58,6 +58,8 @@ public class WebSocketSecurityConfig implements WebSocketMessageBrokerConfigurer
                 MessageMatcherDelegatingAuthorizationManager.builder();
         // 위에서부터 처음 일치한 규칙을 적용한다.
         messages
+                // 오류는 Spring의 사용자 목적지를 통해 현재 연결에만 전달한다.
+                .simpSubscribeDestMatchers("/user/sub/direct-messages_errors").authenticated()
                 // DM은 경로에 포함된 두 사용자 중 본인만 구독할 수 있다.
                 .simpSubscribeDestMatchers(DM_SUBSCRIPTION_PREFIX + "*")
                 .access((authentication, context) -> new AuthorizationDecision(

@@ -67,6 +67,14 @@ public enum ErrorCode {
     FOLLOW_NOT_FOUND(HttpStatus.BAD_REQUEST, "팔로우 관계를 찾을 수 없습니다."),
     FOLLOW_INVALID_CURSOR(HttpStatus.BAD_REQUEST, "커서 또는 조회 개수가 올바르지 않습니다."),
 
+    // DM
+    DIRECT_MESSAGE_USER_NOT_FOUND(HttpStatus.BAD_REQUEST, "DM 사용자를 찾을 수 없습니다."),
+    DIRECT_MESSAGE_INVALID_CURSOR(HttpStatus.BAD_REQUEST, "DM 조회 커서가 올바르지 않습니다."),
+
+    // 알림
+    NOTIFICATION_NOT_FOUND(HttpStatus.BAD_REQUEST, "알림을 찾을 수 없습니다."),
+    NOTIFICATION_INVALID_CURSOR(HttpStatus.BAD_REQUEST, "알림 조회 커서가 올바르지 않습니다."),
+
     // 파일
     FILE_EMPTY(HttpStatus.BAD_REQUEST, "업로드할 파일이 비어 있습니다."),
     FILE_INVALID_TYPE(HttpStatus.BAD_REQUEST, "지원하지 않는 파일 형식입니다. (jpg, jpeg, png, gif, webp)"),

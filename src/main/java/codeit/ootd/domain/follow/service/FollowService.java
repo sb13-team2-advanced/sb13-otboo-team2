@@ -4,6 +4,10 @@ import codeit.ootd.domain.follow.dto.response.*;
 import codeit.ootd.domain.follow.dto.request.FollowCreateRequest;
 import codeit.ootd.domain.follow.entity.Follow;
 import codeit.ootd.domain.follow.exception.FollowAlreadyExistsException;
+import codeit.ootd.domain.follow.exception.FollowInvalidCursorException;
+import codeit.ootd.domain.follow.exception.FollowNotFoundException;
+import codeit.ootd.domain.follow.exception.FollowSelfNotAllowedException;
+import codeit.ootd.domain.follow.exception.FollowUserNotFoundException;
 import codeit.ootd.domain.follow.repository.FollowRepository;
 import codeit.ootd.domain.follow.repository.FollowQueryRepository;
 import codeit.ootd.domain.notification.enums.NotificationLevel;
@@ -55,7 +59,7 @@ public class FollowService {
     @Transactional
     public FollowDto create(FollowCreateRequest request, UUID currentUserId) {
         if (!currentUserId.equals(request.followerId())) throw new OtbooException(ACCESS_DENIED);
-        if (request.followerId().equals(request.followeeId())) throw new OtbooException(FOLLOW_SELF_NOT_ALLOWED);
+        if (request.followerId().equals(request.followeeId())) throw new FollowSelfNotAllowedException();
         User follower = user(request.followerId());
         User followee = user(request.followeeId());
         if (followRepository.existsByFollowerIdAndFolloweeId(follower.getId(), followee.getId())) {
@@ -94,23 +98,23 @@ public class FollowService {
 
     public FollowListResponse getList(UUID userId, boolean followings, String cursor,
         UUID idAfter, int limit, String nameLike) {
-        if (limit < 1 || limit > MAX_LIMIT) throw new OtbooException(FOLLOW_INVALID_CURSOR);
+        if (limit < 1 || limit > MAX_LIMIT) throw new FollowInvalidCursorException();
         user(userId);
         Instant after = null;
         try {
             if (cursor != null) after = Instant.parse(cursor);
         } catch (DateTimeParseException exception) {
-            throw new OtbooException(FOLLOW_INVALID_CURSOR);
+            throw new FollowInvalidCursorException();
         }
-        if (after != null && idAfter == null) throw new OtbooException(FOLLOW_INVALID_CURSOR);
+        if (after != null && idAfter == null) throw new FollowInvalidCursorException();
         if (idAfter != null) {
             Follow anchor = followRepository.findById(idAfter)
-                .orElseThrow(() -> new OtbooException(FOLLOW_INVALID_CURSOR));
+                .orElseThrow(FollowInvalidCursorException::new);
             if (!userId.equals(followings ? anchor.getFollowerId() : anchor.getFolloweeId())) {
-                throw new OtbooException(FOLLOW_INVALID_CURSOR);
+                throw new FollowInvalidCursorException();
             }
             if (after != null && !after.equals(anchor.getCreatedAt())) {
-                throw new OtbooException(FOLLOW_INVALID_CURSOR);
+                throw new FollowInvalidCursorException();
             }
             after = anchor.getCreatedAt();
         }
@@ -124,7 +128,7 @@ public class FollowService {
         if (!ids.isEmpty()) {
             Map<UUID, User> users = userRepository.findAllById(ids).stream()
                 .collect(Collectors.toMap(User::getId, Function.identity()));
-            if (!users.keySet().containsAll(ids)) throw new OtbooException(FOLLOW_USER_NOT_FOUND);
+            if (!users.keySet().containsAll(ids)) throw new FollowUserNotFoundException();
             Map<UUID, Profile> profiles = profileRepository.findByUserIdIn(ids).stream()
                 .collect(Collectors.toMap(Profile::getUserId, Function.identity()));
             for (UUID id : ids) {
@@ -147,13 +151,13 @@ public class FollowService {
     @Transactional
     public void cancel(UUID followId, UUID currentUserId) {
         Follow follow = followRepository.findById(followId)
-            .orElseThrow(() -> new OtbooException(FOLLOW_NOT_FOUND));
+            .orElseThrow(FollowNotFoundException::new);
         if (!follow.getFollowerId().equals(currentUserId)) throw new OtbooException(ACCESS_DENIED);
         followRepository.delete(follow);
     }
 
     private User user(UUID id) {
-        return userRepository.findById(id).orElseThrow(() -> new OtbooException(FOLLOW_USER_NOT_FOUND));
+        return userRepository.findById(id).orElseThrow(FollowUserNotFoundException::new);
     }
 
     private UserSummary summary(User user) {

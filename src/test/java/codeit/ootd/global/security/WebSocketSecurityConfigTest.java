@@ -133,6 +133,22 @@ class WebSocketSecurityConfigTest {
         assertThat(allowed(user(FIRST), StompCommand.SEND, null)).isFalse();
     }
 
+    @Test
+    @DisplayName("오류 구독은 인증된 개인 목적지만 허용하고 직접 구독과 전송은 차단한다")
+    void errors_onlyAllowAuthenticatedUserSubscription() {
+        String destination = "/user/sub/direct-messages_errors";
+        Authentication anonymous = new AnonymousAuthenticationToken("key", "anonymousUser",
+                List.of(new SimpleGrantedAuthority("ROLE_ANONYMOUS")));
+        assertThat(allowed(user(FIRST), StompCommand.SUBSCRIBE, destination)).isTrue();
+        assertThat(allowed(anonymous, StompCommand.SUBSCRIBE, destination)).isFalse();
+        assertThat(allowed(user(FIRST), StompCommand.SEND, destination)).isFalse();
+        assertThat(allowed(user(FIRST), StompCommand.SUBSCRIBE, "/sub/direct-messages_errors")).isFalse();
+        assertThat(allowed(user(FIRST), StompCommand.SUBSCRIBE,
+                "/sub/direct-messages_errors-userother-session")).isFalse();
+        assertThat(allowed(user(FIRST), StompCommand.SUBSCRIBE,
+                "/user/" + SECOND + "/sub/direct-messages_errors")).isFalse();
+    }
+
     private Authentication user(UUID id) {
         return new UsernamePasswordAuthenticationToken(id, null,
                 List.of(new SimpleGrantedAuthority("ROLE_USER")));
