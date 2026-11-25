@@ -4,6 +4,8 @@ import codeit.ootd.domain.notification.dto.response.NotificationDto;
 import codeit.ootd.domain.notification.dto.response.NotificationDtoCursorResponse;
 import codeit.ootd.domain.notification.entity.Notification;
 import codeit.ootd.domain.notification.enums.NotificationLevel;
+import codeit.ootd.domain.notification.exception.NotificationInvalidCursorException;
+import codeit.ootd.domain.notification.exception.NotificationNotFoundException;
 import codeit.ootd.domain.notification.repository.NotificationRepository;
 import codeit.ootd.domain.notification.repository.NotificationQueryRepository;
 import codeit.ootd.global.enums.SortDirection;
@@ -46,13 +48,13 @@ public class NotificationService {
         try {
             if (cursor != null) after = Instant.parse(cursor);
         } catch (DateTimeParseException exception) {
-            throw new OtbooException(ErrorCode.INVALID_REQUEST);
+            throw new NotificationInvalidCursorException();
         }
-        if (after != null && idAfter == null) throw new OtbooException(ErrorCode.INVALID_REQUEST);
+        if (after != null && idAfter == null) throw new NotificationInvalidCursorException();
         // 두 커서가 있으면 기준 알림이 삭제되어도 다음 페이지를 조회할 수 있다.
         if (after == null && idAfter != null) {
             Notification anchor = notificationRepository.findByIdAndReceiverId(idAfter, userId)
-                    .orElseThrow(() -> new OtbooException(ErrorCode.INVALID_REQUEST));
+                    .orElseThrow(NotificationInvalidCursorException::new);
             after = anchor.getCreatedAt();
         }
 
@@ -75,7 +77,7 @@ public class NotificationService {
     public void readNotification(UUID notificationId, UUID userId) {
         if (userId == null) throw new OtbooException(ErrorCode.AUTHENTICATION_REQUIRED);
         Notification notification = notificationRepository.findByIdAndReceiverId(notificationId, userId)
-                .orElseThrow(() -> new OtbooException(ErrorCode.INVALID_REQUEST));
+                .orElseThrow(NotificationNotFoundException::new);
         notificationRepository.delete(notification);
     }
 }

@@ -129,7 +129,7 @@ class NotificationQueryRepositoryIntegrationTest {
         assertThat(next.totalCount()).isEqualTo(4L);
         assertThat(assertThrows(OtbooException.class,
                 () -> service.readNotification(anchorId, receiverId)).getErrorCode())
-                .isEqualTo(ErrorCode.INVALID_REQUEST);
+                .isEqualTo(ErrorCode.NOTIFICATION_NOT_FOUND);
     }
 
 }

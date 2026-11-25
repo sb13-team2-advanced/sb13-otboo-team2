@@ -11,6 +11,7 @@ import static org.mockito.Mockito.when;
 
 import codeit.ootd.domain.notification.entity.Notification;
 import codeit.ootd.domain.notification.enums.NotificationLevel;
+import codeit.ootd.domain.notification.exception.NotificationInvalidCursorException;
 import codeit.ootd.domain.notification.repository.NotificationQueryRepository;
 import codeit.ootd.domain.notification.repository.NotificationRepository;
 import codeit.ootd.global.exception.ErrorCode;
@@ -73,7 +74,7 @@ class NotificationServiceTest {
     void rejectsMissingOrOtherReceiversAnchor() {
         UUID idAfter = UUID.randomUUID();
         when(repository.findByIdAndReceiverId(idAfter, receiverId)).thenReturn(Optional.empty());
-        assertInvalid(() -> service.getNotifications(receiverId, null, idAfter, 10));
+        assertInvalidCursor(() -> service.getNotifications(receiverId, null, idAfter, 10));
         verifyNoInteractions(queries);
     }
 
@@ -93,7 +94,7 @@ class NotificationServiceTest {
     @ValueSource(strings = {"invalid", "2026-11-05T00:00:00Z"})
     @DisplayName("시간 커서 형식이 잘못되거나 시간 커서만 전달하면 거부한다")
     void rejectsInvalidOrTimeOnlyCursor(String cursor) {
-        assertInvalid(() -> service.getNotifications(receiverId, cursor, null, 10));
+        assertInvalidCursor(() -> service.getNotifications(receiverId, cursor, null, 10));
         verifyNoInteractions(repository, queries);
     }
 
@@ -132,5 +133,10 @@ class NotificationServiceTest {
 
     private void assertInvalid(Executable action) {
         assertEquals(ErrorCode.INVALID_REQUEST, assertThrows(OtbooException.class, action).getErrorCode());
+    }
+
+    private void assertInvalidCursor(Executable action) {
+        assertEquals(ErrorCode.NOTIFICATION_INVALID_CURSOR,
+                assertThrows(NotificationInvalidCursorException.class, action).getErrorCode());
     }
 }

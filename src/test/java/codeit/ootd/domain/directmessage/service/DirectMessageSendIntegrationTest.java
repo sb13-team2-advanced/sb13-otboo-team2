@@ -152,7 +152,7 @@ class DirectMessageSendIntegrationTest {
     @DisplayName("수신자가 존재하지 않으면 전송을 거부한다")
     void rejectsMissingReceiver() {
         assertRejected(new DirectMessageSendRequest(sender.getId(), UUID.randomUUID(), "hello"),
-                sender.getId(), ErrorCode.USER_NOT_FOUND);
+                sender.getId(), ErrorCode.DIRECT_MESSAGE_USER_NOT_FOUND);
     }
 
     @Test
