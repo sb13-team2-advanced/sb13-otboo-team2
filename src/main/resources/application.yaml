@@ -94,6 +94,13 @@ jwt:
   access-token-expiration: 30m
 
 ootd:
+  embedding:
+    cache:
+      enabled: true
+      maximum-size: 512
+      ttl: 24h
+      model-revision: v1
+      preprocessing-version: query-normalized-v1
   groq:
     enabled: ${OOTD_GROQ_ENABLED:false}
     api-key: ${GROQ_API_KEY:}

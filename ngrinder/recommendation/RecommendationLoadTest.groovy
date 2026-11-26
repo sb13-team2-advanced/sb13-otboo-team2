@@ -9,6 +9,7 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import org.ngrinder.http.HTTPRequest
 import org.ngrinder.http.HTTPResponse
+import java.util.concurrent.atomic.AtomicLong
 
 /**
  * 인증을 측정 구간에서 제외하고 추천 요청 한 건을 트랜잭션 한 건으로 기록한다.
@@ -28,6 +29,8 @@ class RecommendationLoadTest {
     private static long intervalNanos
     private static long nextRequestAt
     private static HTTPRequest request
+    private static String tracePrefix
+    private static final AtomicLong traceSequence = new AtomicLong()
 
     /** 대상·인증 정보를 검사하고 요청 제한 시간을 설정한다. */
     @BeforeProcess
@@ -38,7 +41,8 @@ class RecommendationLoadTest {
 
         String[] scenario = System.getProperty('param', 'real_1').split('_')
 
-        assert scenario.length == 2 && scenario[0] in ['real', 'mock']
+        assert scenario.length >= 2 && scenario[0] in ['real', 'mock']
+        assert scenario.length == 2 || (scenario.length == 3 && scenario[0] == 'mock' && scenario[2] == 'trace')
 
         String baseUrl = settings.getProperty(scenario[0] + 'BaseUrl',
                 'http://host.docker.internal:' + (scenario[0] == 'mock' ? '8082' : '8081')).trim()
@@ -63,6 +67,9 @@ class RecommendationLoadTest {
         HTTPPluginControl.getConnectionDefaults().timeout = TIMEOUT_MS
 
         request = new HTTPRequest()
+        if (scenario.length == 3) {
+            tracePrefix = 'load-' + UUID.randomUUID()
+        }
 
         recommendation = new GTest(1, 'GET recommendations - Groq ON')
     }
@@ -78,16 +85,32 @@ class RecommendationLoadTest {
     @Test
     void 의상추천_조회() {
         pace()
+        String traceId = tracePrefix == null ? null : tracePrefix + '-' + traceSequence.incrementAndGet()
         long startMs = System.currentTimeMillis()
         long startedAt = System.nanoTime()
+        long headersAt = 0L
+        long bodyReadAt = 0L
+        long bodyReadMs = 0L
         int status = 0
         boolean valid = false
 
         try {
-            HTTPResponse response = request.GET(endpoint, [:], ['Authorization': 'Bearer ' + token])
+            Map headers = ['Authorization': 'Bearer ' + token]
+            if (traceId != null) {
+                headers['X-Request-ID'] = traceId
+            }
+            HTTPResponse response = request.GET(endpoint, [:], headers)
             status = response.statusCode
+            if (traceId != null) {
+                headersAt = System.nanoTime()
+            }
             assert status == OK
-            Map body = (Map) new JsonSlurper().parseText(response.bodyText)
+            String bodyText = response.bodyText
+            if (traceId != null) {
+                bodyReadAt = System.nanoTime()
+                bodyReadMs = System.currentTimeMillis()
+            }
+            Map body = (Map) new JsonSlurper().parseText(bodyText)
             assert body.weatherId == weatherId
             assert body.clothes instanceof List && !body.clothes.isEmpty()
             assert body.sources instanceof List && !body.sources.isEmpty()
@@ -97,6 +120,12 @@ class RecommendationLoadTest {
             long latencyMicros = (System.nanoTime() - startedAt) / NANOS_PER_MICROSECOND
             Grinder.grinder.logger.info('PERF startMs={} endMs={} status={} latencyMicros={} valid={}',
                     startMs, System.currentTimeMillis(), status, latencyMicros, valid)
+            if (traceId != null) {
+                long headersMicros = headersAt == 0L ? -1L : (headersAt - startedAt).intdiv(NANOS_PER_MICROSECOND)
+                long httpMicros = bodyReadAt == 0L ? -1L : (bodyReadAt - startedAt).intdiv(NANOS_PER_MICROSECOND)
+                Grinder.grinder.logger.info('TRACE id={} startMs={} bodyReadMs={} status={} totalUs={} headersUs={} httpUs={}',
+                        traceId, startMs, bodyReadMs, status, latencyMicros, headersMicros, httpMicros)
+            }
         }
     }
 
