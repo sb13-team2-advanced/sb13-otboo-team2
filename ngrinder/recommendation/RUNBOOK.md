@@ -72,8 +72,8 @@ DB·임베딩·추천·근거 검증은 실제 경로를 사용하지만 실제 
 단일 요청 검증:
 
 ```sh
-python3 ngrinder/recommendation/run_measurement.py probe --port 8081
-python3 ngrinder/recommendation/run_measurement.py probe --port 8082
+./gradlew measureRecommendation --args='probe --port 8081'
+./gradlew measureRecommendation --args='probe --port 8082'
 ```
 
 HTTP 200과 출처 존재만으로 실제 Groq 생성 성공을 확정하지 않는다.
@@ -99,9 +99,11 @@ Param은 `대상_숫자` 형식이며 숫자를 10으로 나눈 값을 사용한
 
 ### 자동 실행
 
+`RunMeasurement.groovy`는 Gradle에서 실행하고, Agent에 등록한 `RecommendationLoadTest.groovy`가 API에 요청을 보낸다.
+
 ```sh
-python3 ngrinder/recommendation/run_measurement.py run --mode real --rps 0.1 --threads 1 --runs 3
-python3 ngrinder/recommendation/run_measurement.py mock-suite
+./gradlew measureRecommendation --args='run --mode real --rps 0.1 --threads 1 --runs 3'
+./gradlew measureRecommendation --args='mock-suite'
 ```
 
 `--rps`는 스크립트의 요청 시작 속도 목표를 지정하며, 고정 유입을 보장하는 옵션이 아니다.
@@ -164,7 +166,7 @@ latency는 `pace()`의 사전 대기를 제외하고 HTTP 요청 시작부터 �
 필요하면 다음 명령으로 HTTP 클라이언트 지연·프로세스 CPU·DB 커넥션 대기 지표를 조회한다.
 
 ```sh
-python3 ngrinder/recommendation/run_measurement.py diagnostics --port 8082
+./gradlew measureRecommendation --args='diagnostics --port 8082'
 ```
 
 `diagnostics`는 조회 시점의 지표이며 실행별 증가분이나 전체 구간 모니터링이 아니다.
@@ -191,16 +193,16 @@ Groq과 임베딩은 각각 독립된 Apache HTTP 연결 풀을 사용한다. �
 연결 획득 대기는 전체 API 응답 제한 시간과 다르므로 응답 목표 2초를 보장하지 않는다.
 
 ```sh
-python3 ngrinder/recommendation/run_measurement.py pool-suite --label baseline
+./gradlew measureRecommendation --args='pool-suite --label baseline'
 # Groq 풀 크기를 변경하여 측정용 백엔드를 재시작한 다음 실행한다.
-python3 ngrinder/recommendation/run_measurement.py pool-suite --label tuned
+./gradlew measureRecommendation --args='pool-suite --label tuned'
 ```
 
 `pool-suite`는 `mock-suite`와 같은 워밍업·8.3·16.7 목표 단계를 사용한다.
 100 목표 단계만 100스레드 × 15회 = 1,500건으로 실행하며 기준·확대 양쪽에 동일하게 적용한다.
 최대 100개 작업 스레드를 사용하는 비교 실험이며 서비스 동접 500~1,000명 검증을 의미하지 않는다.
 
-도구는 약 0.5초 간격으로 서버 지표를 조회하고, 첫 요청 시작부터 마지막 응답 완료 사이의 표본만 요약한다.
+도구는 약 0.5초 간격으로 서버 지표를 조회한다. Prometheus 응답을 받은 시각이 첫 요청 시작과 마지막 응답 완료 사이인 표본만 요약한다.
 수집 비용과 간격 오차가 있으며 순간적인 대기를 놓칠 수 있으므로 관측 최대값을 절대 최대값으로 해석하지 않는다.
 원본 표본은 `results/{test_id}-resources.json`에 저장한다.
 
@@ -239,7 +241,7 @@ python -m uvicorn scripts.embedding_observer:app --host 0.0.0.0 --port 8001 --wo
 
 ```sh
 python3 ngrinder/recommendation/monitor_embedding.py --output ngrinder/recommendation/results/embedding-container-resources.jsonl
-python3 ngrinder/recommendation/run_measurement.py pool-suite --label embedding-5 --embedding-metrics-url http://127.0.0.1:8001/_loadtest/metrics
+./gradlew measureRecommendation --args='pool-suite --label embedding-5 --embedding-metrics-url http://127.0.0.1:8001/_loadtest/metrics'
 ```
 
 서버를 해당 풀 크기로 재시작한 다음 `--label embedding-10`, `embedding-20`으로 반복한다.
@@ -247,10 +249,113 @@ python3 ngrinder/recommendation/run_measurement.py pool-suite --label embedding-
 `embedding_server_mean_ms.http`는 서버 미들웨어 진입부터 응답 객체 반환까지의 시간으로,
 서버 내부 스레드 대기·추론·직렬화 등을 포함하지만 클라이언트 연결 획득 대기와 전체 응답 전송 시간은 포함하지 않는다.
 각 count와 완료 요청 수의 일치도 확인한다.
+선택 임베딩 지표 수집이 실패해도 백엔드 표본은 저장한다. 임베딩 서버 증가분은 시작과 종료 표본이 모두 있어야 계산한다.
+관측한 임베딩 호출 수나 누적 시간이 감소하면 `run` 요약에서 임베딩 서버 지표를 생략하고 `probe`의 임베딩 서버 호출 수를 `null`로 표시한다.
 
 자원 수집기는 Docker CPU·메모리 표본을 JSONL로 저장한다. CPU 100%는 약 1코어 사용에 해당하며,
 메모리는 Docker가 보고한 작업 집합 값이다. 각 테스트의 실제 요청 시간 구간에 해당하는 표본끼리 비교한다.
 로컬 Docker의 CPU·메모리 및 에뮬레이션 조건은 운영 서버 성능과 다를 수 있다.
+
+## 임베딩 벡터 캐시 검증
+
+추천 경로는 `StyleKnowledgeSearchService → EmbeddingService → EmbeddingClient`로 구성한다.
+벡터만 JVM 내 Caffeine에 저장하며 DB 문서 검색·최종 추천·Groq 응답은 캐시하지 않는다.
+여러 백엔드는 각각 캐시를 보유하므로 최초 추론이 서버별로 발생할 수 있으며 분산 요청 병합은 제공하지 않는다.
+
+| 설정 | 기본값 | 의미 |
+|------|--------|------|
+| `ootd.embedding.cache.enabled` | true | false이면 캐시와 요청 병합을 우회해 같은 빌드의 기준 성능 측정 |
+| `ootd.embedding.cache.maximum-size` | 512 | 최대 벡터 항목 수 |
+| `ootd.embedding.cache.ttl` | 24h | 저장 시점부터의 만료 시간 |
+| `ootd.embedding.cache.model-revision` | v1 | 운영자가 모델 가중치 변경 시 갱신하는 캐시 버전 |
+| `ootd.embedding.cache.preprocessing-version` | query-normalized-v1 | query 접두어·정규화·토큰화 등 변경 시 갱신하는 버전 |
+
+캐시 키는 모델명·위 두 버전·앞뒤 공백을 제거한 문장을 함께 사용한다.
+버전 값은 모델 서버의 revision을 자동 검출하거나 가중치를 고정하는 기능이 아니다.
+모델·전처리 변경 배포 시 버전을 함께 변경하고 문서 벡터와의 호환성도 확인한다.
+같은 JVM에서 동일 키로 기다리는 요청은 한 임베딩 호출의 결과나 예외를 공유한다. 실패 이후 들어온 요청은 다시 시도할 수 있다.
+공유 벡터는 불변 복사본으로 저장한다.
+
+재측정은 다음 조건을 분리한다.
+
+1. 재시작 후 빈 캐시의 첫 요청: 실제 임베딩 호출과 미스 증가 확인.
+2. 워밍업 후 반복 요청: 벡터 재사용과 임베딩 호출 감소 확인.
+3. 다른 의상 종류·색상의 검색 문장이 섞인 요청: 실제 적중률과 처리량 확인.
+
+Actuator의 `cache.gets`에 `cache=embeddingVectors`, `result=hit/miss` 태그를 사용한다.
+로드 성공·실패는 `cache.load`의 `result=success/failure`, 누적 로드 시간은 `cache.load.duration`, 퇴출은 `cache.evictions`에서 확인한다.
+실행기는 이 지표의 증가분을 `embedding_cache`에 저장한다. `load_seconds`는 누적 로드 시간의 증가분을 초로 표시한다.
+적중률은 적중·미스만으로 계산하며, 진행 중인 호출을 공유한 대기 요청은 별도 적중·미스로 집계하지 않는다.
+`http_client_calls`에는 실제 외부 호출 증가분을 저장한다.
+같은 계정·날씨 반복 테스트만으로 운영 적중률을 추정하지 않는다.
+
+### 2026-11-26 캐시 OFF/ON 재측정
+
+동일 JAR에 `--ootd.embedding.cache.enabled=false/true`만 변경했다.
+Groq은 모의 지연 500ms·풀 100/100, 임베딩은 실제 서버·풀 25/5를 유지했다.
+각 설정 전에 Controller·Agent와 측정 백엔드를 재시작하고 단일 요청 확인·별도 워밍업 후
+20스레드×13회, 30스레드×17회, 100스레드×15회를 순차 실행했다.
+첫 시도의 #33은 Agent 메모리 부족 보호로 중단되어 제외했으며, 보호 설정은 해제하지 않았다.
+재시작 후 완료된 OFF #66·67·68과 ON #98·99·100을 비교한다.
+
+| 목표 | OFF 완료 TPS / p95 | ON 완료 TPS / p95 |
+|------|-------------------|------------------|
+| 8.3 RPS | 8.181 / 661.914ms | 8.212 / 542.368ms |
+| 16.7 RPS | 16.433 / 665.181ms | 16.480 / 532.317ms |
+| 100 RPS | 31.666 / 3370.030ms | 53.614 / 8276.046ms |
+
+ON의 첫 단일 요청은 935ms, 캐시 미스·임베딩 HTTP 호출·서버 추론 각각 1회였다.
+그 뒤 워밍업과 측정에서는 모두 적중해 실제 임베딩 호출이 0회였다.
+OFF/ON 비교의 측정 요청 4,540건은 모두 성공했지만 100 RPS 목표는 여전히 미달했다.
+ON #100에서 첫 100건에 긴 지연이 집중됐으며 전체 p99는 11043.384ms였다.
+이후 구간만 골라 전체 결과를 대체하지 않는다.
+
+같은 조건의 추가 진단 #101에서도 53.489 TPS, p95 7034.814ms로 긴 지연이 재현됐다.
+이 실행의 서버 관측 평균은 527.444ms, 임베딩 호출·Groq 풀 대기·DB 풀 대기는 0이었다.
+부하 발생기·연결 초기화 등 서버 관측 밖의 지연 가능성이 있으나 원인은 확정하지 않았다.
+캐시 재사용과 임베딩 부하 감소는 확인됐지만 고부하 p95 개선 및 100 RPS 통과 근거로 사용하지 않는다.
+ON #100의 nGrinder 화면은 TPS 99.4, 평균 679.54ms로 표시됐다.
+화면 통계와 외부 PERF 타이머의 측정 시작·집계 구간이 다르므로 위 완료 TPS·p95와 혼용하지 않는다.
+이 차이는 초기 부하 발생기·연결 준비 구간을 추가 조사할 근거이며, 초기 요청을 임의로 제외할 근거는 아니다.
+상세 비교는 Git 제외 파일 `results/cache-comparison.json`에 보관한다.
+
+테스트 실행이 시작되면 `results/{test_id}-controller.json`에 마지막 Controller 상태를 저장한다. 지표 수집에 실패한 경우 `metrics_errors`의 `source`로 어느 서버의 지표를 읽지 못했는지 확인할 수 있다.
+종료 상태를 확인한 뒤 지표 수집 결과와 관계없이 Agent 로그를 내려받으며, 로그 목록은 최대 10회 재조회한다.
+종료 후 지표를 읽지 못하면 요청 로그 기반 TPS와 지연 시간은 집계하고, 종료 시점 카운터가 필요한 지표는 `null`로 표시하거나 생략한다.
+`api_server_mean_ms`는 서버의 추천 API 타이머 증가분으로 계산한 평균이며
+부하 발생기부터의 전체 지연이나 서버 p95를 의미하지 않는다.
+
+### 초기 느린 요청 추적
+
+모의 테스트 백엔드 실행 인자에 Tomcat 접근 로그를 추가한다. 로그 디렉터리는 절대 경로를 사용한다.
+로그에 인증 헤더·쿼리 문자열은 포함하지 않는다.
+
+```text
+--server.tomcat.accesslog.enabled=true
+--server.tomcat.accesslog.directory=<저장소의 절대 경로>/ngrinder/recommendation/results
+--server.tomcat.accesslog.prefix=tail-cache-on
+--server.tomcat.accesslog.rotate=false
+--server.tomcat.accesslog.suffix=.access.log
+'--server.tomcat.accesslog.pattern=%{X-Request-ID}i %{begin:msec}t %{end:msec}t %{us}T %F %s %U'
+```
+
+부팅 뒤 단일 요청과 워밍업을 수행한다. Controller에 최신 Groovy 스크립트를 등록하고 실행한다.
+
+```sh
+./gradlew measureRecommendation --args='run --trace --rps 100 --threads 100 --runs 15 --label cache-on-tail'
+```
+
+로그 ZIP의 `TRACE id`를 Tomcat 로그의 `X-Request-ID`와 대조한다. `httpUs`에서 Tomcat 처리시간을
+빼면 Tomcat 측정 구간 밖의 경과 시간을 추정할 수 있고, `totalUs - httpUs`는 본문 변환 이후의 검증 시간이다.
+nGrinder 3.5.9-p1의 `GET`은 응답 본문 바이트가 수신된 뒤 반환한다.
+두 시스템의 벽시계를 빼서 얻은 시차는 시계 동기화와 오차를 확인한 경우에만 사용한다.
+첫 100건과 나머지 요청을 진단용으로 나눠 보고 전체 p95·p99도 함께 유지한다.
+정상 비교에서는 OFF/ON 모두 실제 유입이 약 30 RPS인지 확인하고, 동일한 요청 수와 스레드 설정을 사용한다.
+
+이전 ON 실행 #100·101을 다시 확인했을 때 Agent가 100번째 HTTP 응답을 기록한 뒤
+첫 `PERF` 레코드가 나오기까지 같은 Agent 시계로 각각 4.128초·7.102초가 걸렸다.
+HTTP 클라이언트의 응답 로그는 본문 바이트 수신 뒤에 기록된다. 당시 로그에는 요청 ID가 없어
+개별 요청별 수치는 알 수 없으나, 이 시간차는 Agent의 응답 수신 이후 구간을 조사할 근거다.
 
 ## 종료
 
