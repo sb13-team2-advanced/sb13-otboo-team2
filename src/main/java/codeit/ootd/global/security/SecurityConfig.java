@@ -195,9 +195,9 @@ public class SecurityConfig {
     }
 
     @Bean
-    @Profile("dev")
+    @Profile({"dev", "prod"})
     @Order(2)
-    public SecurityFilterChain devSwaggerSecurityFilterChain(
+    public SecurityFilterChain swaggerSecurityFilterChain(
             HttpSecurity http
     ) throws Exception {
         return http
