@@ -8,7 +8,7 @@
 
 **개인화 의상 및 아이템 추천 SaaS**
 
-<img src="./images/homepage.png" width="900" alt="OTBOO 서비스 메인 화면">
+<img src="./docs/images/homepage.png" width="900" alt="OTBOO 서비스 메인 화면">
 
 <br>
 
@@ -106,10 +106,10 @@ OOTD 피드, 팔로우, 실시간 DM 등을 통해 다른 사용자와
   </tr>
   <tr>
     <td align="center">
-      <img src="./images/recommendation.png" width="450" alt="날씨 기반 의상 추천">
+      <img src="./docs/images/recommendation.png" width="450" alt="날씨 기반 의상 추천">
     </td>
     <td align="center">
-      <img src="./images/clothes-add.png" width="450" alt="의상 등록">
+      <img src="./docs/images/clothes-add.png" width="450" alt="의상 등록">
     </td>
   </tr>
   <tr>
@@ -118,10 +118,10 @@ OOTD 피드, 팔로우, 실시간 DM 등을 통해 다른 사용자와
   </tr>
   <tr>
     <td align="center">
-      <img src="./images/feed-detail.png" width="450" alt="OOTD 피드">
+      <img src="./docs/images/feed-detail.png" width="450" alt="OOTD 피드">
     </td>
     <td align="center">
-      <img src="./images/direct-message.png" width="450" alt="실시간 DM">
+      <img src="./docs/images/direct-message.png" width="450" alt="실시간 DM">
     </td>
   </tr>
   <tr>
@@ -130,10 +130,10 @@ OOTD 피드, 팔로우, 실시간 DM 등을 통해 다른 사용자와
   </tr>
   <tr>
     <td align="center">
-      <img src="./images/admin-users.png" width="450" alt="관리자 사용자 관리">
+      <img src="./docs/images/admin-users.png" width="450" alt="관리자 사용자 관리">
     </td>
     <td align="center">
-      <img src="./images/admin-attributes.png" width="450" alt="관리자 의상 속성 관리">
+      <img src="./docs/images/admin-attributes.png" width="450" alt="관리자 의상 속성 관리">
     </td>
   </tr>
 </table>
@@ -143,7 +143,9 @@ OOTD 피드, 팔로우, 실시간 DM 등을 통해 다른 사용자와
 <h3>🎥 전체 서비스 시연 영상</h3>
 
 <a href="https://drive.google.com/file/d/14YNlb9PBdI0ZjLEO1ccYmFLcr3xtcdWR/view?usp=drive_link">
-  <img src="./images/demo-thumbnail.png" width="700" alt="OTBOO 서비스 시연 영상">
+  <img src="./docs/images/demo-thumbnail.png"
+       width="700"
+       alt="OTBOO 서비스 시연 영상">
 </a>
 
 <p>※ 이미지를 클릭하면 시연 영상 페이지로 이동합니다.</p>
@@ -153,13 +155,13 @@ OOTD 피드, 팔로우, 실시간 DM 등을 통해 다른 사용자와
 ## 🏗️ 시스템 아키텍처
 
 <div align="center">
-  <img src="./images/architecture.png" width="900" alt="OTBOO 시스템 아키텍처">
+  <img src="./docs/images/architecture.png" width="900" alt="OTBOO 시스템 아키텍처">
 </div>
 
 ## 🗂️ ERD
 
 <div align="center">
-  <img src="./images/erd.png" width="900" alt="OTBOO 데이터베이스 ERD">
+  <img src="./docs/images/erd.png" width="900" alt="OTBOO 데이터베이스 ERD">
 </div>
 
 ## ⚙️ 핵심 기술
@@ -195,7 +197,15 @@ OOTD 피드, 팔로우, 실시간 DM 등을 통해 다른 사용자와
 - 핵심 비즈니스 로직 및 예외 상황 검증
 - Pull Request 생성 시 자동 빌드 및 테스트
 
-### 테스트 커버리지
+### 📊 테스트 커버리지
+
+<div align="center">
+
+#### Codecov 테스트 커버리지
+
+[![Codecov](https://codecov.io/gh/sb13-team2-advanced/sb13-otboo-team2/branch/main/graph/badge.svg)](https://app.codecov.io/gh/sb13-team2-advanced/sb13-otboo-team2)
+
+</div>
 
 | 항목 | 내용 |
 | :--- | :--- |
@@ -205,9 +215,10 @@ OOTD 피드, 팔로우, 실시간 DM 등을 통해 다른 사용자와
 | 커버리지 관리 | Codecov |
 | 갱신 방식 | GitHub Actions 기반 자동 갱신 |
 
-최신 테스트 커버리지는 README 상단의 Codecov 배지를 통해 확인할 수 있습니다.
+> 커버리지 수치는 Codecov 배지를 통해 표시되며, 최신 측정 결과에 따라 갱신됩니다.
 
 [📊 상세 테스트 커버리지 확인](https://app.codecov.io/gh/sb13-team2-advanced/sb13-otboo-team2)
+
 
 ### CI/CD 파이프라인
 
