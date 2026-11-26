@@ -65,7 +65,10 @@ springdoc:
     operations-sorter: method
     doc-expansion: list
     display-request-duration: true
-
+    csrf:
+      enabled: true
+      cookie-name: XSRF-TOKEN
+      header-name: X-XSRF-TOKEN
 otboo:
   realtime:
     redis:
