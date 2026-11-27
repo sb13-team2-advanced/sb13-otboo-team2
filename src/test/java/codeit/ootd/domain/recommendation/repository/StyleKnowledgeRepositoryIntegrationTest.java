@@ -6,6 +6,7 @@ import static org.assertj.core.api.Assertions.within;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.times;
 
 import codeit.ootd.domain.clothes.enums.ClothesType;
 import codeit.ootd.domain.clothes.dto.response.ClothesAttributeWithDefDto;
@@ -18,14 +19,17 @@ import codeit.ootd.domain.recommendation.service.StyleKnowledgeSearchService;
 import codeit.ootd.domain.recommendation.service.OutfitRecommendationService;
 import codeit.ootd.infra.embedding.EmbeddingClient;
 import codeit.ootd.infra.embedding.EmbeddingResponse;
+import com.github.benmanes.caffeine.cache.Cache;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.testcontainers.service.connection.ServiceConnection;
 import org.springframework.dao.InvalidDataAccessApiUsageException;
@@ -75,6 +79,32 @@ class StyleKnowledgeRepositoryIntegrationTest {
     private PlatformTransactionManager transactionManager;
     @MockitoBean
     private EmbeddingClient embeddingClient;
+
+    @Autowired
+    @Qualifier("embeddingVectorCache")
+    private Cache<?, ?> embeddingVectorCache;
+
+    @BeforeEach
+    void 캐시를_비워_독립적인_추천_조건을_준비한다() {
+        embeddingVectorCache.invalidateAll();
+    }
+
+    @Test
+    void 임베딩을_재사용해도_변경된_DB_문서를_다시_조회한다() {
+        // given
+        insert("cache-document", "오렌지", "TONAL", "APPROVED", MODEL, vector(1, 0));
+        given(embeddingClient.embed("오렌지 캐시 검증")).willReturn(QUERY);
+        var before = searchService.search("오렌지 캐시 검증", "오렌지", null);
+
+        // when
+        jdbcTemplate.update("UPDATE style_knowledge SET title = '변경된 문서' WHERE document_key = 'cache-document'");
+        var after = searchService.search("오렌지 캐시 검증", "오렌지", null);
+
+        // then
+        assertThat(before.get(0).title()).isEqualTo("배색 사례");
+        assertThat(after.get(0).title()).isEqualTo("변경된 문서");
+        verify(embeddingClient, times(1)).embed("오렌지 캐시 검증");
+    }
 
     @Test
     @Transactional(propagation = Propagation.NOT_SUPPORTED)

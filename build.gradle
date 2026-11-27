@@ -32,6 +32,15 @@ sourceSets {
     }
 }
 
+tasks.register('measureRecommendation', JavaExec) {
+    group = 'verification'
+    description = 'Run the nGrinder recommendation test and collect measurement data.'
+    classpath = sourceSets.ngrinder.runtimeClasspath
+    mainClass = 'RunMeasurement'
+    javaLauncher = javaToolchains.launcherFor(java.toolchain)
+    workingDir = projectDir
+}
+
 /**
  * nGrinder의 Groovy 3 모듈을 Java 17을 지원하는 버전으로 맞춰 로컬 컴파일한다.
  */

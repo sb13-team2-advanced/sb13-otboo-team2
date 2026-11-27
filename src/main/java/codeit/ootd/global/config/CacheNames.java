@@ -8,6 +8,7 @@ public final class CacheNames {
     public static final String USER_PROFILES = "userProfiles";
     public static final String OUTFIT_RECOMMENDATIONS = "outfitRecommendations";
     public static final String CLOTHES_EXTRACTIONS = "clothesExtractions";
+    public static final String EMBEDDING_VECTORS = "embeddingVectors";
 
     private CacheNames() {
     }

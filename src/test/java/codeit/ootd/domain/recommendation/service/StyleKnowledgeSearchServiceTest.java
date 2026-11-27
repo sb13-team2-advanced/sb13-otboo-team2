@@ -8,7 +8,7 @@ import static org.mockito.Mockito.verifyNoInteractions;
 
 import codeit.ootd.domain.recommendation.enums.CombinationType;
 import codeit.ootd.domain.recommendation.repository.StyleKnowledgeRepository;
-import codeit.ootd.infra.embedding.EmbeddingClient;
+import codeit.ootd.infra.embedding.EmbeddingService;
 import codeit.ootd.infra.embedding.EmbeddingResponse;
 import java.util.Collections;
 import java.util.List;
@@ -29,7 +29,7 @@ class StyleKnowledgeSearchServiceTest {
         "intfloat/multilingual-e5-small", 384, Collections.nCopies(384, 0.1));
 
     @Mock
-    private EmbeddingClient embeddingClient;
+    private EmbeddingService embeddingService;
     @Mock
     private StyleKnowledgeRepository repository;
 
@@ -37,13 +37,13 @@ class StyleKnowledgeSearchServiceTest {
 
     @BeforeEach
     void setUp() {
-        service = new StyleKnowledgeSearchService(embeddingClient, repository, false);
+        service = new StyleKnowledgeSearchService(embeddingService, repository, false);
     }
 
     @Test
     void 문장과_기준색을_정리하고_승인_문서를_최대_세_개_검색한다() {
         // given
-        given(embeddingClient.embed("오렌지 코디")).willReturn(EMBEDDING);
+        given(embeddingService.embed("오렌지 코디")).willReturn(EMBEDDING);
         given(repository.search(EMBEDDING, "오렌지", CombinationType.TONAL, false, 3))
             .willReturn(List.of());
 
@@ -58,8 +58,8 @@ class StyleKnowledgeSearchServiceTest {
     void 개발용_초안_포함_설정과_생략한_배색_유형을_전달한다() {
         // given
         StyleKnowledgeSearchService developmentService =
-            new StyleKnowledgeSearchService(embeddingClient, repository, true);
-        given(embeddingClient.embed("오렌지 코디")).willReturn(EMBEDDING);
+            new StyleKnowledgeSearchService(embeddingService, repository, true);
+        given(embeddingService.embed("오렌지 코디")).willReturn(EMBEDDING);
 
         // when
         developmentService.search("오렌지 코디", "오렌지", null);
@@ -76,7 +76,7 @@ class StyleKnowledgeSearchServiceTest {
         assertThatThrownBy(() -> service.search(text, "오렌지", null))
             .isInstanceOf(IllegalArgumentException.class)
             .hasMessage("검색 문장이 비어 있습니다.");
-        verifyNoInteractions(embeddingClient, repository);
+        verifyNoInteractions(embeddingService, repository);
     }
 
     @ParameterizedTest
@@ -87,13 +87,13 @@ class StyleKnowledgeSearchServiceTest {
         assertThatThrownBy(() -> service.search("코디", baseColor, null))
             .isInstanceOf(IllegalArgumentException.class)
             .hasMessage("기준색이 비어 있습니다.");
-        verifyNoInteractions(embeddingClient, repository);
+        verifyNoInteractions(embeddingService, repository);
     }
 
     @Test
     void 임베딩_호출이_실패하면_DB를_조회하지_않는다() {
         // given
-        given(embeddingClient.embed("오렌지 코디"))
+        given(embeddingService.embed("오렌지 코디"))
             .willThrow(new ResourceAccessException("임베딩 서버 연결 실패"));
 
         // when/then

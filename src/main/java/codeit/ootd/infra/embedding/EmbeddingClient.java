@@ -9,7 +9,7 @@ import org.springframework.web.client.RestClient;
 @Component
 public class EmbeddingClient {
 
-    private static final String EXPECTED_MODEL =
+    static final String EXPECTED_MODEL =
             "intfloat/multilingual-e5-small";
     private static final int EXPECTED_DIMENSIONS = 384;
 
