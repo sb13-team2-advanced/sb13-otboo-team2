@@ -318,7 +318,7 @@ PostgreSQL(pgvector 포함) 및 Redis 컨테이너를 실행합니다.
 | API 명세서 | [Swagger](https://d32h6socf0ryd3.cloudfront.net/swagger-ui/index.html) |
 | 테스트 커버리지 | [Codecov](https://app.codecov.io/gh/sb13-team2-advanced/sb13-otboo-team2) |
 | CI/CD 실행 결과 | [GitHub Actions](https://github.com/sb13-team2-advanced/sb13-otboo-team2/actions/workflows/deploy.yml) |
-| 최종 발표 자료 | [📄 발표 자료 PDF](./docs/final-presentation.pdf) |
+| 최종 발표 자료 | [📄 발표 자료 PDF](./docs/2팀_옷장을부탁해_발표자료.pdf) |
 | 서비스 시연 영상 | [Google Drive](https://drive.google.com/file/d/1AKg8R_qMx3GViJMSQSkUrzyPFRAs1O6Z/view?usp=drive_link) |
 
 ---
