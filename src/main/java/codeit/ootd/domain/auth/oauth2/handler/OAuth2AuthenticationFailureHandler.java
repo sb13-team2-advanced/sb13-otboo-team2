@@ -74,7 +74,7 @@ public class OAuth2AuthenticationFailureHandler
                             "/#/settings?error_message=" + errorMessage
                     )
             );
-            return;
+            return; // 이 줄이 반드시 필요해!
         }
 
         response.sendRedirect(
