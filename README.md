@@ -35,7 +35,7 @@
 
 ## 📌 프로젝트 소개
 
-**옷장을 부탁해(OTBOO)**는 날씨, 사용자 취향 및 보유 의상을
+**옷장을 부탁해(OTBOO)** 는 날씨, 사용자 취향 및 보유 의상을
 기반으로 개인화된 의상 조합을 추천하는 서비스입니다.
 
 사용자는 자신의 옷장을 관리하고 날씨에 맞는 코디를 추천받으며,
@@ -70,18 +70,27 @@ OOTD 피드, 팔로우, 실시간 DM 등을 통해 다른 사용자와
 | Backend | Spring Boot, Spring Data JPA, QueryDSL |
 | Security | Spring Security, JWT, OAuth2 |
 | Database | PostgreSQL, pgvector, H2 (Test) |
-| Cache & Pub/Sub | Redis |
+| Cache & Pub/Sub | Redis, Caffeine |
 | Migration | Flyway |
-| Batch | Spring Batch |
+| Batch | Spring Batch, Spring Scheduler |
 | Real-time | WebSocket, STOMP, SSE |
 | Messaging | Apache Kafka, Confluent Cloud |
+| Embedding Server | FastAPI, Uvicorn, Sentence Transformers, PyTorch |
+| Embedding Model | multilingual-e5-small |
+| AI / Recommendation | Groq API, RAG |
+| HTML Parsing | Jsoup |
+| Mail | Spring Mail |
 | External API | OpenWeatherMap, Kakao Local API |
-| Infrastructure | AWS ECS, ECR, S3, CloudFront, ALB, Docker |
-| Monitoring | Spring Actuator, Prometheus |
+| Infrastructure | AWS ECS Fargate, ECR, EC2, S3, CloudFront, ALB, Elastic Cache, Caddy |
+| Configuration & Secret | AWS System Manager Parameter Store |
+| Container | Docker, Docker Compose |
+| Monitoring | Spring Actuator, Micrometer, ADOT, Prometheus, CloudWatch, Grafana |
+| Build | Gradle |
 | CI/CD | GitHub Actions |
-| Test | JUnit 5, Mockito, AssertJ |
+| Test | JUnit 5, Mockito, AssertJ, TestContainer |
+| API Documentation | Swagger UI, springdoc-openapi |
 | Coverage | JaCoCo, Codecov |
-| Documentation | Swagger, Notion |
+| Collaboration | Notion |
 
 ## ✨ 주요 기능
 
@@ -155,7 +164,7 @@ OOTD 피드, 팔로우, 실시간 DM 등을 통해 다른 사용자와
 ## 🏗️ 시스템 아키텍처
 
 <div align="center">
-  <img src="./docs/images/architecture.png" width="900" alt="OTBOO 시스템 아키텍처">
+  <img width="6200" height="4000" alt="OTBOO_서비스_아키텍처" src="https://github.com/user-attachments/assets/9beb8573-ca35-48bc-a418-1a96df70baf9" />
 </div>
 
 ## 🗂️ ERD
@@ -178,15 +187,6 @@ OOTD 피드, 팔로우, 실시간 DM 등을 통해 다른 사용자와
 | Kafka · Outbox | 비동기 이벤트 발행, 중복 처리 방지, 재시도 및 DLT |
 | Global Exception Handling | Bean Validation, ErrorCode, 커스텀 예외 기반 오류 관리 |
 
-## 🔥 트러블슈팅
-
-| 문제 상황 | 해결 방법 |
-| :--- | :--- |
-| JWT 재발급 시 프론트엔드 인증 상태 불일치 | 프론트엔드 응답 계약을 분석하여 사용자 정보 응답 구조 개선 |
-| 날씨 데이터 최초 수집 시 동시성 문제 | DB 조건부 UPDATE를 활용한 수집 권한 제어 및 대기 처리 |
-| 외부 URL 요청 시 SSRF 보안 위험 | 내부 네트워크 접근 제한, 리다이렉트 검증, 타임아웃 및 응답 크기 제한 |
-| Kafka 이벤트 중복 처리 | 이벤트 ID 기반 처리 이력 및 DB 제약 조건을 활용한 멱등성 확보 |
-
 ## 🧪 테스트 및 CI/CD
 
 ### 테스트 전략
@@ -199,13 +199,10 @@ OOTD 피드, 팔로우, 실시간 DM 등을 통해 다른 사용자와
 
 ### 📊 테스트 커버리지
 
-<div align="center">
-
 #### Codecov 테스트 커버리지
 
 [![Codecov](https://codecov.io/gh/sb13-team2-advanced/sb13-otboo-team2/branch/main/graph/badge.svg)](https://app.codecov.io/gh/sb13-team2-advanced/sb13-otboo-team2)
-
-</div>
+<br>
 
 | 항목 | 내용 |
 | :--- | :--- |
@@ -283,6 +280,7 @@ cd sb13-otboo-team2
 - 이메일 발송 설정
 - Google 및 Kakao OAuth2 설정
 - Kafka 연동 설정
+- Groq API Key
 
 실제 API Key, 비밀번호 등의 민감 정보는
 GitHub에 업로드하지 않습니다.
@@ -318,7 +316,7 @@ PostgreSQL(pgvector 포함) 및 Redis 컨테이너를 실행합니다.
 | API 명세서 | [Swagger](https://d32h6socf0ryd3.cloudfront.net/swagger-ui/index.html) |
 | 테스트 커버리지 | [Codecov](https://app.codecov.io/gh/sb13-team2-advanced/sb13-otboo-team2) |
 | CI/CD 실행 결과 | [GitHub Actions](https://github.com/sb13-team2-advanced/sb13-otboo-team2/actions/workflows/deploy.yml) |
-| 최종 발표 자료 | [📄 발표 자료 PDF](https://drive.google.com/file/d/1AmZbTXfRDjLBDxhiSNPd33oTa-K434B4/view?usp=drive_link) |
+| 최종 발표 자료 | [발표 자료 PDF](https://drive.google.com/file/d/1eXStzEx8RaHbyamCAwydT27HgGfqsYqW/view?usp=drive_link) |
 | 서비스 시연 영상 | [Google Drive](https://drive.google.com/file/d/1MRn84rHKyoKWhjS_xubfiIYsAqxwASOb/view?usp=drive_link) |
 
 ---
